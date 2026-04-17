@@ -18,7 +18,24 @@ export default function Scenarios() {
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
   const router = useRouter()
+
+  const resetForm = () => {
+    setNom('')
+    setDescription('')
+    setNotes('')
+    setEditingId(null)
+  }
+
+  const commencerEdition = (scenario: Scenario) => {
+    setEditingId(scenario.id)
+    setNom(scenario.nom)
+    setDescription(scenario.description ?? '')
+    setNotes(scenario.notes ?? '')
+    setMessage('')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   useEffect(() => {
     fetchScenarios()
@@ -29,18 +46,26 @@ export default function Scenarios() {
     if (data) setScenarios(data)
   }
 
-  const creerScenario = async () => {
+  const sauvegarderScenario = async () => {
     if (!nom) return setMessage('Le nom est obligatoire !')
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { error } = await supabase.from('scenarios').insert({ nom, description, notes, mj_id: user?.id })
-    if (error) setMessage(error.message)
-    else {
-      setMessage('Scenario cree !')
-      setNom('')
-      setDescription('')
-      setNotes('')
-      fetchScenarios()
+    if (editingId) {
+      const { error } = await supabase.from('scenarios').update({ nom, description, notes }).eq('id', editingId)
+      if (error) setMessage(error.message)
+      else {
+        setMessage('Scenario modifie !')
+        resetForm()
+        fetchScenarios()
+      }
+    } else {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { error } = await supabase.from('scenarios').insert({ nom, description, notes, mj_id: user?.id })
+      if (error) setMessage(error.message)
+      else {
+        setMessage('Scenario cree !')
+        resetForm()
+        fetchScenarios()
+      }
     }
     setLoading(false)
   }
@@ -60,15 +85,22 @@ export default function Scenarios() {
           <h1 className="text-2xl font-bold text-yellow-500">Scenarios</h1>
         </div>
         <div className="bg-gray-800 p-6 rounded-lg mb-6">
-          <h2 className="text-lg font-bold text-yellow-500 mb-4">Creer un scenario</h2>
+          <h2 className="text-lg font-bold text-yellow-500 mb-4">{editingId ? 'Modifier le scenario' : 'Creer un scenario'}</h2>
           <div className="space-y-3">
             <input type="text" placeholder="Nom du scenario" value={nom} onChange={(e) => setNom(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
             <textarea placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none h-24" />
             <textarea placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none h-24" />
             {message && <p className="text-yellow-400 text-sm">{message}</p>}
-            <button type="button" onClick={creerScenario} disabled={loading} className="w-full p-3 bg-yellow-500 text-gray-900 font-bold rounded">
-              {loading ? 'Chargement...' : 'Creer'}
-            </button>
+            <div className="flex gap-2">
+              <button type="button" onClick={sauvegarderScenario} disabled={loading} className="flex-1 p-3 bg-yellow-500 text-gray-900 font-bold rounded">
+                {loading ? 'Chargement...' : editingId ? 'Modifier' : 'Creer'}
+              </button>
+              {editingId && (
+                <button type="button" onClick={resetForm} className="px-4 p-3 bg-gray-700 text-white font-bold rounded hover:bg-gray-600">
+                  Annuler
+                </button>
+              )}
+            </div>
           </div>
         </div>
         <div className="space-y-4">
@@ -78,9 +110,14 @@ export default function Scenarios() {
             <div key={scenario.id} className="bg-gray-800 p-4 rounded-lg">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold text-white">{scenario.nom}</h3>
-                <button type="button" onClick={() => supprimerScenario(scenario.id)} className="text-red-400 text-sm">
-                  Supprimer
-                </button>
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => commencerEdition(scenario)} className="text-blue-400 text-sm">
+                    Modifier
+                  </button>
+                  <button type="button" onClick={() => supprimerScenario(scenario.id)} className="text-red-400 text-sm">
+                    Supprimer
+                  </button>
+                </div>
               </div>
               {scenario.description && <p className="text-gray-400 text-sm">{scenario.description}</p>}
             </div>

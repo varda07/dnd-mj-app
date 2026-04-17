@@ -19,7 +19,10 @@ type Personnage = {
   charisme: number
   de_vie: string
   image_url: string
+  scenario_id: string | null
 }
+
+type ScenarioOption = { id: string; nom: string }
 
 const RACES = ['Humain', 'Elfe', 'Nain', 'Halfelin', 'Demi-elfe', 'Demi-orc', 'Drakéide', 'Gnome', 'Tieffelin']
 
@@ -57,24 +60,78 @@ export default function Personnages() {
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [imageActuelle, setImageActuelle] = useState('')
+  const [scenarios, setScenarios] = useState<ScenarioOption[]>([])
+  const [scenarioId, setScenarioId] = useState('')
 
   const deVie = CLASSES_DE_VIE[classe]
 
   useEffect(() => {
     fetchPersonnages()
+    fetchScenarios()
   }, [])
+
+  const fetchScenarios = async () => {
+    const { data } = await supabase.from('scenarios').select('id, nom').order('nom')
+    if (data) setScenarios(data)
+  }
+
+  const resetForm = () => {
+    setNom('')
+    setRace(RACES[0])
+    setClasse(CLASSES[0])
+    setNiveau('1')
+    setHpMax('10')
+    setHpActuel('10')
+    setForce('10')
+    setDexterite('10')
+    setConstitution('10')
+    setIntelligence('10')
+    setSagesse('10')
+    setCharisme('10')
+    setFile(null)
+    setEditingId(null)
+    setImageActuelle('')
+    setScenarioId('')
+    const input = document.getElementById('perso-file') as HTMLInputElement | null
+    if (input) input.value = ''
+  }
+
+  const commencerEdition = (perso: Personnage) => {
+    setEditingId(perso.id)
+    setNom(perso.nom)
+    setRace(perso.race || RACES[0])
+    setClasse(perso.classe in CLASSES_DE_VIE ? perso.classe : CLASSES[0])
+    setNiveau(String(perso.niveau))
+    setHpMax(String(perso.hp_max))
+    setHpActuel(String(perso.hp_actuel))
+    setForce(String(perso.force))
+    setDexterite(String(perso.dexterite))
+    setConstitution(String(perso.constitution))
+    setIntelligence(String(perso.intelligence))
+    setSagesse(String(perso.sagesse))
+    setCharisme(String(perso.charisme))
+    setFile(null)
+    setImageActuelle(perso.image_url ?? '')
+    setScenarioId(perso.scenario_id ?? '')
+    const input = document.getElementById('perso-file') as HTMLInputElement | null
+    if (input) input.value = ''
+    setMessage('')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   const fetchPersonnages = async () => {
     const { data } = await supabase.from('personnages').select('*').order('created_at', { ascending: false })
     if (data) setPersonnages(data)
   }
 
-  const creerPersonnage = async () => {
+  const sauvegarderPersonnage = async () => {
     if (!nom) return setMessage('Le nom est obligatoire !')
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
 
-    let imageUrl = ''
+    let imageUrl = imageActuelle
     if (file) {
       const ext = file.name.split('.').pop()
       const path = `${user?.id}/${Date.now()}.${ext}`
@@ -88,10 +145,11 @@ export default function Personnages() {
       imageUrl = urlData.publicUrl
     }
 
-    const { error } = await supabase.from('personnages').insert({
+    const payload = {
       nom,
       race,
       classe,
+      scenario_id: scenarioId || null,
       niveau: parseInt(niveau),
       hp_max: parseInt(hpMax),
       hp_actuel: parseInt(hpActuel),
@@ -102,28 +160,25 @@ export default function Personnages() {
       sagesse: parseInt(sagesse),
       charisme: parseInt(charisme),
       de_vie: deVie,
-      image_url: imageUrl,
-      mj_id: user?.id
-    })
-    if (error) setMessage(error.message)
-    else {
-      setMessage('Personnage créé !')
-      setNom('')
-      setRace(RACES[0])
-      setClasse(CLASSES[0])
-      setNiveau('1')
-      setHpMax('10')
-      setHpActuel('10')
-      setForce('10')
-      setDexterite('10')
-      setConstitution('10')
-      setIntelligence('10')
-      setSagesse('10')
-      setCharisme('10')
-      setFile(null)
-      const input = document.getElementById('perso-file') as HTMLInputElement | null
-      if (input) input.value = ''
-      fetchPersonnages()
+      image_url: imageUrl
+    }
+
+    if (editingId) {
+      const { error } = await supabase.from('personnages').update(payload).eq('id', editingId)
+      if (error) setMessage(error.message)
+      else {
+        setMessage('Personnage modifié !')
+        resetForm()
+        fetchPersonnages()
+      }
+    } else {
+      const { error } = await supabase.from('personnages').insert({ ...payload, joueur_id: user?.id })
+      if (error) setMessage(error.message)
+      else {
+        setMessage('Personnage créé !')
+        resetForm()
+        fetchPersonnages()
+      }
     }
     setLoading(false)
   }
@@ -143,7 +198,7 @@ export default function Personnages() {
           <h1 className="text-2xl font-bold text-yellow-500">🧙 Personnages</h1>
         </div>
         <div className="bg-gray-800 p-6 rounded-lg mb-6">
-          <h2 className="text-lg font-bold text-yellow-500 mb-4">Créer un personnage</h2>
+          <h2 className="text-lg font-bold text-yellow-500 mb-4">{editingId ? 'Modifier le personnage' : 'Créer un personnage'}</h2>
           <div className="space-y-3">
             <input type="text" placeholder="Nom du personnage *" value={nom} onChange={(e) => setNom(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
             <div className="grid grid-cols-2 gap-3">
@@ -161,6 +216,13 @@ export default function Personnages() {
                   {CLASSES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
+            </div>
+            <div>
+              <label className="text-gray-400 text-sm">Scénario</label>
+              <select value={scenarioId} onChange={(e) => setScenarioId(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none">
+                <option value="">Aucun scénario</option>
+                {scenarios.map((s) => <option key={s.id} value={s.id}>{s.nom}</option>)}
+              </select>
             </div>
             <div>
               <label className="text-gray-400 text-sm">Niveau</label>
@@ -204,13 +266,25 @@ export default function Personnages() {
               </div>
             </div>
             <div>
-              <label className="text-gray-400 text-sm">Image du personnage</label>
+              <label className="text-gray-400 text-sm">
+                {editingId ? 'Nouvelle image (laisser vide pour garder l\'actuelle)' : 'Image du personnage'}
+              </label>
               <input id="perso-file" type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:bg-yellow-500 file:text-gray-900 file:font-bold" />
+              {editingId && imageActuelle && (
+                <img src={imageActuelle} alt="actuelle" className="mt-2 h-24 w-24 object-cover rounded bg-gray-900" />
+              )}
             </div>
             {message && <p className="text-yellow-400 text-sm">{message}</p>}
-            <button type="button" onClick={creerPersonnage} disabled={loading} className="w-full p-3 bg-yellow-500 text-gray-900 font-bold rounded">
-              {loading ? 'Chargement...' : 'Créer'}
-            </button>
+            <div className="flex gap-2">
+              <button type="button" onClick={sauvegarderPersonnage} disabled={loading} className="flex-1 p-3 bg-yellow-500 text-gray-900 font-bold rounded">
+                {loading ? 'Chargement...' : editingId ? 'Modifier' : 'Créer'}
+              </button>
+              {editingId && (
+                <button type="button" onClick={resetForm} className="px-4 p-3 bg-gray-700 text-white font-bold rounded hover:bg-gray-600">
+                  Annuler
+                </button>
+              )}
+            </div>
           </div>
         </div>
         <div className="space-y-4">
@@ -225,9 +299,14 @@ export default function Personnages() {
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-lg font-bold text-white">{perso.nom}</h3>
-                    <button type="button" onClick={() => supprimerPersonnage(perso.id)} className="text-red-400 text-sm">
-                      Supprimer
-                    </button>
+                    <div className="flex gap-3">
+                      <button type="button" onClick={() => commencerEdition(perso)} className="text-blue-400 text-sm">
+                        Modifier
+                      </button>
+                      <button type="button" onClick={() => supprimerPersonnage(perso.id)} className="text-red-400 text-sm">
+                        Supprimer
+                      </button>
+                    </div>
                   </div>
                   <p className="text-gray-400 text-sm mb-2">
                     {perso.race} · {perso.classe} · Niv. {perso.niveau} · 🎲 {perso.de_vie}

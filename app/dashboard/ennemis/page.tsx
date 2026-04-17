@@ -16,7 +16,10 @@ type Ennemi = {
   sagesse: number
   charisme: number
   notes: string
+  scenario_id: string | null
 }
+
+type ScenarioOption = { id: string; nom: string }
 
 export default function Ennemis() {
   const [ennemis, setEnnemis] = useState<Ennemi[]>([])
@@ -32,42 +35,103 @@ export default function Ennemis() {
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [scenarios, setScenarios] = useState<ScenarioOption[]>([])
+  const [scenarioId, setScenarioId] = useState('')
 
   useEffect(() => {
     fetchEnnemis()
+    fetchScenarios()
   }, [])
+
+  const fetchScenarios = async () => {
+    const { data } = await supabase.from('scenarios').select('id, nom').order('nom')
+    if (data) setScenarios(data)
+  }
+
+  const resetForm = () => {
+    setNom('')
+    setHp('10')
+    setArmure('10')
+    setForce('10')
+    setDexterite('10')
+    setConstitution('10')
+    setIntelligence('10')
+    setSagesse('10')
+    setCharisme('10')
+    setNotes('')
+    setEditingId(null)
+    setScenarioId('')
+  }
+
+  const commencerEdition = (ennemi: Ennemi) => {
+    setEditingId(ennemi.id)
+    setNom(ennemi.nom)
+    setHp(String(ennemi.hp_max))
+    setArmure(String(ennemi.armure))
+    setForce(String(ennemi.force))
+    setDexterite(String(ennemi.dexterite))
+    setConstitution(String(ennemi.constitution))
+    setIntelligence(String(ennemi.intelligence))
+    setSagesse(String(ennemi.sagesse))
+    setCharisme(String(ennemi.charisme))
+    setNotes(ennemi.notes ?? '')
+    setScenarioId(ennemi.scenario_id ?? '')
+    setMessage('')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   const fetchEnnemis = async () => {
     const { data } = await supabase.from('ennemis').select('*').order('created_at', { ascending: false })
     if (data) setEnnemis(data)
   }
 
-  const creerEnnemi = async () => {
+  const sauvegarderEnnemi = async () => {
     if (!nom) return setMessage('Le nom est obligatoire !')
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { error } = await supabase.from('ennemis').insert({
-      nom,
-      hp_max: parseInt(hp),
-      hp_actuel: parseInt(hp),
-      armure: parseInt(armure),
-      force: parseInt(force),
-      dexterite: parseInt(dexterite),
-      constitution: parseInt(constitution),
-      intelligence: parseInt(intelligence),
-      sagesse: parseInt(sagesse),
-      charisme: parseInt(charisme),
-      notes,
-      mj_id: user?.id
-    })
-    if (error) setMessage(error.message)
-    else {
-      setMessage('Ennemi créé !')
-      setNom('')
-      setHp('10')
-      setArmure('10')
-      setNotes('')
-      fetchEnnemis()
+    if (editingId) {
+      const { error } = await supabase.from('ennemis').update({
+        nom,
+        hp_max: parseInt(hp),
+        armure: parseInt(armure),
+        force: parseInt(force),
+        dexterite: parseInt(dexterite),
+        constitution: parseInt(constitution),
+        intelligence: parseInt(intelligence),
+        sagesse: parseInt(sagesse),
+        charisme: parseInt(charisme),
+        notes,
+        scenario_id: scenarioId || null
+      }).eq('id', editingId)
+      if (error) setMessage(error.message)
+      else {
+        setMessage('Ennemi modifié !')
+        resetForm()
+        fetchEnnemis()
+      }
+    } else {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { error } = await supabase.from('ennemis').insert({
+        nom,
+        hp_max: parseInt(hp),
+        hp_actuel: parseInt(hp),
+        armure: parseInt(armure),
+        force: parseInt(force),
+        dexterite: parseInt(dexterite),
+        constitution: parseInt(constitution),
+        intelligence: parseInt(intelligence),
+        sagesse: parseInt(sagesse),
+        charisme: parseInt(charisme),
+        notes,
+        scenario_id: scenarioId || null,
+        mj_id: user?.id
+      })
+      if (error) setMessage(error.message)
+      else {
+        setMessage('Ennemi créé !')
+        resetForm()
+        fetchEnnemis()
+      }
     }
     setLoading(false)
   }
@@ -87,9 +151,16 @@ export default function Ennemis() {
           <h1 className="text-2xl font-bold text-yellow-500">👹 Ennemis</h1>
         </div>
         <div className="bg-gray-800 p-6 rounded-lg mb-6">
-          <h2 className="text-lg font-bold text-yellow-500 mb-4">Créer un ennemi</h2>
+          <h2 className="text-lg font-bold text-yellow-500 mb-4">{editingId ? "Modifier l'ennemi" : 'Créer un ennemi'}</h2>
           <div className="space-y-3">
             <input type="text" placeholder="Nom de l'ennemi *" value={nom} onChange={(e) => setNom(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
+            <div>
+              <label className="text-gray-400 text-sm">Scénario</label>
+              <select value={scenarioId} onChange={(e) => setScenarioId(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none">
+                <option value="">Aucun scénario</option>
+                {scenarios.map((s) => <option key={s.id} value={s.id}>{s.nom}</option>)}
+              </select>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-gray-400 text-sm">Points de vie</label>
@@ -129,9 +200,16 @@ export default function Ennemis() {
             </div>
             <textarea placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none h-24" />
             {message && <p className="text-yellow-400 text-sm">{message}</p>}
-            <button type="button" onClick={creerEnnemi} disabled={loading} className="w-full p-3 bg-yellow-500 text-gray-900 font-bold rounded">
-              {loading ? 'Chargement...' : 'Créer'}
-            </button>
+            <div className="flex gap-2">
+              <button type="button" onClick={sauvegarderEnnemi} disabled={loading} className="flex-1 p-3 bg-yellow-500 text-gray-900 font-bold rounded">
+                {loading ? 'Chargement...' : editingId ? 'Modifier' : 'Créer'}
+              </button>
+              {editingId && (
+                <button type="button" onClick={resetForm} className="px-4 p-3 bg-gray-700 text-white font-bold rounded hover:bg-gray-600">
+                  Annuler
+                </button>
+              )}
+            </div>
           </div>
         </div>
         <div className="space-y-4">
@@ -141,9 +219,14 @@ export default function Ennemis() {
             <div key={ennemi.id} className="bg-gray-800 p-4 rounded-lg">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-lg font-bold text-white">{ennemi.nom}</h3>
-                <button type="button" onClick={() => supprimerEnnemi(ennemi.id)} className="text-red-400 text-sm">
-                  Supprimer
-                </button>
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => commencerEdition(ennemi)} className="text-blue-400 text-sm">
+                    Modifier
+                  </button>
+                  <button type="button" onClick={() => supprimerEnnemi(ennemi.id)} className="text-red-400 text-sm">
+                    Supprimer
+                  </button>
+                </div>
               </div>
               <div className="grid grid-cols-3 gap-2 text-sm text-gray-400">
                 <span>❤️ HP: {ennemi.hp_actuel}/{ennemi.hp_max}</span>

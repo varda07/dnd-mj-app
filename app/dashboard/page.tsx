@@ -81,7 +81,17 @@ export default function Dashboard() {
       {interface_ === 'joueur' && (
         <div className="p-6">
           <h2 className="text-2xl font-bold text-yellow-500 mb-4">Interface Joueur</h2>
-          <p className="text-gray-400">Bienvenue Aventurier !</p>
+          <p className="text-gray-400 mb-4">Bienvenue Aventurier !</p>
+          <div className="grid grid-cols-2 gap-4">
+            <button type="button" onClick={() => router.push('/dashboard/personnages')} className="bg-gray-800 p-4 rounded-lg hover:bg-gray-700 transition text-left">
+              <h3 className="text-lg font-bold text-yellow-500">Personnages</h3>
+              <p className="text-gray-400 text-sm mt-1">Gerer tes personnages</p>
+            </button>
+            <button type="button" onClick={() => router.push('/dashboard/sorts')} className="bg-gray-800 p-4 rounded-lg hover:bg-gray-700 transition text-left">
+              <h3 className="text-lg font-bold text-yellow-500">Sorts</h3>
+              <p className="text-gray-400 text-sm mt-1">Gerer tes sorts</p>
+            </button>
+          </div>
         </div>
       )}
     </main>

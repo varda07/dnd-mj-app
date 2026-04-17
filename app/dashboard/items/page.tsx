@@ -22,35 +22,61 @@ export default function Items() {
   const [rarete, setRarete] = useState(RARETES[0])
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchItems()
   }, [])
+
+  const resetForm = () => {
+    setNom('')
+    setDescription('')
+    setType(TYPES[0])
+    setRarete(RARETES[0])
+    setEditingId(null)
+  }
+
+  const commencerEdition = (item: Item) => {
+    setEditingId(item.id)
+    setNom(item.nom)
+    setDescription(item.description ?? '')
+    setType(item.type || TYPES[0])
+    setRarete(item.rarete || RARETES[0])
+    setMessage('')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   const fetchItems = async () => {
     const { data } = await supabase.from('items').select('*').order('created_at', { ascending: false })
     if (data) setItems(data)
   }
 
-  const creerItem = async () => {
+  const sauvegarderItem = async () => {
     if (!nom) return setMessage('Le nom est obligatoire !')
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { error } = await supabase.from('items').insert({
-      nom,
-      description,
-      type,
-      rarete,
-      mj_id: user?.id
-    })
-    if (error) setMessage(error.message)
-    else {
-      setMessage('Item créé !')
-      setNom('')
-      setDescription('')
-      setType(TYPES[0])
-      setRarete(RARETES[0])
-      fetchItems()
+    if (editingId) {
+      const { error } = await supabase.from('items').update({ nom, description, type, rarete }).eq('id', editingId)
+      if (error) setMessage(error.message)
+      else {
+        setMessage('Item modifié !')
+        resetForm()
+        fetchItems()
+      }
+    } else {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { error } = await supabase.from('items').insert({
+        nom,
+        description,
+        type,
+        rarete,
+        mj_id: user?.id
+      })
+      if (error) setMessage(error.message)
+      else {
+        setMessage('Item créé !')
+        resetForm()
+        fetchItems()
+      }
     }
     setLoading(false)
   }
@@ -70,7 +96,7 @@ export default function Items() {
           <h1 className="text-2xl font-bold text-yellow-500">🎒 Items</h1>
         </div>
         <div className="bg-gray-800 p-6 rounded-lg mb-6">
-          <h2 className="text-lg font-bold text-yellow-500 mb-4">Créer un item</h2>
+          <h2 className="text-lg font-bold text-yellow-500 mb-4">{editingId ? "Modifier l'item" : 'Créer un item'}</h2>
           <div className="space-y-3">
             <input type="text" placeholder="Nom de l'item *" value={nom} onChange={(e) => setNom(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
             <div className="grid grid-cols-2 gap-3">
@@ -89,9 +115,16 @@ export default function Items() {
             </div>
             <textarea placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none h-24" />
             {message && <p className="text-yellow-400 text-sm">{message}</p>}
-            <button type="button" onClick={creerItem} disabled={loading} className="w-full p-3 bg-yellow-500 text-gray-900 font-bold rounded">
-              {loading ? 'Chargement...' : 'Créer'}
-            </button>
+            <div className="flex gap-2">
+              <button type="button" onClick={sauvegarderItem} disabled={loading} className="flex-1 p-3 bg-yellow-500 text-gray-900 font-bold rounded">
+                {loading ? 'Chargement...' : editingId ? 'Modifier' : 'Créer'}
+              </button>
+              {editingId && (
+                <button type="button" onClick={resetForm} className="px-4 p-3 bg-gray-700 text-white font-bold rounded hover:bg-gray-600">
+                  Annuler
+                </button>
+              )}
+            </div>
           </div>
         </div>
         <div className="space-y-4">
@@ -101,9 +134,14 @@ export default function Items() {
             <div key={item.id} className="bg-gray-800 p-4 rounded-lg">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-lg font-bold text-white">{item.nom}</h3>
-                <button type="button" onClick={() => supprimerItem(item.id)} className="text-red-400 text-sm">
-                  Supprimer
-                </button>
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => commencerEdition(item)} className="text-blue-400 text-sm">
+                    Modifier
+                  </button>
+                  <button type="button" onClick={() => supprimerItem(item.id)} className="text-red-400 text-sm">
+                    Supprimer
+                  </button>
+                </div>
               </div>
               <div className="flex gap-3 text-sm text-gray-400 mb-2">
                 <span>📦 {item.type}</span>

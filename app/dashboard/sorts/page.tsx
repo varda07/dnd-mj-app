@@ -43,11 +43,33 @@ export default function Sorts() {
   const [disponible, setDisponible] = useState(true)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchPersonnages()
     fetchSorts()
   }, [])
+
+  const resetForm = () => {
+    setNom('')
+    setNiveau('0')
+    setEcole(ECOLES[0])
+    setDescription('')
+    setDisponible(true)
+    setEditingId(null)
+  }
+
+  const commencerEdition = (sort: Sort) => {
+    setEditingId(sort.id)
+    setPersonnageId(sort.personnage_id)
+    setNom(sort.nom)
+    setNiveau(String(sort.niveau))
+    setEcole(sort.ecole || ECOLES[0])
+    setDescription(sort.description ?? '')
+    setDisponible(sort.disponible)
+    setMessage('')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   const fetchPersonnages = async () => {
     const { data } = await supabase.from('personnages').select('id, nom').order('nom')
@@ -62,29 +84,34 @@ export default function Sorts() {
     if (data) setSorts(data)
   }
 
-  const creerSort = async () => {
+  const sauvegarderSort = async () => {
     if (!personnageId) return setMessage('Sélectionne un personnage !')
     if (!nom) return setMessage('Le nom du sort est obligatoire !')
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { error } = await supabase.from('sorts').insert({
+    const payload = {
       personnage_id: personnageId,
       nom,
       niveau: parseInt(niveau),
       ecole,
       description,
-      disponible,
-      mj_id: user?.id
-    })
-    if (error) setMessage(error.message)
-    else {
-      setMessage('Sort ajouté !')
-      setNom('')
-      setNiveau('0')
-      setEcole(ECOLES[0])
-      setDescription('')
-      setDisponible(true)
-      fetchSorts()
+      disponible
+    }
+    if (editingId) {
+      const { error } = await supabase.from('sorts').update(payload).eq('id', editingId)
+      if (error) setMessage(error.message)
+      else {
+        setMessage('Sort modifié !')
+        resetForm()
+        fetchSorts()
+      }
+    } else {
+      const { error } = await supabase.from('sorts').insert(payload)
+      if (error) setMessage(error.message)
+      else {
+        setMessage('Sort ajouté !')
+        resetForm()
+        fetchSorts()
+      }
     }
     setLoading(false)
   }
@@ -115,7 +142,7 @@ export default function Sorts() {
           <h1 className="text-2xl font-bold text-yellow-500">✨ Sorts</h1>
         </div>
         <div className="bg-gray-800 p-6 rounded-lg mb-6">
-          <h2 className="text-lg font-bold text-yellow-500 mb-4">Ajouter un sort</h2>
+          <h2 className="text-lg font-bold text-yellow-500 mb-4">{editingId ? 'Modifier le sort' : 'Ajouter un sort'}</h2>
           {personnages.length === 0 ? (
             <p className="text-gray-400">Crée d&apos;abord un personnage pour lui ajouter des sorts.</p>
           ) : (
@@ -147,9 +174,16 @@ export default function Sorts() {
                 <span>Sort disponible</span>
               </label>
               {message && <p className="text-yellow-400 text-sm">{message}</p>}
-              <button type="button" onClick={creerSort} disabled={loading} className="w-full p-3 bg-yellow-500 text-gray-900 font-bold rounded">
-                {loading ? 'Chargement...' : 'Ajouter'}
-              </button>
+              <div className="flex gap-2">
+                <button type="button" onClick={sauvegarderSort} disabled={loading} className="flex-1 p-3 bg-yellow-500 text-gray-900 font-bold rounded">
+                  {loading ? 'Chargement...' : editingId ? 'Modifier' : 'Ajouter'}
+                </button>
+                {editingId && (
+                  <button type="button" onClick={resetForm} className="px-4 p-3 bg-gray-700 text-white font-bold rounded hover:bg-gray-600">
+                    Annuler
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -171,9 +205,14 @@ export default function Sorts() {
                   <input type="checkbox" checked={sort.disponible} onChange={() => toggleDisponible(sort)} className="w-4 h-4 accent-yellow-500" />
                   <h3 className={`text-lg font-bold ${sort.disponible ? 'text-white' : 'text-gray-500 line-through'}`}>{sort.nom}</h3>
                 </div>
-                <button type="button" onClick={() => supprimerSort(sort.id)} className="text-red-400 text-sm">
-                  Supprimer
-                </button>
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => commencerEdition(sort)} className="text-blue-400 text-sm">
+                    Modifier
+                  </button>
+                  <button type="button" onClick={() => supprimerSort(sort.id)} className="text-red-400 text-sm">
+                    Supprimer
+                  </button>
+                </div>
               </div>
               <div className="flex gap-3 text-sm text-gray-400 mb-2 flex-wrap">
                 <span>🧙 {nomPersonnage(sort.personnage_id)}</span>
