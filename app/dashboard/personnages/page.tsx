@@ -357,70 +357,71 @@ export default function Personnages() {
           {personnages.length === 0 && <p className="text-gray-400">Aucun personnage créé pour l'instant.</p>}
           {personnages.map((perso) => (
             <div key={perso.id} className="bg-gray-800 p-4 rounded-lg">
-              <div className="flex gap-4">
+              <div className="flex gap-3">
                 {perso.image_url && (
                   <img
                     src={perso.image_url}
                     alt={perso.nom}
-                    className="w-20 h-20 object-cover rounded-full bg-gray-900 flex-shrink-0 ring-2 ring-yellow-500"
+                    className="w-12 h-12 object-cover rounded-full bg-gray-900 flex-shrink-0 ring-2 ring-yellow-500"
                   />
                 )}
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-lg font-bold text-white">{perso.nom}</h3>
-                    <div className="flex gap-3">
-                      <button type="button" onClick={() => window.location.href = `/dashboard/personnages/${perso.id}`} className="text-yellow-400 text-sm">
-                        📜 Fiche
-                      </button>
-                      <button type="button" onClick={() => partagerPersonnage(perso.id)} className="text-green-400 text-sm">
-                        Partager
-                      </button>
-                      <button type="button" onClick={() => commencerEdition(perso)} className="text-blue-400 text-sm">
-                        Modifier
-                      </button>
-                      <button type="button" onClick={() => supprimerPersonnage(perso.id)} className="text-red-400 text-sm">
-                        Supprimer
-                      </button>
-                    </div>
-                  </div>
-                  {codesVisibles[perso.id] && (
-                    <div className="mb-2 p-2 rounded bg-gray-900 border border-green-600/50 flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-gray-400 text-xs">Code à donner au MJ :</p>
-                        <code className="text-green-300 font-mono font-bold text-lg">{codesVisibles[perso.id]}</code>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => navigator.clipboard?.writeText(codesVisibles[perso.id])}
-                          className="text-gray-400 hover:text-white text-xs"
-                          title="Copier"
-                        >
-                          📋 Copier
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => cacherCode(perso.id)}
-                          className="text-gray-400 hover:text-white text-xs"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  <p className="text-gray-400 text-sm mb-2">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-bold text-white break-words">{perso.nom}</h3>
+                  <p className="text-gray-400 text-xs break-words">
                     {perso.race} · {perso.classe} · Niv. {perso.niveau} · 🎲 {perso.de_vie}
                   </p>
-                  <div className="grid grid-cols-3 gap-2 text-sm text-gray-400">
-                    <span>❤️ PV: {perso.hp_actuel}/{perso.hp_max}</span>
-                    <span>💪 For: {perso.force}</span>
-                    <span>🏃 Dex: {perso.dexterite}</span>
-                    <span>🫀 Con: {perso.constitution}</span>
-                    <span>🧠 Int: {perso.intelligence}</span>
-                    <span>🙏 Sag: {perso.sagesse}</span>
-                    <span>✨ Cha: {perso.charisme}</span>
+                </div>
+              </div>
+
+              {codesVisibles[perso.id] && (
+                <div className="mt-3 p-2 rounded bg-gray-900 border border-green-600/50 flex items-center justify-between gap-2 flex-wrap">
+                  <div className="min-w-0">
+                    <p className="text-gray-400 text-xs">Code à donner au MJ :</p>
+                    <code className="text-green-300 font-mono font-bold text-lg break-all">{codesVisibles[perso.id]}</code>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => navigator.clipboard?.writeText(codesVisibles[perso.id])}
+                      className="text-gray-400 hover:text-white text-xs"
+                      title="Copier"
+                    >
+                      📋 Copier
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => cacherCode(perso.id)}
+                      className="text-gray-400 hover:text-white text-xs"
+                    >
+                      ✕
+                    </button>
                   </div>
                 </div>
+              )}
+
+              <div className="grid grid-cols-3 gap-2 text-xs sm:text-sm text-gray-400 mt-3">
+                <span>❤️ PV: {perso.hp_actuel}/{perso.hp_max}</span>
+                <span>💪 For: {perso.force}</span>
+                <span>🏃 Dex: {perso.dexterite}</span>
+                <span>🫀 Con: {perso.constitution}</span>
+                <span>🧠 Int: {perso.intelligence}</span>
+                <span>🙏 Sag: {perso.sagesse}</span>
+                <span>✨ Cha: {perso.charisme}</span>
+              </div>
+
+              <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-gray-700 text-xs">
+                <button type="button" onClick={() => window.location.href = `/dashboard/personnages/${perso.id}`} className="text-yellow-400">
+                  📜 Fiche
+                </button>
+                <button type="button" onClick={() => partagerPersonnage(perso.id)} className="text-green-400">
+                  Partager
+                </button>
+                <button type="button" onClick={() => commencerEdition(perso)} className="text-blue-400">
+                  Modifier
+                </button>
+                <button type="button" onClick={() => supprimerPersonnage(perso.id)} className="text-red-400">
+                  Supprimer
+                </button>
               </div>
             </div>
           ))}

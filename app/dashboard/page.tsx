@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Combat from './combat/page'
@@ -29,7 +29,20 @@ export default function Dashboard() {
   const [codeScenario, setCodeScenario] = useState('')
   const [messageJoueur, setMessageJoueur] = useState('')
   const [personnagesJoueurs, setPersonnagesJoueurs] = useState<PersoLite[]>([])
+  const [menuOuvert, setMenuOuvert] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+
+  useEffect(() => {
+    if (!menuOuvert) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOuvert(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [menuOuvert])
 
   const fetchPersonnagesJoueurs = async (scenarioIds: string[]) => {
     if (scenarioIds.length === 0) {
@@ -145,19 +158,53 @@ export default function Dashboard() {
 
   return (
     <main className="min-h-screen bg-gray-900 text-white">
-      <div className="bg-gray-800 p-4 flex items-center justify-between border-b border-gray-700">
-        <h1 className="text-xl font-bold text-yellow-500">D&D Manager</h1>
-        <div className="flex bg-gray-700 rounded-lg p-1">
-          <button type="button" onClick={() => setInterface('mj')} className={`px-4 py-2 rounded-md font-bold transition ${interface_ === 'mj' ? 'bg-yellow-500 text-gray-900' : 'text-gray-400 hover:text-white'}`}>
+      <div className="bg-gray-800 p-3 sm:p-4 flex items-center justify-between gap-2 border-b border-gray-700">
+        <h1 className="text-base sm:text-xl font-bold text-yellow-500 flex-shrink-0 truncate">D&D Manager</h1>
+        <div className="flex bg-gray-700 rounded-lg p-1 flex-shrink min-w-0">
+          <button type="button" onClick={() => setInterface('mj')} className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-md text-sm sm:text-base font-bold transition ${interface_ === 'mj' ? 'bg-yellow-500 text-gray-900' : 'text-gray-400 hover:text-white'}`}>
             MJ
           </button>
-          <button type="button" onClick={() => setInterface('joueur')} className={`px-4 py-2 rounded-md font-bold transition ${interface_ === 'joueur' ? 'bg-yellow-500 text-gray-900' : 'text-gray-400 hover:text-white'}`}>
+          <button type="button" onClick={() => setInterface('joueur')} className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-md text-sm sm:text-base font-bold transition ${interface_ === 'joueur' ? 'bg-yellow-500 text-gray-900' : 'text-gray-400 hover:text-white'}`}>
             Joueur
           </button>
         </div>
-        <button type="button" onClick={async () => { await supabase.auth.signOut(); router.push('/') }} className="text-gray-400 hover:text-white text-sm">
-          Deconnexion
-        </button>
+        <div className="relative flex-shrink-0" ref={menuRef}>
+          <button
+            type="button"
+            onClick={() => setMenuOuvert((v) => !v)}
+            aria-label="Menu"
+            aria-expanded={menuOuvert}
+            className="w-10 h-10 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 rounded transition text-2xl leading-none"
+          >
+            ☰
+          </button>
+          {menuOuvert && (
+            <div className="absolute right-0 mt-2 w-52 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOuvert(false)
+                  router.push('/dashboard/bibliotheque')
+                }}
+                className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2 text-sm"
+              >
+                📚 Bibliothèque
+              </button>
+              <div className="border-t border-gray-700" />
+              <button
+                type="button"
+                onClick={async () => {
+                  setMenuOuvert(false)
+                  await supabase.auth.signOut()
+                  router.push('/')
+                }}
+                className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2 text-sm"
+              >
+                🚪 Déconnexion
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {interface_ === 'mj' && (
