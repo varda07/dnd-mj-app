@@ -6,6 +6,16 @@ import { supabase } from '@/lib/supabase'
 import Combat from './combat/page'
 
 type ScenarioLite = { id: string; nom: string }
+type PersoLite = {
+  id: string
+  nom: string
+  classe: string | null
+  niveau: number
+  hp_actuel: number
+  hp_max: number
+  image_url: string | null
+  scenario_id: string | null
+}
 
 export default function Dashboard() {
   const [interface_, setInterface] = useState<'mj' | 'joueur'>('mj')
@@ -18,7 +28,21 @@ export default function Dashboard() {
   const [scenariosRejoints, setScenariosRejoints] = useState<ScenarioLite[]>([])
   const [codeScenario, setCodeScenario] = useState('')
   const [messageJoueur, setMessageJoueur] = useState('')
+  const [personnagesJoueurs, setPersonnagesJoueurs] = useState<PersoLite[]>([])
   const router = useRouter()
+
+  const fetchPersonnagesJoueurs = async (scenarioIds: string[]) => {
+    if (scenarioIds.length === 0) {
+      setPersonnagesJoueurs([])
+      return
+    }
+    const { data } = await supabase
+      .from('personnages')
+      .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, scenario_id')
+      .in('scenario_id', scenarioIds)
+      .order('nom')
+    if (data) setPersonnagesJoueurs(data)
+  }
 
   useEffect(() => {
     const init = async () => {
@@ -35,7 +59,10 @@ export default function Dashboard() {
           .select('scenario:scenarios(id, nom)')
           .eq('joueur_id', data.user.id)
       ])
-      if (mine) setScenariosMj(mine)
+      if (mine) {
+        setScenariosMj(mine)
+        fetchPersonnagesJoueurs(mine.map((s) => s.id))
+      }
       if (joined) {
         const list = joined
           .map((r: { scenario: ScenarioLite | ScenarioLite[] | null }) =>
@@ -73,6 +100,7 @@ export default function Dashboard() {
 
     setMessageMj('✓ Personnage ajouté au scénario !')
     setCodePersonnage('')
+    fetchPersonnagesJoueurs(scenariosMj.map((s) => s.id))
   }
 
   const rejoindreScenario = async () => {
@@ -143,6 +171,47 @@ export default function Dashboard() {
             </button>
           </div>
           <div className="p-6">
+            {personnagesJoueurs.length > 0 && (
+              <div className="bg-gray-800 p-4 rounded-lg mb-6">
+                <h3 className="text-lg font-bold text-yellow-500 mb-3">🧙 Personnages des joueurs</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {personnagesJoueurs.map((p) => {
+                    const scenario = scenariosMj.find((s) => s.id === p.scenario_id)
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => router.push(`/dashboard/personnages/${p.id}`)}
+                        className="w-full flex items-center gap-3 bg-gray-900/50 border border-gray-700 rounded-lg p-3 hover:bg-gray-700/50 hover:border-yellow-600 transition text-left overflow-hidden"
+                        title={`Ouvrir la fiche de ${p.nom}`}
+                      >
+                        {p.image_url ? (
+                          <img
+                            src={p.image_url}
+                            alt={p.nom}
+                            className="w-12 h-12 rounded-full object-cover ring-2 ring-blue-400 flex-shrink-0 bg-gray-900"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center font-bold text-white flex-shrink-0">
+                            {p.nom.slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0 overflow-hidden">
+                          <p className="text-white font-bold truncate">{p.nom}</p>
+                          <p className="text-gray-400 text-xs truncate">
+                            {[p.classe, `Niv. ${p.niveau}`].filter(Boolean).join(' · ')}
+                          </p>
+                          <p className="text-gray-500 text-xs truncate">
+                            ❤️ {p.hp_actuel}/{p.hp_max}
+                            {scenario && <span className="ml-2">📖 {scenario.nom}</span>}
+                          </p>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
             {modeMJ === 'travail' && (
               <div>
                 <h2 className="text-2xl font-bold text-blue-400 mb-4">Mode Travail</h2>
@@ -162,6 +231,10 @@ export default function Dashboard() {
                   <button type="button" onClick={() => router.push('/dashboard/maps')} className="bg-gray-800 p-4 rounded-lg hover:bg-gray-700 transition text-left">
                     <h3 className="text-lg font-bold text-yellow-500">Maps</h3>
                     <p className="text-gray-400 text-sm mt-1">Gerer tes cartes</p>
+                  </button>
+                  <button type="button" onClick={() => router.push('/dashboard/bibliotheque')} className="bg-gray-800 p-4 rounded-lg hover:bg-gray-700 transition text-left col-span-2">
+                    <h3 className="text-lg font-bold text-yellow-500">📚 Bibliothèque</h3>
+                    <p className="text-gray-400 text-sm mt-1">Parcourir tout ce qui a été créé (scénarios, personnages, ennemis, items, maps, sorts)</p>
                   </button>
                 </div>
                 <div className="bg-gray-800 p-4 rounded-lg">

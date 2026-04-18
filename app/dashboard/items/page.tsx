@@ -40,7 +40,13 @@ export default function Items() {
   }, [])
 
   const fetchScenarios = async () => {
-    const { data } = await supabase.from('scenarios').select('id, nom').order('nom')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('scenarios')
+      .select('id, nom')
+      .eq('mj_id', user.id)
+      .order('nom')
     if (data) setScenarios(data)
   }
 
@@ -71,7 +77,13 @@ export default function Items() {
   }
 
   const fetchItems = async () => {
-    const { data } = await supabase.from('items').select('*').order('created_at', { ascending: false })
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('items')
+      .select('*')
+      .eq('mj_id', user.id)
+      .order('created_at', { ascending: false })
     if (data) setItems(data)
   }
 
@@ -124,6 +136,7 @@ export default function Items() {
   }
 
   const supprimerItem = async (id: string) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible.')) return
     await supabase.from('items').delete().eq('id', id)
     fetchItems()
   }

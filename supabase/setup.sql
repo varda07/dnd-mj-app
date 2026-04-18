@@ -37,6 +37,31 @@ alter table public.ennemis
 alter table public.items
   add column if not exists image_url text;
 
+-- Fiche de personnage détaillée (D&D 5e) : stockée directement sur la ligne
+-- personnage pour éviter une table 1:1. Les structures complexes (maîtrises,
+-- armes) sont en JSONB.
+alter table public.personnages
+  add column if not exists sous_classe text default '',
+  add column if not exists historique text default '',
+  add column if not exists xp int default 0,
+  add column if not exists ca int default 10,
+  add column if not exists vitesse int default 9,
+  add column if not exists temp_hp int default 0,
+  add column if not exists death_success int default 0,
+  add column if not exists death_fail int default 0,
+  add column if not exists de_vie_utilises int default 0,
+  add column if not exists inspiration boolean default false,
+  add column if not exists saves_maitrises jsonb default '{}'::jsonb,
+  add column if not exists comp_maitrises jsonb default '{}'::jsonb,
+  add column if not exists comp_expertise jsonb default '{}'::jsonb,
+  add column if not exists armes jsonb default '[]'::jsonb,
+  add column if not exists equipement text default '',
+  add column if not exists traits_espece text default '',
+  add column if not exists traits_classe text default '',
+  add column if not exists exploits text default '',
+  add column if not exists langues text default '',
+  add column if not exists autres_maitrises text default '';
+
 
 -- ----------------------------------------------------------------------------
 -- 2. NOUVELLES TABLES
@@ -112,6 +137,11 @@ alter table public.maps enable row level security;
 alter table public.jets_de_des enable row level security;
 alter table public.codes_invitation enable row level security;
 alter table public.scenarios_joueurs enable row level security;
+alter table public.scenarios enable row level security;
+alter table public.personnages enable row level security;
+alter table public.ennemis enable row level security;
+alter table public.items enable row level security;
+alter table public.sorts enable row level security;
 
 
 -- ----------------------------------------------------------------------------
@@ -185,6 +215,141 @@ create policy "scenarios_joueurs_delete_self" on public.scenarios_joueurs
     or exists (
       select 1 from public.scenarios s
       where s.id = scenario_id and s.mj_id = auth.uid()
+    )
+  );
+
+-- scenarios : le MJ voit/modifie ses scénarios ; les joueurs qui ont rejoint voient en lecture
+drop policy if exists "scenarios_select" on public.scenarios;
+create policy "scenarios_select" on public.scenarios
+  for select using (
+    auth.uid() = mj_id
+    or exists (
+      select 1 from public.scenarios_joueurs sj
+      where sj.scenario_id = scenarios.id and sj.joueur_id = auth.uid()
+    )
+  );
+
+drop policy if exists "scenarios_insert" on public.scenarios;
+create policy "scenarios_insert" on public.scenarios
+  for insert with check (auth.uid() = mj_id);
+
+drop policy if exists "scenarios_update" on public.scenarios;
+create policy "scenarios_update" on public.scenarios
+  for update using (auth.uid() = mj_id);
+
+drop policy if exists "scenarios_delete" on public.scenarios;
+create policy "scenarios_delete" on public.scenarios
+  for delete using (auth.uid() = mj_id);
+
+-- personnages : le joueur propriétaire voit/modifie tout ; le MJ d'un scénario
+-- rejoint par le joueur (via scenarios_joueurs) peut voir la fiche et modifier
+-- (utile pour hp_actuel en combat). Seul le propriétaire peut supprimer.
+drop policy if exists "personnages_select" on public.personnages;
+create policy "personnages_select" on public.personnages
+  for select using (
+    auth.uid() = joueur_id
+    or exists (
+      select 1 from public.scenarios_joueurs sj
+      join public.scenarios s on s.id = sj.scenario_id
+      where sj.joueur_id = personnages.joueur_id and s.mj_id = auth.uid()
+    )
+  );
+
+drop policy if exists "personnages_insert" on public.personnages;
+create policy "personnages_insert" on public.personnages
+  for insert with check (auth.uid() = joueur_id);
+
+drop policy if exists "personnages_update" on public.personnages;
+create policy "personnages_update" on public.personnages
+  for update using (
+    auth.uid() = joueur_id
+    or exists (
+      select 1 from public.scenarios s
+      where s.id = personnages.scenario_id and s.mj_id = auth.uid()
+    )
+  );
+
+drop policy if exists "personnages_delete" on public.personnages;
+create policy "personnages_delete" on public.personnages
+  for delete using (auth.uid() = joueur_id);
+
+-- ennemis : MJ uniquement (création, lecture, modif, suppression)
+drop policy if exists "ennemis_select" on public.ennemis;
+create policy "ennemis_select" on public.ennemis
+  for select using (auth.uid() = mj_id);
+
+drop policy if exists "ennemis_insert" on public.ennemis;
+create policy "ennemis_insert" on public.ennemis
+  for insert with check (auth.uid() = mj_id);
+
+drop policy if exists "ennemis_update" on public.ennemis;
+create policy "ennemis_update" on public.ennemis
+  for update using (auth.uid() = mj_id);
+
+drop policy if exists "ennemis_delete" on public.ennemis;
+create policy "ennemis_delete" on public.ennemis
+  for delete using (auth.uid() = mj_id);
+
+-- items : MJ uniquement
+drop policy if exists "items_select" on public.items;
+create policy "items_select" on public.items
+  for select using (auth.uid() = mj_id);
+
+drop policy if exists "items_insert" on public.items;
+create policy "items_insert" on public.items
+  for insert with check (auth.uid() = mj_id);
+
+drop policy if exists "items_update" on public.items;
+create policy "items_update" on public.items
+  for update using (auth.uid() = mj_id);
+
+drop policy if exists "items_delete" on public.items;
+create policy "items_delete" on public.items
+  for delete using (auth.uid() = mj_id);
+
+-- sorts : rattachés à un personnage. Le joueur propriétaire gère ; le MJ d'un
+-- scénario du joueur peut lire en consultation.
+drop policy if exists "sorts_select" on public.sorts;
+create policy "sorts_select" on public.sorts
+  for select using (
+    exists (
+      select 1 from public.personnages p
+      where p.id = sorts.personnage_id
+        and (
+          p.joueur_id = auth.uid()
+          or exists (
+            select 1 from public.scenarios_joueurs sj
+            join public.scenarios s on s.id = sj.scenario_id
+            where sj.joueur_id = p.joueur_id and s.mj_id = auth.uid()
+          )
+        )
+    )
+  );
+
+drop policy if exists "sorts_insert" on public.sorts;
+create policy "sorts_insert" on public.sorts
+  for insert with check (
+    exists (
+      select 1 from public.personnages p
+      where p.id = sorts.personnage_id and p.joueur_id = auth.uid()
+    )
+  );
+
+drop policy if exists "sorts_update" on public.sorts;
+create policy "sorts_update" on public.sorts
+  for update using (
+    exists (
+      select 1 from public.personnages p
+      where p.id = sorts.personnage_id and p.joueur_id = auth.uid()
+    )
+  );
+
+drop policy if exists "sorts_delete" on public.sorts;
+create policy "sorts_delete" on public.sorts
+  for delete using (
+    exists (
+      select 1 from public.personnages p
+      where p.id = sorts.personnage_id and p.joueur_id = auth.uid()
     )
   );
 

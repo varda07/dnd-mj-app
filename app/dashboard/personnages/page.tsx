@@ -67,6 +67,7 @@ export default function Personnages() {
   const [scenarioId, setScenarioId] = useState('')
   const [cropperKey, setCropperKey] = useState(0)
   const [codesVisibles, setCodesVisibles] = useState<Record<string, string>>({})
+  const [aideOuverte, setAideOuverte] = useState(false)
 
   const deVie = CLASSES_DE_VIE[classe]
 
@@ -76,7 +77,13 @@ export default function Personnages() {
   }, [])
 
   const fetchScenarios = async () => {
-    const { data } = await supabase.from('scenarios').select('id, nom').order('nom')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('scenarios')
+      .select('id, nom')
+      .eq('mj_id', user.id)
+      .order('nom')
     if (data) setScenarios(data)
   }
 
@@ -166,7 +173,13 @@ export default function Personnages() {
   }
 
   const fetchPersonnages = async () => {
-    const { data } = await supabase.from('personnages').select('*').order('created_at', { ascending: false })
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('personnages')
+      .select('*')
+      .eq('joueur_id', user.id)
+      .order('created_at', { ascending: false })
     if (data) setPersonnages(data)
   }
 
@@ -228,6 +241,7 @@ export default function Personnages() {
   }
 
   const supprimerPersonnage = async (id: string) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible.')) return
     await supabase.from('personnages').delete().eq('id', id)
     fetchPersonnages()
   }
@@ -240,6 +254,14 @@ export default function Personnages() {
             Retour
           </button>
           <h1 className="text-2xl font-bold text-yellow-500">🧙 Personnages</h1>
+          <button
+            type="button"
+            onClick={() => setAideOuverte(true)}
+            title="Aide : créer un personnage D&D 5e"
+            className="ml-auto w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-yellow-500 border border-gray-700 font-bold text-sm flex items-center justify-center transition"
+          >
+            ?
+          </button>
         </div>
         <div className="bg-gray-800 p-6 rounded-lg mb-6">
           <h2 className="text-lg font-bold text-yellow-500 mb-4">{editingId ? 'Modifier le personnage' : 'Créer un personnage'}</h2>
@@ -347,6 +369,9 @@ export default function Personnages() {
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-lg font-bold text-white">{perso.nom}</h3>
                     <div className="flex gap-3">
+                      <button type="button" onClick={() => window.location.href = `/dashboard/personnages/${perso.id}`} className="text-yellow-400 text-sm">
+                        📜 Fiche
+                      </button>
                       <button type="button" onClick={() => partagerPersonnage(perso.id)} className="text-green-400 text-sm">
                         Partager
                       </button>
@@ -401,6 +426,144 @@ export default function Personnages() {
           ))}
         </div>
       </div>
+
+      {aideOuverte && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setAideOuverte(false)}
+        >
+          <div
+            className="bg-gray-800 border border-gray-700 rounded-lg max-w-2xl w-full max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-gray-800 border-b border-gray-700 p-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-yellow-500">
+                📘 Créer un personnage D&amp;D 5e
+              </h2>
+              <button
+                type="button"
+                onClick={() => setAideOuverte(false)}
+                className="w-8 h-8 rounded text-gray-400 hover:text-white hover:bg-gray-700 font-bold"
+                title="Fermer"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-5 space-y-5 text-sm text-gray-300">
+              <section>
+                <h3 className="text-yellow-500 font-bold mb-2">1. Choisir une race</h3>
+                <p>
+                  La race donne le ton physique et culturel du personnage, ainsi que
+                  des bonus aux caractéristiques. Quelques repères :
+                </p>
+                <ul className="list-disc list-inside mt-2 space-y-1 text-gray-400">
+                  <li><span className="text-white">Humain</span> — polyvalent, +1 à toutes les stats.</li>
+                  <li><span className="text-white">Elfe</span> — agile et perceptif, +2 Dex.</li>
+                  <li><span className="text-white">Nain</span> — résistant, +2 Con.</li>
+                  <li><span className="text-white">Halfelin</span> — petit et chanceux, +2 Dex.</li>
+                  <li><span className="text-white">Demi-elfe</span> — charismatique, +2 Cha.</li>
+                  <li><span className="text-white">Demi-orc</span> — puissant, +2 For.</li>
+                  <li><span className="text-white">Drakéide</span> — souffle élémentaire, +2 For / +1 Cha.</li>
+                  <li><span className="text-white">Gnome</span> — malin, +2 Int.</li>
+                  <li><span className="text-white">Tieffelin</span> — infernal, +2 Cha / +1 Int.</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3 className="text-yellow-500 font-bold mb-2">2. Choisir une classe</h3>
+                <p>
+                  La classe détermine ton rôle en combat, ton dé de vie (PV par niveau) et
+                  les caractéristiques prioritaires.
+                </p>
+                <ul className="list-disc list-inside mt-2 space-y-1 text-gray-400">
+                  <li><span className="text-white">Barbare (d12)</span> — bourrin, For &amp; Con.</li>
+                  <li><span className="text-white">Guerrier / Paladin / Rôdeur (d10)</span> — combat polyvalent, For ou Dex.</li>
+                  <li><span className="text-white">Barde / Clerc / Druide / Moine / Roublard / Ensorceleur (d8)</span> — équilibré.</li>
+                  <li><span className="text-white">Magicien / Sorcier (d6)</span> — fragile mais puissant, Int ou Cha.</li>
+                </ul>
+                <p className="mt-2 text-gray-400">
+                  💡 Vérifie que la stat principale de ta classe correspond aux bonus
+                  raciaux pour un personnage efficace.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-yellow-500 font-bold mb-2">3. Répartir les caractéristiques</h3>
+                <p className="mb-2">Deux méthodes standard :</p>
+
+                <div className="bg-gray-900/50 border border-gray-700 rounded p-3 mb-3">
+                  <p className="text-white font-bold mb-1">🎲 Jet de dés (4d6, on retire le plus bas)</p>
+                  <p className="text-gray-400">
+                    Lance 4d6, ignore le plus petit résultat, additionne les 3 restants.
+                    Fais ça 6 fois puis attribue chaque total à une caractéristique. Plus
+                    aléatoire et souvent plus généreux.
+                  </p>
+                </div>
+
+                <div className="bg-gray-900/50 border border-gray-700 rounded p-3">
+                  <p className="text-white font-bold mb-1">⚖️ Méthode des points (27 points)</p>
+                  <p className="text-gray-400 mb-2">
+                    Toutes les stats commencent à 8. Tu dépenses 27 points pour les
+                    augmenter (max 15 avant bonus racial). Coûts :
+                  </p>
+                  <ul className="text-gray-400 text-xs grid grid-cols-2 gap-x-4">
+                    <li>9 = 1 pt</li>
+                    <li>10 = 2 pts</li>
+                    <li>11 = 3 pts</li>
+                    <li>12 = 4 pts</li>
+                    <li>13 = 5 pts</li>
+                    <li>14 = 7 pts</li>
+                    <li>15 = 9 pts</li>
+                  </ul>
+                </div>
+
+                <p className="mt-3 text-gray-400">
+                  💡 Ajoute ensuite les bonus raciaux. Le modificateur utilisé en jeu est
+                  <span className="text-white"> (stat − 10) ÷ 2</span> arrondi vers le bas.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-yellow-500 font-bold mb-2">4. Ce que représente chaque stat</h3>
+                <ul className="space-y-2">
+                  <li>
+                    <span className="text-white font-bold">💪 Force</span> —
+                    <span className="text-gray-400"> puissance physique brute. Attaques au corps à corps, soulever, pousser.</span>
+                  </li>
+                  <li>
+                    <span className="text-white font-bold">🏃 Dextérité</span> —
+                    <span className="text-gray-400"> agilité, réflexes, équilibre. CA, initiative, armes à distance et finesse.</span>
+                  </li>
+                  <li>
+                    <span className="text-white font-bold">🫀 Constitution</span> —
+                    <span className="text-gray-400"> endurance et santé. Ajoute des PV à chaque niveau, résistance aux poisons.</span>
+                  </li>
+                  <li>
+                    <span className="text-white font-bold">🧠 Intelligence</span> —
+                    <span className="text-gray-400"> savoir, logique, mémoire. Stat principale du magicien.</span>
+                  </li>
+                  <li>
+                    <span className="text-white font-bold">🙏 Sagesse</span> —
+                    <span className="text-gray-400"> perception et intuition. Stat principale du clerc, druide, rôdeur.</span>
+                  </li>
+                  <li>
+                    <span className="text-white font-bold">✨ Charisme</span> —
+                    <span className="text-gray-400"> force de personnalité et persuasion. Stat principale du barde, paladin, ensorceleur, sorcier.</span>
+                  </li>
+                </ul>
+              </section>
+
+              <section className="border-t border-gray-700 pt-4">
+                <p className="text-gray-400 italic">
+                  🎯 Points de vie de départ = max du dé de vie + modificateur de
+                  Constitution. Exemple : un Guerrier (d10) avec Con 14 (+2) commence à
+                  12 PV.
+                </p>
+              </section>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }

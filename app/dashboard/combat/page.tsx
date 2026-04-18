@@ -56,7 +56,12 @@ export default function Combat() {
   }, [scenarioId])
 
   const fetchScenarios = async () => {
-    const { data, error } = await supabase.from('scenarios').select('*')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data, error } = await supabase
+      .from('scenarios')
+      .select('*')
+      .eq('mj_id', user.id)
     console.log('[combat] scenarios fetched:', data)
     if (error) console.error('[combat] erreur Supabase scenarios:', error)
     if (data) {
@@ -75,7 +80,7 @@ export default function Combat() {
         .eq('scenario_id', scenarioId),
       supabase
         .from('ennemis')
-        .select('id, nom, hp_max, hp_actuel, dexterite')
+        .select('id, nom, hp_max, hp_actuel, dexterite, image_url')
         .eq('scenario_id', scenarioId),
       supabase.from('items').select('*').eq('scenario_id', scenarioId)
     ])
@@ -600,25 +605,31 @@ export default function Combat() {
                           style={{ width: CELL_SIZE, height: CELL_SIZE }}
                         >
                           {p && (
-                            p.kind === 'perso' && p.image_url ? (
+                            p.image_url ? (
                               <img
                                 src={p.image_url}
                                 alt={p.nom}
                                 title={`${p.nom} (${p.hp_actuel}/${p.hp_max})`}
-                                className={`w-7 h-7 rounded-full object-cover shadow-md ring-2 ring-blue-400 ${
-                                  selected ? '!ring-yellow-300 scale-110' : ''
-                                } ${isTurn ? '!ring-yellow-400 animate-pulse' : ''}`}
+                                className={`w-7 h-7 ${
+                                  p.kind === 'perso' ? 'rounded-full' : 'rounded'
+                                } object-cover shadow-md ring-2 ${
+                                  p.kind === 'perso' ? 'ring-blue-400' : 'ring-red-400'
+                                } ${selected ? '!ring-yellow-300 scale-110' : ''} ${
+                                  isTurn ? '!ring-yellow-400 animate-pulse' : ''
+                                }`}
                               />
                             ) : (
                               <div
-                                className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs text-white shadow-md ${
-                                  p.kind === 'perso' ? 'bg-blue-500' : 'bg-red-500'
+                                className={`w-7 h-7 flex items-center justify-center font-bold text-xs text-white shadow-md ${
+                                  p.kind === 'perso'
+                                    ? 'rounded-full bg-blue-500'
+                                    : 'rounded bg-red-500'
                                 } ${selected ? 'ring-2 ring-yellow-300 scale-110' : ''} ${
                                   isTurn ? 'ring-2 ring-yellow-400 animate-pulse' : ''
                                 }`}
                                 title={`${p.nom} (${p.hp_actuel}/${p.hp_max})`}
                               >
-                                {p.nom[0]?.toUpperCase() ?? '?'}
+                                {p.nom.slice(0, 2).toUpperCase() || '?'}
                               </div>
                             )
                           )}

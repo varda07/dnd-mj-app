@@ -19,9 +19,22 @@ export default function Home() {
 
   const handleRegister = async () => {
     setLoading(true)
-    const { error } = await supabase.auth.signUp({ email, password })
-    if (error) setMessage(error.message)
-    else setMessage('Compte créé avec succès !')
+    const { data, error } = await supabase.auth.signUp({ email, password })
+    if (error) {
+      console.error('[auth] signUp erreur complète :', {
+        message: error.message,
+        name: error.name,
+        status: error.status,
+        code: (error as { code?: string }).code,
+        cause: (error as { cause?: unknown }).cause,
+        stack: error.stack,
+        raw: error
+      })
+      setMessage(`Erreur création compte : ${error.message}`)
+    } else {
+      console.log('[auth] signUp succès :', data)
+      setMessage('Compte créé avec succès !')
+    }
     setLoading(false)
   }
 

@@ -43,7 +43,13 @@ export default function Scenarios() {
   }, [])
 
   const fetchScenarios = async () => {
-    const { data } = await supabase.from('scenarios').select('*').order('created_at', { ascending: false })
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('scenarios')
+      .select('*')
+      .eq('mj_id', user.id)
+      .order('created_at', { ascending: false })
     if (data) setScenarios(data)
   }
 
@@ -72,6 +78,7 @@ export default function Scenarios() {
   }
 
   const supprimerScenario = async (id: string) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible.')) return
     await supabase.from('scenarios').delete().eq('id', id)
     fetchScenarios()
   }

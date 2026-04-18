@@ -166,7 +166,11 @@ export default function DiceLauncher() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-yellow-500 text-gray-900 text-2xl font-bold shadow-2xl hover:scale-110 hover:bg-yellow-400 transition-transform z-50 flex items-center justify-center"
+          className="fixed bottom-4 right-4 md:bottom-6 md:right-6 w-14 h-14 rounded-full bg-yellow-500 text-gray-900 text-2xl font-bold shadow-2xl hover:scale-110 hover:bg-yellow-400 transition-transform z-50 flex items-center justify-center"
+          style={{
+            bottom: 'max(1rem, env(safe-area-inset-bottom))',
+            right: 'max(1rem, env(safe-area-inset-right))'
+          }}
           aria-label="Lanceur de dés"
         >
           🎲
@@ -174,7 +178,7 @@ export default function DiceLauncher() {
       )}
 
       {open && (
-        <div className="fixed bottom-6 right-6 w-80 max-h-[85vh] overflow-y-auto bg-gray-800 rounded-xl shadow-2xl border border-gray-700 z-50">
+        <div className="fixed bottom-4 right-4 left-4 md:left-auto md:bottom-6 md:right-6 md:w-80 max-h-[85vh] overflow-y-auto bg-gray-800 rounded-xl shadow-2xl border border-gray-700 z-50">
           <div className="p-4 border-b border-gray-700 flex items-center justify-between sticky top-0 bg-gray-800 z-10">
             <h3 className="text-lg font-bold text-yellow-500">🎲 Lanceur de dés</h3>
             <button

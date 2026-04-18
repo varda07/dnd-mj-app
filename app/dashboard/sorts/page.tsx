@@ -72,7 +72,13 @@ export default function Sorts() {
   }
 
   const fetchPersonnages = async () => {
-    const { data } = await supabase.from('personnages').select('id, nom').order('nom')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('personnages')
+      .select('id, nom')
+      .eq('joueur_id', user.id)
+      .order('nom')
     if (data) {
       setPersonnages(data)
       if (data.length > 0 && !personnageId) setPersonnageId(data[0].id)
@@ -80,7 +86,23 @@ export default function Sorts() {
   }
 
   const fetchSorts = async () => {
-    const { data } = await supabase.from('sorts').select('*').order('niveau').order('nom')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data: mesPersos } = await supabase
+      .from('personnages')
+      .select('id')
+      .eq('joueur_id', user.id)
+    const ids = (mesPersos ?? []).map((p) => p.id)
+    if (ids.length === 0) {
+      setSorts([])
+      return
+    }
+    const { data } = await supabase
+      .from('sorts')
+      .select('*')
+      .in('personnage_id', ids)
+      .order('niveau')
+      .order('nom')
     if (data) setSorts(data)
   }
 
@@ -122,6 +144,7 @@ export default function Sorts() {
   }
 
   const supprimerSort = async (id: string) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible.')) return
     await supabase.from('sorts').delete().eq('id', id)
     fetchSorts()
   }

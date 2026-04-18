@@ -50,7 +50,13 @@ export default function Ennemis() {
   }, [])
 
   const fetchScenarios = async () => {
-    const { data } = await supabase.from('scenarios').select('id, nom').order('nom')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('scenarios')
+      .select('id, nom')
+      .eq('mj_id', user.id)
+      .order('nom')
     if (data) setScenarios(data)
   }
 
@@ -93,7 +99,13 @@ export default function Ennemis() {
   }
 
   const fetchEnnemis = async () => {
-    const { data } = await supabase.from('ennemis').select('*').order('created_at', { ascending: false })
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('ennemis')
+      .select('*')
+      .eq('mj_id', user.id)
+      .order('created_at', { ascending: false })
     if (data) setEnnemis(data)
   }
 
@@ -156,6 +168,7 @@ export default function Ennemis() {
   }
 
   const supprimerEnnemi = async (id: string) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible.')) return
     await supabase.from('ennemis').delete().eq('id', id)
     fetchEnnemis()
   }
