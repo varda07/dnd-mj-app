@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import ImageCropper from '@/app/components/ImageCropper'
 
 type Item = {
   id: string
@@ -9,7 +10,11 @@ type Item = {
   description: string
   type: string
   rarete: string
+  scenario_id: string | null
+  image_url: string | null
 }
+
+type ScenarioOption = { id: string; nom: string }
 
 const TYPES = ['Arme', 'Armure', 'Potion', 'Parchemin', 'Objet merveilleux', 'Autre']
 const RARETES = ['Commun', 'Peu commun', 'Rare', 'Très rare', 'Légendaire', 'Artéfact']
@@ -23,10 +28,21 @@ export default function Items() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [scenarios, setScenarios] = useState<ScenarioOption[]>([])
+  const [scenarioId, setScenarioId] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [imageActuelle, setImageActuelle] = useState('')
+  const [cropperKey, setCropperKey] = useState(0)
 
   useEffect(() => {
     fetchItems()
+    fetchScenarios()
   }, [])
+
+  const fetchScenarios = async () => {
+    const { data } = await supabase.from('scenarios').select('id, nom').order('nom')
+    if (data) setScenarios(data)
+  }
 
   const resetForm = () => {
     setNom('')
@@ -34,6 +50,10 @@ export default function Items() {
     setType(TYPES[0])
     setRarete(RARETES[0])
     setEditingId(null)
+    setScenarioId('')
+    setFile(null)
+    setImageActuelle('')
+    setCropperKey((k) => k + 1)
   }
 
   const commencerEdition = (item: Item) => {
@@ -42,6 +62,10 @@ export default function Items() {
     setDescription(item.description ?? '')
     setType(item.type || TYPES[0])
     setRarete(item.rarete || RARETES[0])
+    setScenarioId(item.scenario_id ?? '')
+    setFile(null)
+    setImageActuelle(item.image_url ?? '')
+    setCropperKey((k) => k + 1)
     setMessage('')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -54,8 +78,33 @@ export default function Items() {
   const sauvegarderItem = async () => {
     if (!nom) return setMessage('Le nom est obligatoire !')
     setLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+
+    let imageUrl = imageActuelle
+    if (file) {
+      const ext = file.name.split('.').pop()
+      const path = `${user?.id}/${Date.now()}.${ext}`
+      const { error: uploadError } = await supabase.storage.from('Items').upload(path, file)
+      if (uploadError) {
+        setMessage(uploadError.message)
+        setLoading(false)
+        return
+      }
+      const { data: urlData } = supabase.storage.from('Items').getPublicUrl(path)
+      imageUrl = urlData.publicUrl
+    }
+
+    const payload = {
+      nom,
+      description,
+      type,
+      rarete,
+      scenario_id: scenarioId || null,
+      image_url: imageUrl
+    }
+
     if (editingId) {
-      const { error } = await supabase.from('items').update({ nom, description, type, rarete }).eq('id', editingId)
+      const { error } = await supabase.from('items').update(payload).eq('id', editingId)
       if (error) setMessage(error.message)
       else {
         setMessage('Item modifié !')
@@ -63,14 +112,7 @@ export default function Items() {
         fetchItems()
       }
     } else {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { error } = await supabase.from('items').insert({
-        nom,
-        description,
-        type,
-        rarete,
-        mj_id: user?.id
-      })
+      const { error } = await supabase.from('items').insert({ ...payload, mj_id: user?.id })
       if (error) setMessage(error.message)
       else {
         setMessage('Item créé !')
@@ -113,7 +155,22 @@ export default function Items() {
                 </select>
               </div>
             </div>
+            <div>
+              <label className="text-gray-400 text-sm">Scénario</label>
+              <select value={scenarioId} onChange={(e) => setScenarioId(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none">
+                <option value="">Aucun scénario</option>
+                {scenarios.map((s) => <option key={s.id} value={s.id}>{s.nom}</option>)}
+              </select>
+            </div>
             <textarea placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none h-24" />
+            <ImageCropper
+              key={cropperKey}
+              inputId="item-file"
+              currentImageUrl={imageActuelle}
+              onChange={setFile}
+              aspect={1}
+              label={editingId ? "Nouvelle image (laisser vide pour garder l'actuelle)" : "Image de l'item"}
+            />
             {message && <p className="text-yellow-400 text-sm">{message}</p>}
             <div className="flex gap-2">
               <button type="button" onClick={sauvegarderItem} disabled={loading} className="flex-1 p-3 bg-yellow-500 text-gray-900 font-bold rounded">
@@ -132,22 +189,33 @@ export default function Items() {
           {items.length === 0 && <p className="text-gray-400">Aucun item créé pour l'instant.</p>}
           {items.map((item) => (
             <div key={item.id} className="bg-gray-800 p-4 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-bold text-white">{item.nom}</h3>
-                <div className="flex gap-3">
-                  <button type="button" onClick={() => commencerEdition(item)} className="text-blue-400 text-sm">
-                    Modifier
-                  </button>
-                  <button type="button" onClick={() => supprimerItem(item.id)} className="text-red-400 text-sm">
-                    Supprimer
-                  </button>
+              <div className="flex gap-4">
+                {item.image_url && (
+                  <img
+                    src={item.image_url}
+                    alt={item.nom}
+                    className="w-16 h-16 object-cover rounded bg-gray-900 flex-shrink-0"
+                  />
+                )}
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-lg font-bold text-white">{item.nom}</h3>
+                    <div className="flex gap-3">
+                      <button type="button" onClick={() => commencerEdition(item)} className="text-blue-400 text-sm">
+                        Modifier
+                      </button>
+                      <button type="button" onClick={() => supprimerItem(item.id)} className="text-red-400 text-sm">
+                        Supprimer
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 text-sm text-gray-400 mb-2">
+                    <span>📦 {item.type}</span>
+                    <span>✨ {item.rarete}</span>
+                  </div>
+                  {item.description && <p className="text-gray-500 text-sm italic">{item.description}</p>}
                 </div>
               </div>
-              <div className="flex gap-3 text-sm text-gray-400 mb-2">
-                <span>📦 {item.type}</span>
-                <span>✨ {item.rarete}</span>
-              </div>
-              {item.description && <p className="text-gray-500 text-sm italic">{item.description}</p>}
             </div>
           ))}
         </div>

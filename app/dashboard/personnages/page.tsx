@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import ImageCropper from '@/app/components/ImageCropper'
 
 type Personnage = {
   id: string
@@ -64,6 +65,8 @@ export default function Personnages() {
   const [imageActuelle, setImageActuelle] = useState('')
   const [scenarios, setScenarios] = useState<ScenarioOption[]>([])
   const [scenarioId, setScenarioId] = useState('')
+  const [cropperKey, setCropperKey] = useState(0)
+  const [codesVisibles, setCodesVisibles] = useState<Record<string, string>>({})
 
   const deVie = CLASSES_DE_VIE[classe]
 
@@ -75,6 +78,49 @@ export default function Personnages() {
   const fetchScenarios = async () => {
     const { data } = await supabase.from('scenarios').select('id, nom').order('nom')
     if (data) setScenarios(data)
+  }
+
+  const genererCode = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    let suffix = ''
+    for (let i = 0; i < 6; i++) suffix += chars[Math.floor(Math.random() * chars.length)]
+    return `DND-${suffix}`
+  }
+
+  const partagerPersonnage = async (personnageId: string) => {
+    const { data: existing } = await supabase
+      .from('codes_invitation')
+      .select('code')
+      .eq('personnage_id', personnageId)
+      .eq('utilise', false)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (existing?.code) {
+      setCodesVisibles((prev) => ({ ...prev, [personnageId]: existing.code }))
+      return
+    }
+
+    for (let i = 0; i < 5; i++) {
+      const code = genererCode()
+      const { error } = await supabase
+        .from('codes_invitation')
+        .insert({ code, personnage_id: personnageId })
+      if (!error) {
+        setCodesVisibles((prev) => ({ ...prev, [personnageId]: code }))
+        return
+      }
+    }
+    setMessage("Impossible de générer un code unique, réessaie.")
+  }
+
+  const cacherCode = (personnageId: string) => {
+    setCodesVisibles((prev) => {
+      const next = { ...prev }
+      delete next[personnageId]
+      return next
+    })
   }
 
   const resetForm = () => {
@@ -94,8 +140,7 @@ export default function Personnages() {
     setEditingId(null)
     setImageActuelle('')
     setScenarioId('')
-    const input = document.getElementById('perso-file') as HTMLInputElement | null
-    if (input) input.value = ''
+    setCropperKey((k) => k + 1)
   }
 
   const commencerEdition = (perso: Personnage) => {
@@ -115,8 +160,7 @@ export default function Personnages() {
     setFile(null)
     setImageActuelle(perso.image_url ?? '')
     setScenarioId(perso.scenario_id ?? '')
-    const input = document.getElementById('perso-file') as HTMLInputElement | null
-    if (input) input.value = ''
+    setCropperKey((k) => k + 1)
     setMessage('')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -135,13 +179,13 @@ export default function Personnages() {
     if (file) {
       const ext = file.name.split('.').pop()
       const path = `${user?.id}/${Date.now()}.${ext}`
-      const { error: uploadError } = await supabase.storage.from('personnages').upload(path, file)
+      const { error: uploadError } = await supabase.storage.from('personnage').upload(path, file)
       if (uploadError) {
         setMessage(uploadError.message)
         setLoading(false)
         return
       }
-      const { data: urlData } = supabase.storage.from('personnages').getPublicUrl(path)
+      const { data: urlData } = supabase.storage.from('personnage').getPublicUrl(path)
       imageUrl = urlData.publicUrl
     }
 
@@ -265,15 +309,14 @@ export default function Personnages() {
                 <input type="number" value={charisme} onChange={(e) => setCharisme(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
               </div>
             </div>
-            <div>
-              <label className="text-gray-400 text-sm">
-                {editingId ? 'Nouvelle image (laisser vide pour garder l\'actuelle)' : 'Image du personnage'}
-              </label>
-              <input id="perso-file" type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:bg-yellow-500 file:text-gray-900 file:font-bold" />
-              {editingId && imageActuelle && (
-                <img src={imageActuelle} alt="actuelle" className="mt-2 h-24 w-24 object-cover rounded bg-gray-900" />
-              )}
-            </div>
+            <ImageCropper
+              key={cropperKey}
+              inputId="perso-file"
+              currentImageUrl={imageActuelle}
+              onChange={setFile}
+              aspect={1}
+              label={editingId ? "Nouvelle image (laisser vide pour garder l'actuelle)" : 'Image du personnage'}
+            />
             {message && <p className="text-yellow-400 text-sm">{message}</p>}
             <div className="flex gap-2">
               <button type="button" onClick={sauvegarderPersonnage} disabled={loading} className="flex-1 p-3 bg-yellow-500 text-gray-900 font-bold rounded">
@@ -294,12 +337,19 @@ export default function Personnages() {
             <div key={perso.id} className="bg-gray-800 p-4 rounded-lg">
               <div className="flex gap-4">
                 {perso.image_url && (
-                  <img src={perso.image_url} alt={perso.nom} className="w-24 h-24 object-cover rounded bg-gray-900 flex-shrink-0" />
+                  <img
+                    src={perso.image_url}
+                    alt={perso.nom}
+                    className="w-20 h-20 object-cover rounded-full bg-gray-900 flex-shrink-0 ring-2 ring-yellow-500"
+                  />
                 )}
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-lg font-bold text-white">{perso.nom}</h3>
                     <div className="flex gap-3">
+                      <button type="button" onClick={() => partagerPersonnage(perso.id)} className="text-green-400 text-sm">
+                        Partager
+                      </button>
                       <button type="button" onClick={() => commencerEdition(perso)} className="text-blue-400 text-sm">
                         Modifier
                       </button>
@@ -308,6 +358,31 @@ export default function Personnages() {
                       </button>
                     </div>
                   </div>
+                  {codesVisibles[perso.id] && (
+                    <div className="mb-2 p-2 rounded bg-gray-900 border border-green-600/50 flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-gray-400 text-xs">Code à donner au MJ :</p>
+                        <code className="text-green-300 font-mono font-bold text-lg">{codesVisibles[perso.id]}</code>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => navigator.clipboard?.writeText(codesVisibles[perso.id])}
+                          className="text-gray-400 hover:text-white text-xs"
+                          title="Copier"
+                        >
+                          📋 Copier
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => cacherCode(perso.id)}
+                          className="text-gray-400 hover:text-white text-xs"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <p className="text-gray-400 text-sm mb-2">
                     {perso.race} · {perso.classe} · Niv. {perso.niveau} · 🎲 {perso.de_vie}
                   </p>

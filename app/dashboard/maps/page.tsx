@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import ImageCropper from '@/app/components/ImageCropper'
 
 type Map = {
   id: string
@@ -19,6 +20,7 @@ export default function Maps() {
   const [message, setMessage] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [imageActuelle, setImageActuelle] = useState('')
+  const [cropperKey, setCropperKey] = useState(0)
 
   useEffect(() => {
     fetchMaps()
@@ -30,8 +32,7 @@ export default function Maps() {
     setFile(null)
     setEditingId(null)
     setImageActuelle('')
-    const input = document.getElementById('map-file') as HTMLInputElement | null
-    if (input) input.value = ''
+    setCropperKey((k) => k + 1)
   }
 
   const commencerEdition = (map: Map) => {
@@ -40,8 +41,7 @@ export default function Maps() {
     setDescription(map.description ?? '')
     setImageActuelle(map.image_url ?? '')
     setFile(null)
-    const input = document.getElementById('map-file') as HTMLInputElement | null
-    if (input) input.value = ''
+    setCropperKey((k) => k + 1)
     setMessage('')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -61,13 +61,13 @@ export default function Maps() {
     if (file) {
       const ext = file.name.split('.').pop()
       const path = `${user?.id}/${Date.now()}.${ext}`
-      const { error: uploadError } = await supabase.storage.from('maps').upload(path, file)
+      const { error: uploadError } = await supabase.storage.from('MAP').upload(path, file)
       if (uploadError) {
         setMessage(uploadError.message)
         setLoading(false)
         return
       }
-      const { data: urlData } = supabase.storage.from('maps').getPublicUrl(path)
+      const { data: urlData } = supabase.storage.from('MAP').getPublicUrl(path)
       imageUrl = urlData.publicUrl
     }
 
@@ -119,15 +119,13 @@ export default function Maps() {
           <div className="space-y-3">
             <input type="text" placeholder="Nom de la carte *" value={nom} onChange={(e) => setNom(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
             <textarea placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none h-24" />
-            <div>
-              <label className="text-gray-400 text-sm">
-                {editingId ? 'Nouvelle image (laisser vide pour garder l\'actuelle)' : 'Image de la carte *'}
-              </label>
-              <input id="map-file" type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:bg-yellow-500 file:text-gray-900 file:font-bold" />
-              {editingId && imageActuelle && (
-                <img src={imageActuelle} alt="actuelle" className="mt-2 max-h-32 rounded bg-gray-900" />
-              )}
-            </div>
+            <ImageCropper
+              key={cropperKey}
+              inputId="map-file"
+              currentImageUrl={imageActuelle}
+              onChange={setFile}
+              label={editingId ? "Nouvelle image (laisser vide pour garder l'actuelle)" : 'Image de la carte *'}
+            />
             {message && <p className="text-yellow-400 text-sm">{message}</p>}
             <div className="flex gap-2">
               <button type="button" onClick={sauvegarderMap} disabled={loading} className="flex-1 p-3 bg-yellow-500 text-gray-900 font-bold rounded">

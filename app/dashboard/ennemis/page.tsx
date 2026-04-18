@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import ImageCropper from '@/app/components/ImageCropper'
 
 type Ennemi = {
   id: string
@@ -17,6 +18,7 @@ type Ennemi = {
   charisme: number
   notes: string
   scenario_id: string | null
+  image_url: string | null
 }
 
 type ScenarioOption = { id: string; nom: string }
@@ -38,6 +40,9 @@ export default function Ennemis() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [scenarios, setScenarios] = useState<ScenarioOption[]>([])
   const [scenarioId, setScenarioId] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [imageActuelle, setImageActuelle] = useState('')
+  const [cropperKey, setCropperKey] = useState(0)
 
   useEffect(() => {
     fetchEnnemis()
@@ -62,6 +67,9 @@ export default function Ennemis() {
     setNotes('')
     setEditingId(null)
     setScenarioId('')
+    setFile(null)
+    setImageActuelle('')
+    setCropperKey((k) => k + 1)
   }
 
   const commencerEdition = (ennemi: Ennemi) => {
@@ -77,6 +85,9 @@ export default function Ennemis() {
     setCharisme(String(ennemi.charisme))
     setNotes(ennemi.notes ?? '')
     setScenarioId(ennemi.scenario_id ?? '')
+    setFile(null)
+    setImageActuelle(ennemi.image_url ?? '')
+    setCropperKey((k) => k + 1)
     setMessage('')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -89,20 +100,39 @@ export default function Ennemis() {
   const sauvegarderEnnemi = async () => {
     if (!nom) return setMessage('Le nom est obligatoire !')
     setLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+
+    let imageUrl = imageActuelle
+    if (file) {
+      const ext = file.name.split('.').pop()
+      const path = `${user?.id}/${Date.now()}.${ext}`
+      const { error: uploadError } = await supabase.storage.from('ennemie').upload(path, file)
+      if (uploadError) {
+        setMessage(uploadError.message)
+        setLoading(false)
+        return
+      }
+      const { data: urlData } = supabase.storage.from('ennemie').getPublicUrl(path)
+      imageUrl = urlData.publicUrl
+    }
+
+    const payload = {
+      nom,
+      hp_max: parseInt(hp),
+      armure: parseInt(armure),
+      force: parseInt(force),
+      dexterite: parseInt(dexterite),
+      constitution: parseInt(constitution),
+      intelligence: parseInt(intelligence),
+      sagesse: parseInt(sagesse),
+      charisme: parseInt(charisme),
+      notes,
+      scenario_id: scenarioId || null,
+      image_url: imageUrl
+    }
+
     if (editingId) {
-      const { error } = await supabase.from('ennemis').update({
-        nom,
-        hp_max: parseInt(hp),
-        armure: parseInt(armure),
-        force: parseInt(force),
-        dexterite: parseInt(dexterite),
-        constitution: parseInt(constitution),
-        intelligence: parseInt(intelligence),
-        sagesse: parseInt(sagesse),
-        charisme: parseInt(charisme),
-        notes,
-        scenario_id: scenarioId || null
-      }).eq('id', editingId)
+      const { error } = await supabase.from('ennemis').update(payload).eq('id', editingId)
       if (error) setMessage(error.message)
       else {
         setMessage('Ennemi modifié !')
@@ -110,20 +140,9 @@ export default function Ennemis() {
         fetchEnnemis()
       }
     } else {
-      const { data: { user } } = await supabase.auth.getUser()
       const { error } = await supabase.from('ennemis').insert({
-        nom,
-        hp_max: parseInt(hp),
+        ...payload,
         hp_actuel: parseInt(hp),
-        armure: parseInt(armure),
-        force: parseInt(force),
-        dexterite: parseInt(dexterite),
-        constitution: parseInt(constitution),
-        intelligence: parseInt(intelligence),
-        sagesse: parseInt(sagesse),
-        charisme: parseInt(charisme),
-        notes,
-        scenario_id: scenarioId || null,
         mj_id: user?.id
       })
       if (error) setMessage(error.message)
@@ -199,6 +218,14 @@ export default function Ennemis() {
               </div>
             </div>
             <textarea placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none h-24" />
+            <ImageCropper
+              key={cropperKey}
+              inputId="ennemi-file"
+              currentImageUrl={imageActuelle}
+              onChange={setFile}
+              aspect={1}
+              label={editingId ? "Nouvelle image (laisser vide pour garder l'actuelle)" : "Image de l'ennemi"}
+            />
             {message && <p className="text-yellow-400 text-sm">{message}</p>}
             <div className="flex gap-2">
               <button type="button" onClick={sauvegarderEnnemi} disabled={loading} className="flex-1 p-3 bg-yellow-500 text-gray-900 font-bold rounded">
@@ -217,28 +244,39 @@ export default function Ennemis() {
           {ennemis.length === 0 && <p className="text-gray-400">Aucun ennemi créé pour l'instant.</p>}
           {ennemis.map((ennemi) => (
             <div key={ennemi.id} className="bg-gray-800 p-4 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-bold text-white">{ennemi.nom}</h3>
-                <div className="flex gap-3">
-                  <button type="button" onClick={() => commencerEdition(ennemi)} className="text-blue-400 text-sm">
-                    Modifier
-                  </button>
-                  <button type="button" onClick={() => supprimerEnnemi(ennemi.id)} className="text-red-400 text-sm">
-                    Supprimer
-                  </button>
+              <div className="flex gap-4">
+                {ennemi.image_url && (
+                  <img
+                    src={ennemi.image_url}
+                    alt={ennemi.nom}
+                    className="w-24 h-24 object-cover rounded bg-gray-900 flex-shrink-0"
+                  />
+                )}
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-lg font-bold text-white">{ennemi.nom}</h3>
+                    <div className="flex gap-3">
+                      <button type="button" onClick={() => commencerEdition(ennemi)} className="text-blue-400 text-sm">
+                        Modifier
+                      </button>
+                      <button type="button" onClick={() => supprimerEnnemi(ennemi.id)} className="text-red-400 text-sm">
+                        Supprimer
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-sm text-gray-400">
+                    <span>❤️ HP: {ennemi.hp_actuel}/{ennemi.hp_max}</span>
+                    <span>🛡️ Armure: {ennemi.armure}</span>
+                    <span>💪 Force: {ennemi.force}</span>
+                    <span>🏃 Dex: {ennemi.dexterite}</span>
+                    <span>🫀 Con: {ennemi.constitution}</span>
+                    <span>🧠 Int: {ennemi.intelligence}</span>
+                    <span>🙏 Sag: {ennemi.sagesse}</span>
+                    <span>✨ Cha: {ennemi.charisme}</span>
+                  </div>
+                  {ennemi.notes && <p className="text-gray-500 text-sm mt-2 italic">{ennemi.notes}</p>}
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-2 text-sm text-gray-400">
-                <span>❤️ HP: {ennemi.hp_actuel}/{ennemi.hp_max}</span>
-                <span>🛡️ Armure: {ennemi.armure}</span>
-                <span>💪 Force: {ennemi.force}</span>
-                <span>🏃 Dex: {ennemi.dexterite}</span>
-                <span>🫀 Con: {ennemi.constitution}</span>
-                <span>🧠 Int: {ennemi.intelligence}</span>
-                <span>🙏 Sag: {ennemi.sagesse}</span>
-                <span>✨ Cha: {ennemi.charisme}</span>
-              </div>
-              {ennemi.notes && <p className="text-gray-500 text-sm mt-2 italic">{ennemi.notes}</p>}
             </div>
           ))}
         </div>

@@ -19,6 +19,7 @@ export default function Scenarios() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [codesVisibles, setCodesVisibles] = useState<Record<string, string>>({})
   const router = useRouter()
 
   const resetForm = () => {
@@ -75,6 +76,49 @@ export default function Scenarios() {
     fetchScenarios()
   }
 
+  const genererCode = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    let suffix = ''
+    for (let i = 0; i < 6; i++) suffix += chars[Math.floor(Math.random() * chars.length)]
+    return `DND-${suffix}`
+  }
+
+  const inviterJoueur = async (scenarioId: string) => {
+    const { data: existing } = await supabase
+      .from('codes_invitation')
+      .select('code')
+      .eq('scenario_id', scenarioId)
+      .eq('utilise', false)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (existing?.code) {
+      setCodesVisibles((prev) => ({ ...prev, [scenarioId]: existing.code }))
+      return
+    }
+
+    for (let i = 0; i < 5; i++) {
+      const code = genererCode()
+      const { error } = await supabase
+        .from('codes_invitation')
+        .insert({ code, scenario_id: scenarioId })
+      if (!error) {
+        setCodesVisibles((prev) => ({ ...prev, [scenarioId]: code }))
+        return
+      }
+    }
+    setMessage("Impossible de générer un code unique, réessaie.")
+  }
+
+  const cacherCode = (scenarioId: string) => {
+    setCodesVisibles((prev) => {
+      const next = { ...prev }
+      delete next[scenarioId]
+      return next
+    })
+  }
+
   return (
     <main className="min-h-screen bg-gray-900 text-white p-6">
       <div className="max-w-4xl mx-auto">
@@ -111,6 +155,9 @@ export default function Scenarios() {
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold text-white">{scenario.nom}</h3>
                 <div className="flex gap-3">
+                  <button type="button" onClick={() => inviterJoueur(scenario.id)} className="text-green-400 text-sm">
+                    Inviter un joueur
+                  </button>
                   <button type="button" onClick={() => commencerEdition(scenario)} className="text-blue-400 text-sm">
                     Modifier
                   </button>
@@ -119,7 +166,32 @@ export default function Scenarios() {
                   </button>
                 </div>
               </div>
-              {scenario.description && <p className="text-gray-400 text-sm">{scenario.description}</p>}
+              {codesVisibles[scenario.id] && (
+                <div className="mt-2 p-2 rounded bg-gray-900 border border-green-600/50 flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-gray-400 text-xs">Code d&apos;invitation à donner au joueur :</p>
+                    <code className="text-green-300 font-mono font-bold text-lg">{codesVisibles[scenario.id]}</code>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => navigator.clipboard?.writeText(codesVisibles[scenario.id])}
+                      className="text-gray-400 hover:text-white text-xs"
+                      title="Copier"
+                    >
+                      📋 Copier
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => cacherCode(scenario.id)}
+                      className="text-gray-400 hover:text-white text-xs"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )}
+              {scenario.description && <p className="text-gray-400 text-sm mt-2">{scenario.description}</p>}
             </div>
           ))}
         </div>
