@@ -4,6 +4,14 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Combat from './combat/page'
+import {
+  THEMES,
+  THEME_KEYS,
+  DEFAULT_THEME,
+  PREMIUM_THEMES,
+  applyTheme,
+  type ThemeKey
+} from '@/app/styles/themes'
 
 type ScenarioLite = { id: string; nom: string }
 type PersoLite = {
@@ -30,14 +38,67 @@ export default function Dashboard() {
   const [messageJoueur, setMessageJoueur] = useState('')
   const [personnagesJoueurs, setPersonnagesJoueurs] = useState<PersoLite[]>([])
   const [menuOuvert, setMenuOuvert] = useState(false)
+  const [themeOuvert, setThemeOuvert] = useState(false)
+  const [rejoindreOuvert, setRejoindreOuvert] = useState(false)
+  const [themeActuel, setThemeActuel] = useState<ThemeKey>(DEFAULT_THEME)
   const menuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+
+  useEffect(() => {
+    const load = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase
+        .from('profiles')
+        .select('theme')
+        .eq('id', user.id)
+        .maybeSingle()
+      const raw = data?.theme as string | undefined
+      if (raw && raw in THEMES) setThemeActuel(raw as ThemeKey)
+    }
+    load()
+  }, [])
+
+  const changerTheme = async (key: ThemeKey) => {
+    applyTheme(key)
+    setThemeActuel(key)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { data: existing, error: selectError } = await supabase
+      .from('profiles')
+      .select('username, role')
+      .eq('id', user.id)
+      .maybeSingle()
+    if (selectError) {
+      console.error('[theme] lecture profil échec :', selectError)
+    }
+
+    const username =
+      (existing?.username as string | undefined) ?? user.email ?? user.id
+    const role = (existing?.role as string | undefined) ?? 'joueur'
+
+    const { error } = await supabase
+      .from('profiles')
+      .upsert({ id: user.id, username, role, theme: key })
+    if (error) {
+      console.error('[theme] sauvegarde échec :', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        payload: { id: user.id, username, role, theme: key }
+      })
+    }
+  }
 
   useEffect(() => {
     if (!menuOuvert) return
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOuvert(false)
+        setThemeOuvert(false)
+        setRejoindreOuvert(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -158,9 +219,173 @@ export default function Dashboard() {
 
   return (
     <main className="min-h-screen bg-gray-900 text-white">
-      <div className="bg-gray-800 p-3 sm:p-4 flex items-center justify-between gap-2 border-b border-gray-700">
-        <h1 className="text-base sm:text-xl font-bold text-yellow-500 flex-shrink-0 truncate">D&D Manager</h1>
-        <div className="flex bg-gray-700 rounded-lg p-1 flex-shrink min-w-0">
+      <div className="bg-gray-800 p-3 sm:p-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-gray-700 theme-header-border theme-no-deco">
+        <div className="min-w-0 justify-self-start">
+          <h1 className="text-base sm:text-xl font-bold text-yellow-500 truncate text-center sm:text-left">
+            D&D MANAGER
+          </h1>
+          <p
+            className="text-[11px] uppercase text-center sm:text-left truncate mt-0.5 italic"
+            style={{
+              color: THEMES[themeActuel].colors.accent_color,
+              opacity: 0.75,
+              fontFamily: 'var(--font-cinzel), Cinzel, serif',
+              letterSpacing: '0.25em',
+              textShadow: `0 0 6px ${THEMES[themeActuel].colors.accent_color}66`
+            }}
+          >
+            {THEMES[themeActuel].slogan}
+          </p>
+          {themeActuel === 'royal' && (
+            <div
+              className="flex justify-center mt-2"
+              style={{
+                background: '#030100',
+                boxShadow: 'inset 0 0 24px rgba(0,0,0,0.95)',
+                borderRadius: '4px',
+                padding: '6px 10px',
+                width: 'fit-content',
+                margin: '8px auto 0'
+              }}
+            >
+              <svg
+                viewBox="0 0 200 80"
+                width="120"
+                aria-label="Yeux de dragon royal"
+              >
+                <style>{`
+                  .royal-eye {
+                    transform-box: fill-box;
+                    transform-origin: center;
+                    animation: royal-eye-blink 4.5s infinite ease-in-out;
+                  }
+                  .royal-iris-wrap {
+                    transform-box: fill-box;
+                    transform-origin: center;
+                    animation: royal-eye-scan 6s infinite ease-in-out;
+                  }
+                  .royal-iris-inner {
+                    animation: royal-iris-pulse 3s infinite ease-in-out;
+                  }
+                  @keyframes royal-eye-blink {
+                    0%, 88%, 100% { transform: scaleY(1); }
+                    92% { transform: scaleY(0.05); }
+                    96% { transform: scaleY(0.05); }
+                  }
+                  @keyframes royal-eye-scan {
+                    0%, 100% { transform: translateX(0); }
+                    30% { transform: translateX(-1.5px); }
+                    70% { transform: translateX(1.5px); }
+                  }
+                  @keyframes royal-iris-pulse {
+                    0%, 100% { opacity: 0.88; }
+                    50% { opacity: 1; }
+                  }
+                `}</style>
+
+                <defs>
+                  <radialGradient id="royal-iris-left" cx="0.5" cy="0.5" r="0.55">
+                    <stop offset="0%" stopColor="#ff2200" />
+                    <stop offset="25%" stopColor="#cc1100" />
+                    <stop offset="55%" stopColor="#880000" />
+                    <stop offset="80%" stopColor="#330000" />
+                    <stop offset="100%" stopColor="#0a0000" />
+                  </radialGradient>
+                  <radialGradient id="royal-iris-right" cx="0.5" cy="0.5" r="0.55">
+                    <stop offset="0%" stopColor="#ff2200" />
+                    <stop offset="25%" stopColor="#cc1100" />
+                    <stop offset="55%" stopColor="#880000" />
+                    <stop offset="80%" stopColor="#330000" />
+                    <stop offset="100%" stopColor="#0a0000" />
+                  </radialGradient>
+                  <clipPath id="royal-eye-clip-left">
+                    <path d="M 32 38 Q 38 28 48 26 Q 70 30 86 46 Q 72 54 52 54 Q 36 48 32 38 Z" />
+                  </clipPath>
+                  <clipPath id="royal-eye-clip-right">
+                    <path d="M 168 38 Q 162 28 152 26 Q 130 30 114 46 Q 128 54 148 54 Q 164 48 168 38 Z" />
+                  </clipPath>
+                </defs>
+
+                {/* Fond sombre */}
+                <rect x="0" y="0" width="200" height="80" fill="#030100" />
+
+                {/* ŒIL GAUCHE */}
+                <g className="royal-eye">
+                  {/* Socle noir sous l'iris */}
+                  <path
+                    d="M 32 38 Q 38 28 48 26 Q 70 30 86 46 Q 72 54 52 54 Q 36 48 32 38 Z"
+                    fill="#0a0000"
+                  />
+                  <g clipPath="url(#royal-eye-clip-left)">
+                    <g className="royal-iris-wrap">
+                      <circle
+                        cx="60"
+                        cy="40"
+                        r="14"
+                        fill="url(#royal-iris-left)"
+                        className="royal-iris-inner"
+                      />
+                      {/* Veines fines rouges */}
+                      <g stroke="#ff2200" strokeWidth="0.25" fill="none" opacity="0.55">
+                        <path d="M 50 34 Q 53 38 52 42" />
+                        <path d="M 68 34 Q 69 39 68 42" />
+                        <path d="M 52 46 Q 56 44 56 48" />
+                        <path d="M 66 46 Q 68 44 70 47" />
+                        <path d="M 48 40 Q 52 42 50 44" />
+                      </g>
+                      {/* Pupille fendue verticale */}
+                      <ellipse cx="60" cy="40" rx="1.2" ry="11" fill="#000" />
+                      {/* Reflet orange haut-gauche */}
+                      <ellipse cx="55" cy="35" rx="2.2" ry="1.4" fill="#ff8844" opacity="0.82" />
+                    </g>
+                  </g>
+                  {/* Contour de la paupière */}
+                  <path
+                    d="M 32 38 Q 38 28 48 26 Q 70 30 86 46 Q 72 54 52 54 Q 36 48 32 38 Z"
+                    fill="none"
+                    stroke="#3a0000"
+                    strokeWidth="0.4"
+                  />
+                </g>
+
+                {/* ŒIL DROIT (miroir) */}
+                <g className="royal-eye">
+                  <path
+                    d="M 168 38 Q 162 28 152 26 Q 130 30 114 46 Q 128 54 148 54 Q 164 48 168 38 Z"
+                    fill="#0a0000"
+                  />
+                  <g clipPath="url(#royal-eye-clip-right)">
+                    <g className="royal-iris-wrap">
+                      <circle
+                        cx="140"
+                        cy="40"
+                        r="14"
+                        fill="url(#royal-iris-right)"
+                        className="royal-iris-inner"
+                      />
+                      <g stroke="#ff2200" strokeWidth="0.25" fill="none" opacity="0.55">
+                        <path d="M 130 34 Q 133 38 132 42" />
+                        <path d="M 148 34 Q 149 39 148 42" />
+                        <path d="M 132 46 Q 136 44 136 48" />
+                        <path d="M 146 46 Q 148 44 150 47" />
+                        <path d="M 128 40 Q 132 42 130 44" />
+                      </g>
+                      <ellipse cx="140" cy="40" rx="1.2" ry="11" fill="#000" />
+                      <ellipse cx="135" cy="35" rx="2.2" ry="1.4" fill="#ff8844" opacity="0.82" />
+                    </g>
+                  </g>
+                  <path
+                    d="M 168 38 Q 162 28 152 26 Q 130 30 114 46 Q 128 54 148 54 Q 164 48 168 38 Z"
+                    fill="none"
+                    stroke="#3a0000"
+                    strokeWidth="0.4"
+                  />
+                </g>
+              </svg>
+            </div>
+          )}
+        </div>
+        <div className="flex bg-gray-700 rounded-lg p-1 justify-self-center">
           <button type="button" onClick={() => setInterface('mj')} className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-md text-sm sm:text-base font-bold transition ${interface_ === 'mj' ? 'bg-yellow-500 text-gray-900' : 'text-gray-400 hover:text-white'}`}>
             MJ
           </button>
@@ -168,7 +393,7 @@ export default function Dashboard() {
             Joueur
           </button>
         </div>
-        <div className="relative flex-shrink-0" ref={menuRef}>
+        <div className="relative justify-self-end" ref={menuRef}>
           <button
             type="button"
             onClick={() => setMenuOuvert((v) => !v)}
@@ -179,11 +404,13 @@ export default function Dashboard() {
             ☰
           </button>
           {menuOuvert && (
-            <div className="absolute right-0 mt-2 w-52 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
+            <div className="absolute right-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden theme-no-deco">
               <button
                 type="button"
                 onClick={() => {
                   setMenuOuvert(false)
+                  setThemeOuvert(false)
+                  setRejoindreOuvert(false)
                   router.push('/dashboard/bibliotheque')
                 }}
                 className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2 text-sm"
@@ -193,8 +420,121 @@ export default function Dashboard() {
               <div className="border-t border-gray-700" />
               <button
                 type="button"
+                onClick={() => setRejoindreOuvert((v) => !v)}
+                className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center justify-between gap-2 text-sm"
+                aria-expanded={rejoindreOuvert}
+              >
+                <span>🎟️ Rejoindre un scénario</span>
+                <span className="text-xs text-gray-500">{rejoindreOuvert ? '▾' : '▸'}</span>
+              </button>
+              {rejoindreOuvert && (
+                <div className="bg-gray-900/50 border-t border-gray-700 p-3 space-y-2">
+                  <p className="text-gray-400 text-xs">
+                    Entre le code d&apos;invitation donné par ton MJ.
+                  </p>
+                  <input
+                    type="text"
+                    value={codeScenario}
+                    onChange={(e) => setCodeScenario(e.target.value)}
+                    placeholder="DND-XXXXXX"
+                    className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none font-mono uppercase text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={rejoindreScenario}
+                    className="w-full px-3 py-2 bg-yellow-500 text-gray-900 font-bold rounded hover:bg-yellow-400 text-sm"
+                  >
+                    Rejoindre
+                  </button>
+                  {messageJoueur && (
+                    <p className="text-yellow-400 text-xs">{messageJoueur}</p>
+                  )}
+                </div>
+              )}
+              <div className="border-t border-gray-700" />
+              <button
+                type="button"
+                onClick={() => setThemeOuvert((v) => !v)}
+                className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center justify-between gap-2 text-sm"
+                aria-expanded={themeOuvert}
+              >
+                <span className="flex items-center gap-2">🎨 Thème</span>
+                <span className="text-xs text-gray-500">
+                  {THEMES[themeActuel].label} {themeOuvert ? '▾' : '▸'}
+                </span>
+              </button>
+              {themeOuvert && (
+                <div className="bg-gray-900/50 border-t border-gray-700 p-2 space-y-1 max-h-80 overflow-y-auto">
+                  {THEME_KEYS.map((key) => {
+                    const t = THEMES[key]
+                    const actif = themeActuel === key
+                    const premium = PREMIUM_THEMES.includes(key)
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => changerTheme(key)}
+                        className={`w-full flex items-center gap-3 p-2 rounded transition text-left ${
+                          actif ? 'bg-gray-700' : 'hover:bg-gray-700/60'
+                        } ${premium ? 'ring-1 ring-yellow-600/40' : ''}`}
+                      >
+                        <div
+                          className="flex flex-shrink-0 rounded overflow-hidden"
+                          style={{ border: `1px solid ${t.colors.border_color}` }}
+                        >
+                          <span
+                            className="block w-4 h-10"
+                            style={{ backgroundColor: t.colors.bg_primary }}
+                          />
+                          <span
+                            className="block w-4 h-10"
+                            style={{ backgroundColor: t.colors.bg_secondary }}
+                          />
+                          <span
+                            className="block w-4 h-10"
+                            style={{ backgroundColor: t.colors.accent_color }}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className={`text-sm font-bold truncate ${
+                              actif ? 'text-white' : 'text-gray-200'
+                            }`}
+                          >
+                            {premium && <span className="mr-1">👑</span>}
+                            {t.label}
+                            {premium && (
+                              <span className="ml-1 text-[10px] font-bold tracking-wide text-yellow-500">
+                                — Premium
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-gray-500 truncate">
+                            {t.description}
+                          </p>
+                          <p
+                            className="text-[10px] font-bold tracking-wider truncate mt-0.5"
+                            style={{ color: t.colors.accent_color }}
+                          >
+                            « {t.slogan} »
+                          </p>
+                        </div>
+                        {actif && (
+                          <span className="text-green-400 text-sm flex-shrink-0">
+                            ✓
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+              <div className="border-t border-gray-700" />
+              <button
+                type="button"
                 onClick={async () => {
                   setMenuOuvert(false)
+                  setThemeOuvert(false)
                   await supabase.auth.signOut()
                   router.push('/')
                 }}
@@ -205,16 +545,17 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+        <div className="theme-header-glow" />
       </div>
 
       {interface_ === 'mj' && (
         <div>
-          <div className="bg-gray-800 border-b border-gray-700 p-3 flex justify-center gap-4">
+          <div className="bg-gray-800 border-b border-gray-700 p-3 flex justify-center gap-4 theme-no-deco">
             <button type="button" onClick={() => setModeMJ('travail')} className={`px-6 py-2 rounded-lg font-bold transition ${modeMJ === 'travail' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>
-              Mode Travail
+              📜 Forge
             </button>
             <button type="button" onClick={() => setModeMJ('action')} className={`px-6 py-2 rounded-lg font-bold transition ${modeMJ === 'action' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'}`}>
-              Mode Action
+              🗡️ Aventure
             </button>
           </div>
           <div className="p-6">
@@ -261,7 +602,7 @@ export default function Dashboard() {
             )}
             {modeMJ === 'travail' && (
               <div>
-                <h2 className="text-2xl font-bold text-blue-400 mb-4">Mode Travail</h2>
+                <h2 className="text-2xl font-bold text-blue-400 mb-4">📜 Forge</h2>
                 <div className="grid grid-cols-2 gap-4 mb-6">
                   <button type="button" onClick={() => router.push('/dashboard/scenarios')} className="bg-gray-800 p-4 rounded-lg hover:bg-gray-700 transition text-left">
                     <h3 className="text-lg font-bold text-yellow-500">Scenarios</h3>
@@ -278,10 +619,6 @@ export default function Dashboard() {
                   <button type="button" onClick={() => router.push('/dashboard/maps')} className="bg-gray-800 p-4 rounded-lg hover:bg-gray-700 transition text-left">
                     <h3 className="text-lg font-bold text-yellow-500">Maps</h3>
                     <p className="text-gray-400 text-sm mt-1">Gerer tes cartes</p>
-                  </button>
-                  <button type="button" onClick={() => router.push('/dashboard/bibliotheque')} className="bg-gray-800 p-4 rounded-lg hover:bg-gray-700 transition text-left col-span-2">
-                    <h3 className="text-lg font-bold text-yellow-500">📚 Bibliothèque</h3>
-                    <p className="text-gray-400 text-sm mt-1">Parcourir tout ce qui a été créé (scénarios, personnages, ennemis, items, maps, sorts)</p>
                   </button>
                 </div>
                 <div className="bg-gray-800 p-4 rounded-lg">
@@ -339,30 +676,6 @@ export default function Dashboard() {
               <h3 className="text-lg font-bold text-yellow-500">Sorts</h3>
               <p className="text-gray-400 text-sm mt-1">Gerer tes sorts</p>
             </button>
-          </div>
-
-          <div className="bg-gray-800 p-4 rounded-lg mb-6">
-            <h3 className="text-lg font-bold text-yellow-500 mb-2">🎟️ Rejoindre un scénario</h3>
-            <p className="text-gray-400 text-sm mb-3">
-              Entre le code d&apos;invitation donné par ton MJ.
-            </p>
-            <div className="flex flex-col md:flex-row gap-2">
-              <input
-                type="text"
-                value={codeScenario}
-                onChange={(e) => setCodeScenario(e.target.value)}
-                placeholder="DND-XXXXXX"
-                className="flex-1 p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none font-mono uppercase"
-              />
-              <button
-                type="button"
-                onClick={rejoindreScenario}
-                className="px-4 py-3 bg-yellow-500 text-gray-900 font-bold rounded hover:bg-yellow-400"
-              >
-                Rejoindre
-              </button>
-            </div>
-            {messageJoueur && <p className="text-yellow-400 text-sm mt-2">{messageJoueur}</p>}
           </div>
 
           <div className="bg-gray-800 p-4 rounded-lg">

@@ -1,4 +1,5 @@
 import DiceLauncher from '@/app/components/DiceLauncher'
+import ThemeLoader from './ThemeLoader'
 
 export default function DashboardLayout({
   children,
@@ -7,6 +8,7 @@ export default function DashboardLayout({
 }) {
   return (
     <>
+      <ThemeLoader />
       {children}
       <DiceLauncher />
     </>

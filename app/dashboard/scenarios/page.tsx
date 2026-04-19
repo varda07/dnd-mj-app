@@ -20,7 +20,37 @@ export default function Scenarios() {
   const [message, setMessage] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [codesVisibles, setCodesVisibles] = useState<Record<string, string>>({})
+  const [codeJoueur, setCodeJoueur] = useState('')
+  const [scenarioCibleId, setScenarioCibleId] = useState('')
+  const [messageJoueur, setMessageJoueur] = useState('')
   const router = useRouter()
+
+  const ajouterJoueur = async () => {
+    setMessageJoueur('')
+    const code = codeJoueur.trim().toUpperCase()
+    if (!code) return setMessageJoueur('Entre un code.')
+    if (!scenarioCibleId) return setMessageJoueur('Choisis un scénario cible.')
+
+    const { data: invit, error: err1 } = await supabase
+      .from('codes_invitation')
+      .select('id, personnage_id, utilise')
+      .eq('code', code)
+      .maybeSingle()
+    if (err1 || !invit) return setMessageJoueur('Code introuvable.')
+    if (invit.utilise) return setMessageJoueur('Ce code a déjà été utilisé.')
+    if (!invit.personnage_id) return setMessageJoueur("Ce code n'est pas un code de personnage.")
+
+    const { error: err2 } = await supabase
+      .from('personnages')
+      .update({ scenario_id: scenarioCibleId })
+      .eq('id', invit.personnage_id)
+    if (err2) return setMessageJoueur('Impossible de lier le personnage : ' + err2.message)
+
+    await supabase.from('codes_invitation').update({ utilise: true }).eq('id', invit.id)
+
+    setMessageJoueur('✓ Personnage ajouté au scénario !')
+    setCodeJoueur('')
+  }
 
   const resetForm = () => {
     setNom('')
@@ -154,6 +184,42 @@ export default function Scenarios() {
             </div>
           </div>
         </div>
+
+        <div className="bg-gray-800 p-4 rounded-lg mb-6">
+          <h2 className="text-lg font-bold text-yellow-500 mb-2">🎟️ Ajouter un joueur</h2>
+          <p className="text-gray-400 text-sm mb-3">
+            Entre le code d&apos;invitation partagé par un joueur pour rattacher son
+            personnage à l&apos;un de tes scénarios.
+          </p>
+          <div className="flex flex-col md:flex-row gap-2">
+            <input
+              type="text"
+              value={codeJoueur}
+              onChange={(e) => setCodeJoueur(e.target.value)}
+              placeholder="DND-XXXXXX"
+              className="flex-1 p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none font-mono uppercase"
+            />
+            <select
+              value={scenarioCibleId}
+              onChange={(e) => setScenarioCibleId(e.target.value)}
+              className="flex-1 p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none"
+            >
+              <option value="">— Choisir un scénario —</option>
+              {scenarios.map((s) => (
+                <option key={s.id} value={s.id}>{s.nom}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={ajouterJoueur}
+              className="px-4 py-3 bg-yellow-500 text-gray-900 font-bold rounded hover:bg-yellow-400"
+            >
+              Ajouter
+            </button>
+          </div>
+          {messageJoueur && <p className="text-yellow-400 text-sm mt-2">{messageJoueur}</p>}
+        </div>
+
         <div className="space-y-4">
           <h2 className="text-lg font-bold text-yellow-500">Mes scenarios</h2>
           {scenarios.length === 0 && <p className="text-gray-400">Aucun scenario pour l'instant.</p>}

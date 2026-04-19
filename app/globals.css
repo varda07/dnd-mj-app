@@ -24,3 +24,336 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ============================================================================
+   THÈMES — architecture
+   ============================================================================
+   Chaque thème définit 3 familles de tokens :
+   - Colorimétrie Tailwind (--color-gray-*, --color-yellow-*) pour remapper
+     les utilities par défaut (bg-gray-800, text-yellow-500, etc.)
+   - Variables sémantiques (--theme-*) définies côté JS par applyTheme()
+   - Variables "premium" (--premium-*) pour le traitement visuel élaboré :
+     accent, ornements, overlay texture, inset, etc.
+
+   Toutes les pages du dashboard reçoivent automatiquement le traitement
+   premium (Cinzel, texture, cartes ornées, bordures animées). Pour opter une
+   surface OUT (menu déroulant, toggle bar), lui appliquer la classe
+   `.theme-no-deco` — elle désactive position:relative, border animée,
+   ornements et background texture sur cette surface.
+*/
+
+
+/* ---- 1. Tokens Tailwind par thème ---- */
+html[data-theme="runique"] {
+  --color-gray-900: #0f0a1e;
+  --color-gray-800: #1a1332;
+  --color-gray-700: #2a1f4a;
+  --color-gray-600: #3d2c6b;
+  --color-yellow-500: #a855f7;
+
+  --premium-accent: #a855f7;
+  --premium-accent-soft: rgba(168, 85, 247, 0.35);
+  --premium-accent-strong: rgba(168, 85, 247, 0.95);
+  --premium-accent-tip: #d8b4fe;
+  --premium-ornament: #6644cc;
+  --premium-ornament-tip: #a88af0;
+  --premium-overlay: rgba(10, 10, 20, 0.88);
+  --premium-texture: url('https://www.transparenttextures.com/patterns/dark-mosaic.png');
+  --premium-inset: rgba(102, 68, 204, 0.18);
+  --premium-inset-strong: rgba(102, 68, 204, 0.35);
+}
+
+html[data-theme="parchemin"] {
+  --color-gray-900: #0a0805;
+  --color-gray-800: #1a1508;
+  --color-gray-700: #2a2010;
+  --color-gray-600: #4a3820;
+  --color-yellow-500: #d97706;
+
+  --premium-accent: #d97706;
+  --premium-accent-soft: rgba(217, 119, 6, 0.35);
+  --premium-accent-strong: rgba(217, 119, 6, 1.0);
+  --premium-accent-tip: #fbbf24;
+  --premium-ornament: #d97706;
+  --premium-ornament-tip: #fbbf24;
+  --premium-overlay: rgba(21, 14, 4, 0.88);
+  --premium-texture: url('https://www.transparenttextures.com/patterns/old-mathematics.png');
+  --premium-inset: rgba(217, 119, 6, 0.15);
+  --premium-inset-strong: rgba(217, 119, 6, 0.3);
+}
+
+html[data-theme="lave"] {
+  --color-gray-900: #0f0300;
+  --color-gray-800: #1f0a05;
+  --color-gray-700: #2f1510;
+  --color-gray-600: #4a1e10;
+  --color-yellow-500: #ff4400;
+
+  --premium-accent: #ff4400;
+  --premium-accent-soft: rgba(255, 68, 0, 0.35);
+  --premium-accent-strong: rgba(255, 68, 0, 1.0);
+  --premium-accent-tip: #ff8c40;
+  --premium-ornament: #ff4400;
+  --premium-ornament-tip: #ff8c40;
+  --premium-overlay: rgba(15, 3, 0, 0.9);
+  --premium-texture: url('https://www.transparenttextures.com/patterns/dark-mosaic.png');
+  --premium-inset: rgba(220, 60, 0, 0.22);
+  --premium-inset-strong: rgba(255, 68, 0, 0.4);
+}
+
+html[data-theme="necromancien"] {
+  --color-gray-900: #050508;
+  --color-gray-800: #0a0a10;
+  --color-gray-700: #0f1012;
+  --color-gray-600: #1a2018;
+  --color-yellow-500: #00cc44;
+
+  --premium-accent: #00cc44;
+  --premium-accent-soft: rgba(0, 204, 68, 0.3);
+  --premium-accent-strong: rgba(0, 204, 68, 0.95);
+  --premium-accent-tip: #6eff9a;
+  --premium-ornament: #00cc44;
+  --premium-ornament-tip: #6eff9a;
+  --premium-overlay: rgba(5, 5, 8, 0.9);
+  --premium-texture: url('https://www.transparenttextures.com/patterns/dark-mosaic.png');
+  --premium-inset: rgba(0, 180, 60, 0.15);
+  --premium-inset-strong: rgba(0, 180, 60, 0.32);
+}
+
+html[data-theme="royal"] {
+  --color-gray-900: #050200;
+  --color-gray-800: #1a0f05;
+  --color-gray-700: #2a1a0a;
+  --color-gray-600: #3a2510;
+  --color-yellow-500: #C9A84C;
+
+  --premium-accent: #C9A84C;
+  --premium-accent-soft: rgba(201, 168, 76, 0.4);
+  --premium-accent-strong: rgba(201, 168, 76, 1.0);
+  --premium-accent-tip: #e8c664;
+  --premium-ornament: #C9A84C;
+  --premium-ornament-tip: #e8c664;
+  --premium-overlay: rgba(5, 2, 0, 0.85);
+  --premium-texture: url('https://www.transparenttextures.com/patterns/dark-mosaic.png');
+  --premium-inset: rgba(139, 0, 0, 0.25);
+  --premium-inset-strong: rgba(139, 0, 0, 0.4);
+}
+
+
+/* ---- 2. Overrides couleurs de base (filet de sécurité) ---- */
+html[data-theme] body,
+html[data-theme] .bg-gray-900 {
+  background-color: var(--theme-bg-primary) !important;
+  color: var(--theme-text-primary);
+}
+html[data-theme] {
+  background-color: var(--theme-bg-primary);
+}
+html[data-theme] .bg-gray-800 {
+  background-color: var(--theme-bg-secondary) !important;
+}
+html[data-theme] .bg-gray-700 {
+  background-color: var(--theme-bg-card) !important;
+}
+html[data-theme] .border-gray-700,
+html[data-theme] .border-gray-600 {
+  border-color: var(--theme-border) !important;
+}
+html[data-theme] .text-yellow-500 {
+  color: var(--theme-accent) !important;
+}
+html[data-theme] .bg-yellow-500 {
+  background-color: var(--theme-accent) !important;
+}
+html[data-theme] .ring-yellow-500 {
+  --tw-ring-color: var(--theme-accent) !important;
+}
+
+
+/* ============================================================================
+   TRAITEMENT PREMIUM — appliqué à tous les thèmes
+   ============================================================================
+*/
+
+@keyframes premium-pulse {
+  0%, 100% {
+    border-color: var(--premium-accent-soft);
+    box-shadow:
+      inset 0 0 18px var(--premium-inset),
+      0 0 0 1px var(--premium-accent-soft);
+  }
+  50% {
+    border-color: var(--premium-accent-strong);
+    box-shadow:
+      inset 0 0 26px var(--premium-inset-strong),
+      0 0 0 1px var(--premium-accent-strong);
+  }
+}
+
+@keyframes premium-ornament-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1.0; }
+}
+
+@keyframes premium-border-slide {
+  0% { background-position: 0% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Fond : texture spécifique au thème + overlay teinté */
+html[data-theme] body,
+html[data-theme] .bg-gray-900 {
+  background-image:
+    linear-gradient(var(--premium-overlay), var(--premium-overlay)),
+    var(--premium-texture);
+  background-repeat: repeat;
+}
+
+/* Police Cinzel sur tous les titres et boutons */
+html[data-theme] h1,
+html[data-theme] h2,
+html[data-theme] h3,
+html[data-theme] button {
+  font-family: var(--font-cinzel), 'Cinzel', serif;
+  letter-spacing: 0.06em;
+}
+
+html[data-theme] h1 { letter-spacing: 0.12em; }
+html[data-theme] h2 { letter-spacing: 0.08em; }
+
+/* Cartes : bordure animée + lueur inset */
+html[data-theme] .bg-gray-800:not(.theme-no-deco) {
+  position: relative;
+  border: 1px solid var(--premium-accent-soft);
+  animation: premium-pulse 4s ease-in-out infinite;
+}
+
+/* Ornements de coins : L filigrané + points colorés (couleur spécifique ornement) */
+html[data-theme] .bg-gray-800:not(.theme-no-deco)::before,
+html[data-theme] .bg-gray-800:not(.theme-no-deco)::after {
+  content: '';
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  pointer-events: none;
+  animation: premium-ornament-pulse 4s ease-in-out infinite;
+  background:
+    /* branche horizontale */
+    linear-gradient(var(--premium-ornament), var(--premium-ornament)) 0 0 / 26px 2px no-repeat,
+    /* branche verticale */
+    linear-gradient(var(--premium-ornament), var(--premium-ornament)) 0 0 / 2px 26px no-repeat,
+    /* point au bout horizontal */
+    radial-gradient(circle, var(--premium-ornament-tip) 2.3px, transparent 3px) 22px -3px / 10px 10px no-repeat,
+    /* point au bout vertical */
+    radial-gradient(circle, var(--premium-ornament-tip) 2.3px, transparent 3px) -3px 22px / 10px 10px no-repeat,
+    /* point de jonction */
+    radial-gradient(circle, var(--premium-ornament) 1.6px, transparent 2.2px) -3px -3px / 10px 10px no-repeat;
+}
+
+html[data-theme] .bg-gray-800:not(.theme-no-deco)::before {
+  top: 5px;
+  left: 5px;
+}
+
+html[data-theme] .bg-gray-800:not(.theme-no-deco)::after {
+  bottom: 5px;
+  right: 5px;
+  transform: rotate(180deg);
+}
+
+/* Texte accent enrichi */
+html[data-theme] .text-yellow-500 {
+  text-shadow: 0 0 10px var(--premium-accent-soft);
+}
+
+/* Bouton accent avec dégradé */
+html[data-theme] .bg-yellow-500 {
+  background-image: linear-gradient(
+    135deg,
+    var(--premium-accent-tip) 0%,
+    var(--premium-accent) 50%,
+    var(--premium-accent) 100%
+  ) !important;
+  box-shadow:
+    0 2px 8px var(--premium-accent-soft),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Bordure dorée animée sous le header (activée via .theme-header-border) */
+html[data-theme] .theme-header-border {
+  position: relative;
+  border-bottom: none !important;
+}
+
+html[data-theme] .theme-header-border::before,
+html[data-theme] .theme-header-border::after {
+  content: none !important;
+}
+
+html[data-theme] .theme-header-border > .theme-header-glow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--premium-accent-soft) 20%,
+    var(--premium-accent) 40%,
+    var(--premium-accent-tip) 50%,
+    var(--premium-accent) 60%,
+    var(--premium-accent-soft) 80%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: premium-border-slide 4s linear infinite;
+  box-shadow: 0 0 8px var(--premium-accent-soft);
+  pointer-events: none;
+}
+
+/* Opt-out : surfaces structurelles (menu déroulant, toggle bar) qui ne
+   doivent PAS recevoir le traitement premium — évite les décalages de
+   layout provoqués par la border animée et les pseudo-éléments. */
+html[data-theme] .theme-no-deco {
+  animation: none !important;
+  border: none !important;
+  background-image: none !important;
+}
+html[data-theme] .theme-no-deco::before,
+html[data-theme] .theme-no-deco::after {
+  content: none !important;
+}
+
+
+/* ============================================================================
+   Spécificités royal : Cinzel plus prononcé, dégradé rouge dans les cartes,
+   shadow dorée renforcée sur bouton
+*/
+
+html[data-theme="royal"] h1 { letter-spacing: 0.15em; }
+html[data-theme="royal"] h2 { letter-spacing: 0.10em; }
+
+html[data-theme="royal"] .bg-gray-800:not(.theme-no-deco) {
+  background-image: linear-gradient(
+    135deg,
+    rgba(201, 168, 76, 0.05) 0%,
+    transparent 35%,
+    transparent 65%,
+    rgba(139, 0, 0, 0.08) 100%
+  );
+}
+
+html[data-theme="royal"] .bg-yellow-500 {
+  background-image: linear-gradient(135deg, #e8c664 0%, #C9A84C 50%, #8B6914 100%) !important;
+  color: #050200 !important;
+  box-shadow:
+    0 2px 10px rgba(201, 168, 76, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+html[data-theme="royal"] .border-gray-700,
+html[data-theme="royal"] .border-gray-600 {
+  border-color: #8B0000 !important;
+}
