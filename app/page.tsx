@@ -155,7 +155,7 @@ export default function Home() {
       <div className="w-full max-w-sm">
         {/* Titre */}
         <h1 className="login-title text-2xl sm:text-3xl font-bold text-center mb-3">
-          ⚔️ D&amp;D MANAGER
+          D&amp;D MANAGER
         </h1>
 
         {/* Slogan */}
