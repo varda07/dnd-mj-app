@@ -695,7 +695,18 @@ export default function Dashboard() {
               </div>
             )}
             {modeMJ === 'action' && (
-              <Combat />
+              <>
+                <div className="mb-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => router.push('/dashboard/exploration')}
+                    className="px-4 py-2 rounded-lg font-bold bg-gray-800 border border-yellow-600 text-yellow-500 hover:bg-gray-700"
+                  >
+                    🗺️ Exploration
+                  </button>
+                </div>
+                <Combat />
+              </>
             )}
           </div>
         </div>
@@ -731,13 +742,22 @@ export default function Dashboard() {
                       <span className="text-xl flex-shrink-0">📖</span>
                       <span className="font-bold truncate">{s.nom}</span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => quitterScenario(s.id)}
-                      className="px-3 py-1.5 text-xs font-bold bg-red-600 text-white rounded hover:bg-red-500 transition self-end"
-                    >
-                      Quitter
-                    </button>
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => router.push('/dashboard/exploration')}
+                        className="px-3 py-1.5 text-xs font-bold bg-gray-800 border border-yellow-600 text-yellow-500 rounded hover:bg-gray-700 transition"
+                      >
+                        🗺️ Explorer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => quitterScenario(s.id)}
+                        className="px-3 py-1.5 text-xs font-bold bg-red-600 text-white rounded hover:bg-red-500 transition"
+                      >
+                        Quitter
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
