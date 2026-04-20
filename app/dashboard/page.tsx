@@ -40,6 +40,7 @@ export default function Dashboard() {
   const [menuOuvert, setMenuOuvert] = useState(false)
   const [themeOuvert, setThemeOuvert] = useState(false)
   const [rejoindreOuvert, setRejoindreOuvert] = useState(false)
+  const [personnagesOuvert, setPersonnagesOuvert] = useState(false)
   const [themeActuel, setThemeActuel] = useState<ThemeKey>(DEFAULT_THEME)
   const menuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
@@ -175,6 +176,20 @@ export default function Dashboard() {
     setMessageMj('✓ Personnage ajouté au scénario !')
     setCodePersonnage('')
     fetchPersonnagesJoueurs(scenariosMj.map((s) => s.id))
+  }
+
+  const quitterScenario = async (scenarioId: string) => {
+    if (!confirm('Êtes-vous sûr de vouloir quitter ce scénario ?')) return
+    const { error } = await supabase
+      .from('scenarios_joueurs')
+      .delete()
+      .eq('scenario_id', scenarioId)
+      .eq('joueur_id', userId)
+    if (error) {
+      setMessageJoueur('Impossible de quitter : ' + error.message)
+      return
+    }
+    setScenariosRejoints((prev) => prev.filter((s) => s.id !== scenarioId))
   }
 
   const rejoindreScenario = async () => {
@@ -560,43 +575,66 @@ export default function Dashboard() {
           </div>
           <div className="p-6">
             {personnagesJoueurs.length > 0 && (
-              <div className="bg-gray-800 p-4 rounded-lg mb-6">
-                <h3 className="text-lg font-bold text-yellow-500 mb-3">🧙 Personnages des joueurs</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {personnagesJoueurs.map((p) => {
-                    const scenario = scenariosMj.find((s) => s.id === p.scenario_id)
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => router.push(`/dashboard/personnages/${p.id}`)}
-                        className="w-full flex items-center gap-3 bg-gray-900/50 border border-gray-700 rounded-lg p-3 hover:bg-gray-700/50 hover:border-yellow-600 transition text-left overflow-hidden"
-                        title={`Ouvrir la fiche de ${p.nom}`}
-                      >
-                        {p.image_url ? (
-                          <img
-                            src={p.image_url}
-                            alt={p.nom}
-                            className="w-12 h-12 rounded-full object-cover ring-2 ring-blue-400 flex-shrink-0 bg-gray-900"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center font-bold text-white flex-shrink-0">
-                            {p.nom.slice(0, 2).toUpperCase()}
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0 overflow-hidden">
-                          <p className="text-white font-bold truncate">{p.nom}</p>
-                          <p className="text-gray-400 text-xs truncate">
-                            {[p.classe, `Niv. ${p.niveau}`].filter(Boolean).join(' · ')}
-                          </p>
-                          <p className="text-gray-500 text-xs truncate">
-                            ❤️ {p.hp_actuel}/{p.hp_max}
-                            {scenario && <span className="ml-2">📖 {scenario.nom}</span>}
-                          </p>
-                        </div>
-                      </button>
-                    )
-                  })}
+              <div className="bg-gray-800 rounded-lg mb-6 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setPersonnagesOuvert((v) => !v)}
+                  aria-expanded={personnagesOuvert}
+                  className="w-full flex items-center justify-between p-4 hover:bg-gray-700/50 transition text-left"
+                >
+                  <h3 className="text-lg font-bold text-yellow-500">
+                    🧙 Personnages des joueurs ({personnagesJoueurs.length})
+                  </h3>
+                  <span
+                    className={`text-yellow-500 text-sm transition-transform duration-300 ${
+                      personnagesOuvert ? 'rotate-180' : ''
+                    }`}
+                  >
+                    ▾
+                  </span>
+                </button>
+                <div
+                  className="grid transition-[grid-template-rows] duration-300 ease-in-out"
+                  style={{ gridTemplateRows: personnagesOuvert ? '1fr' : '0fr' }}
+                >
+                  <div className="overflow-hidden">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4 pt-0">
+                      {personnagesJoueurs.map((p) => {
+                        const scenario = scenariosMj.find((s) => s.id === p.scenario_id)
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => router.push(`/dashboard/personnages/${p.id}`)}
+                            className="w-full flex items-center gap-3 bg-gray-900/50 border border-gray-700 rounded-lg p-3 hover:bg-gray-700/50 hover:border-yellow-600 transition text-left overflow-hidden"
+                            title={`Ouvrir la fiche de ${p.nom}`}
+                          >
+                            {p.image_url ? (
+                              <img
+                                src={p.image_url}
+                                alt={p.nom}
+                                className="w-12 h-12 rounded-full object-cover ring-2 ring-blue-400 flex-shrink-0 bg-gray-900"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center font-bold text-white flex-shrink-0">
+                                {p.nom.slice(0, 2).toUpperCase()}
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0 overflow-hidden">
+                              <p className="text-white font-bold truncate">{p.nom}</p>
+                              <p className="text-gray-400 text-xs truncate">
+                                {[p.classe, `Niv. ${p.niveau}`].filter(Boolean).join(' · ')}
+                              </p>
+                              <p className="text-gray-500 text-xs truncate">
+                                ❤️ {p.hp_actuel}/{p.hp_max}
+                                {scenario && <span className="ml-2">📖 {scenario.nom}</span>}
+                              </p>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -685,8 +723,18 @@ export default function Dashboard() {
             ) : (
               <ul className="space-y-2">
                 {scenariosRejoints.map((s) => (
-                  <li key={s.id} className="p-3 rounded bg-gray-900/50 border border-gray-700 text-white">
-                    📖 {s.nom}
+                  <li
+                    key={s.id}
+                    className="p-3 rounded bg-gray-900/50 border border-gray-700 text-white flex items-center justify-between gap-2"
+                  >
+                    <span className="truncate">📖 {s.nom}</span>
+                    <button
+                      type="button"
+                      onClick={() => quitterScenario(s.id)}
+                      className="px-3 py-1 text-xs font-bold bg-red-600 text-white rounded hover:bg-red-500 transition flex-shrink-0"
+                    >
+                      Quitter
+                    </button>
                   </li>
                 ))}
               </ul>
