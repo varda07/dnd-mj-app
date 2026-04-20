@@ -721,17 +721,20 @@ export default function Dashboard() {
             {scenariosRejoints.length === 0 ? (
               <p className="text-gray-400 text-sm">Aucun scénario rejoint pour l&apos;instant.</p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="flex gap-3 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-2 [scrollbar-width:thin]">
                 {scenariosRejoints.map((s) => (
                   <li
                     key={s.id}
-                    className="p-3 rounded bg-gray-900/50 border border-gray-700 text-white flex items-center justify-between gap-2"
+                    className="snap-start flex-shrink-0 w-64 p-4 rounded-lg bg-gray-900/50 border border-gray-700 text-white flex flex-col justify-between gap-3"
                   >
-                    <span className="truncate">📖 {s.nom}</span>
+                    <div className="flex items-start gap-2 min-w-0">
+                      <span className="text-xl flex-shrink-0">📖</span>
+                      <span className="font-bold truncate">{s.nom}</span>
+                    </div>
                     <button
                       type="button"
                       onClick={() => quitterScenario(s.id)}
-                      className="px-3 py-1 text-xs font-bold bg-red-600 text-white rounded hover:bg-red-500 transition flex-shrink-0"
+                      className="px-3 py-1.5 text-xs font-bold bg-red-600 text-white rounded hover:bg-red-500 transition self-end"
                     >
                       Quitter
                     </button>

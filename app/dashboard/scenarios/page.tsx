@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import MindMap from './MindMap'
 
 type Scenario = {
   id: string
@@ -23,6 +24,7 @@ export default function Scenarios() {
   const [codeJoueur, setCodeJoueur] = useState('')
   const [scenarioCibleId, setScenarioCibleId] = useState('')
   const [messageJoueur, setMessageJoueur] = useState('')
+  const [vue, setVue] = useState<'liste' | 'carte'>('liste')
   const router = useRouter()
 
   const ajouterJoueur = async () => {
@@ -165,6 +167,30 @@ export default function Scenarios() {
           </button>
           <h1 className="text-2xl font-bold text-yellow-500">Scenarios</h1>
         </div>
+        <div className="flex bg-gray-800 rounded-lg p-1 mb-6 w-fit">
+          <button
+            type="button"
+            onClick={() => setVue('liste')}
+            className={`px-4 py-2 rounded-md text-sm font-bold transition ${
+              vue === 'liste' ? 'bg-yellow-500 text-gray-900' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            📋 Vue Liste
+          </button>
+          <button
+            type="button"
+            onClick={() => setVue('carte')}
+            className={`px-4 py-2 rounded-md text-sm font-bold transition ${
+              vue === 'carte' ? 'bg-yellow-500 text-gray-900' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            🧠 Vue Carte Mentale
+          </button>
+        </div>
+        {vue === 'carte' ? (
+          <MindMap scenarios={scenarios.map((s) => ({ id: s.id, nom: s.nom }))} />
+        ) : (
+        <>
         <div className="bg-gray-800 p-6 rounded-lg mb-6">
           <h2 className="text-lg font-bold text-yellow-500 mb-4">{editingId ? 'Modifier le scenario' : 'Creer un scenario'}</h2>
           <div className="space-y-3">
@@ -268,6 +294,8 @@ export default function Scenarios() {
             </div>
           ))}
         </div>
+        </>
+        )}
       </div>
     </main>
   )
