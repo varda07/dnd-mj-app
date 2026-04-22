@@ -1,4 +1,5 @@
 export type ThemeKey =
+  | 'eclipsed'
   | 'runique'
   | 'parchemin'
   | 'lave'
@@ -23,9 +24,24 @@ export type Theme = {
   colors: ThemeColors
 }
 
-export const DEFAULT_THEME: ThemeKey = 'runique'
+export const DEFAULT_THEME: ThemeKey = 'eclipsed'
 
 export const THEMES: Record<ThemeKey, Theme> = {
+  eclipsed: {
+    key: 'eclipsed',
+    label: 'Eclipsed Forge',
+    description: 'Sobre, épuré, moderne',
+    slogan: 'LA FORGE ÉCLIPSÉE',
+    colors: {
+      bg_primary: '#0a0b0d',
+      bg_secondary: '#0f1115',
+      bg_card: '#12141a',
+      border_color: 'rgba(201,168,76,0.15)',
+      text_primary: '#e8e8ec',
+      text_secondary: '#6a6a72',
+      accent_color: '#C9A84C'
+    }
+  },
   runique: {
     key: 'runique',
     label: 'Runique',
@@ -104,6 +120,7 @@ export const THEMES: Record<ThemeKey, Theme> = {
 }
 
 export const THEME_KEYS: ThemeKey[] = [
+  'eclipsed',
   'runique',
   'parchemin',
   'lave',

@@ -411,8 +411,9 @@ export default function ExplorationPage() {
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
 
-    if (pointersRef.current.size === 2) {
-      const pts = Array.from(pointersRef.current.values())
+    // 2+ pointeurs = pinch. On annule pan/brush en cours.
+    if (pointersRef.current.size >= 2) {
+      const pts = Array.from(pointersRef.current.values()).slice(0, 2)
       const outer = outerRef.current
       if (!outer) return
       const r = outer.getBoundingClientRect()
@@ -429,6 +430,9 @@ export default function ExplorationPage() {
       return
     }
 
+    // 1 seul pointeur — JAMAIS de zoom. Sécurité : on efface tout pinchRef résiduel.
+    pinchRef.current = null
+
     if (isMJ) {
       const coords = getCoords(e)
       if (coords) {
@@ -444,7 +448,7 @@ export default function ExplorationPage() {
       }
     }
 
-    // Default: pan
+    // Default: pan (1 doigt)
     panRef.current = {
       startX: e.clientX,
       startY: e.clientY,
@@ -458,6 +462,11 @@ export default function ExplorationPage() {
       pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     }
 
+    // Sécurité absolue : moins de 2 pointeurs ⇒ jamais de pinch.
+    if (pointersRef.current.size < 2) {
+      pinchRef.current = null
+    }
+
     const lp = longPressRef.current
     if (lp) {
       if (Math.hypot(e.clientX - lp.startX, e.clientY - lp.startY) > 8) {
@@ -468,10 +477,10 @@ export default function ExplorationPage() {
     // Drag d'un marker placé
     if (advanceMarkerDrag(e.clientX, e.clientY)) return
 
-    // Pinch
+    // Pinch UNIQUEMENT avec exactement 2 pointeurs ET pinchRef armé
     const pinch = pinchRef.current
     if (pinch && pointersRef.current.size === 2) {
-      const pts = Array.from(pointersRef.current.values())
+      const pts = Array.from(pointersRef.current.values()).slice(0, 2)
       const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y)
       const newScale = Math.min(
         MAX_SCALE,
@@ -491,9 +500,9 @@ export default function ExplorationPage() {
       return
     }
 
-    // Pan
+    // Pan UNIQUEMENT avec exactement 1 pointeur
     const pan = panRef.current
-    if (pan) {
+    if (pan && pointersRef.current.size === 1) {
       setView((v) => ({
         ...v,
         x: pan.viewX + (e.clientX - pan.startX),
@@ -505,6 +514,19 @@ export default function ExplorationPage() {
   const handlePointerUp = async (e: ReactPointerEvent<HTMLDivElement>) => {
     pointersRef.current.delete(e.pointerId)
     if (pointersRef.current.size < 2) pinchRef.current = null
+
+    // Transition 2 → 1 doigt : on relance un pan propre depuis le doigt restant
+    // (sans ça, le doigt restant ne fait rien jusqu'au prochain touchstart).
+    if (pointersRef.current.size === 1) {
+      const remaining = Array.from(pointersRef.current.values())[0]
+      panRef.current = {
+        startX: remaining.x,
+        startY: remaining.y,
+        viewX: viewRef.current.x,
+        viewY: viewRef.current.y
+      }
+    }
+
     if (pointersRef.current.size === 0) panRef.current = null
     clearLongPress()
 

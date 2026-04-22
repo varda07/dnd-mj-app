@@ -42,173 +42,169 @@ export default function Home() {
     <main className="login-root min-h-screen flex items-center justify-center p-4 sm:p-6 overflow-x-hidden">
       <style>{`
         .login-root {
-          background-color: #050200;
-          background-image:
-            repeating-linear-gradient(
-              45deg,
-              rgba(201, 168, 76, 0.025),
-              rgba(201, 168, 76, 0.025) 1px,
-              transparent 1px,
-              transparent 8px
-            ),
-            repeating-linear-gradient(
-              -45deg,
-              rgba(139, 0, 0, 0.02),
-              rgba(139, 0, 0, 0.02) 1px,
-              transparent 1px,
-              transparent 12px
-            );
-          color: #C9A84C;
+          background-color: #0a0b0d;
+          color: #e8e8ec;
+          font-family: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
         }
 
         .login-title {
-          font-family: var(--font-cinzel), 'Cinzel', serif;
-          letter-spacing: 0.08em;
+          font-family: var(--font-inter), 'Inter', system-ui, sans-serif;
+          font-weight: 500;
+          letter-spacing: 0.18em;
           color: #C9A84C;
-          text-shadow: 0 0 12px rgba(201, 168, 76, 0.4);
-          overflow-wrap: break-word;
         }
 
         .login-slogan {
-          font-family: var(--font-cinzel), 'Cinzel', serif;
-          letter-spacing: 0.15em;
-          color: #C9A84C;
-          opacity: 0.7;
-          font-style: italic;
-          text-shadow: 0 0 6px rgba(201, 168, 76, 0.3);
-          overflow-wrap: break-word;
+          font-family: var(--font-inter), 'Inter', system-ui, sans-serif;
+          font-weight: 400;
+          letter-spacing: 0.25em;
+          color: #6a6a72;
+          text-transform: uppercase;
         }
 
         .login-card {
-          background-color: #1a0f05;
-          background-image: linear-gradient(
-            135deg,
-            rgba(201, 168, 76, 0.05) 0%,
-            transparent 40%,
-            transparent 60%,
-            rgba(139, 0, 0, 0.08) 100%
-          );
-          border: 1px solid rgba(201, 168, 76, 0.5);
-          box-shadow:
-            inset 0 0 20px rgba(139, 0, 0, 0.2),
-            0 0 14px rgba(201, 168, 76, 0.18);
+          background-color: #12141a;
+          border: 1px solid rgba(201, 168, 76, 0.15);
+          border-radius: 10px;
+        }
+
+        .login-label {
+          font-size: 11px;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          color: #6a6a72;
+          font-weight: 400;
         }
 
         .login-input {
-          background-color: #0a0502;
-          border: 1px solid rgba(201, 168, 76, 0.3);
-          color: #f4e9c7;
-          font-family: var(--font-cinzel), 'Cinzel', serif;
-          letter-spacing: 0.05em;
-          transition: border-color 0.2s, box-shadow 0.2s;
+          background-color: #0a0b0d;
+          border: 1px solid rgba(201, 168, 76, 0.15);
+          color: #e8e8ec;
+          font-family: inherit;
+          font-size: 14px;
+          letter-spacing: 0.02em;
+          transition: border-color 0.15s ease, box-shadow 0.15s ease;
+          border-radius: 6px;
         }
         .login-input::placeholder {
-          color: rgba(201, 168, 76, 0.4);
+          color: #4a4a52;
+          letter-spacing: 0;
         }
         .login-input:focus {
-          border-color: #C9A84C;
-          box-shadow: inset 0 0 8px rgba(201, 168, 76, 0.15);
+          border-color: rgba(201, 168, 76, 0.55);
+          box-shadow: 0 0 0 1px rgba(201, 168, 76, 0.15);
           outline: none;
         }
 
         .login-btn-primary {
-          font-family: var(--font-cinzel), 'Cinzel', serif;
-          letter-spacing: 0.1em;
-          background: linear-gradient(135deg, #e8c664 0%, #C9A84C 50%, #8B6914 100%);
-          color: #050200;
-          border: 1px solid #8B6914;
-          box-shadow:
-            0 2px 8px rgba(201, 168, 76, 0.3),
-            inset 0 1px 0 rgba(255, 255, 255, 0.25);
-          text-shadow: 0 1px 0 rgba(255, 255, 255, 0.15);
-          transition: transform 0.15s, box-shadow 0.2s;
+          font-family: inherit;
+          font-weight: 500;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          background-color: #C9A84C;
+          color: #0a0b0d;
+          border: 1px solid #C9A84C;
+          border-radius: 6px;
+          transition: background-color 0.15s ease, border-color 0.15s ease;
         }
         .login-btn-primary:hover:not(:disabled) {
-          transform: translateY(-1px);
-          box-shadow:
-            0 4px 12px rgba(201, 168, 76, 0.45),
-            inset 0 1px 0 rgba(255, 255, 255, 0.3);
+          background-color: #d4b558;
+          border-color: #d4b558;
         }
         .login-btn-primary:disabled {
-          opacity: 0.6;
+          opacity: 0.4;
           cursor: not-allowed;
         }
 
         .login-btn-secondary {
-          font-family: var(--font-cinzel), 'Cinzel', serif;
-          letter-spacing: 0.1em;
+          font-family: inherit;
+          font-weight: 400;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
           background-color: transparent;
-          color: #C9A84C;
-          border: 1px solid rgba(201, 168, 76, 0.5);
-          transition: background-color 0.2s, border-color 0.2s;
+          color: #e8e8ec;
+          border: 1px solid rgba(201, 168, 76, 0.15);
+          border-radius: 6px;
+          transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
         }
         .login-btn-secondary:hover:not(:disabled) {
-          background-color: rgba(201, 168, 76, 0.08);
-          border-color: #C9A84C;
+          background-color: rgba(201, 168, 76, 0.04);
+          border-color: rgba(201, 168, 76, 0.35);
+          color: #C9A84C;
         }
         .login-btn-secondary:disabled {
-          opacity: 0.5;
+          opacity: 0.4;
           cursor: not-allowed;
+        }
+
+        .login-error {
+          color: #dc2626;
+          font-size: 12px;
+          letter-spacing: 0.04em;
+        }
+
+        .login-divider {
+          height: 1px;
+          background-color: rgba(201, 168, 76, 0.15);
+          margin: 0;
         }
       `}</style>
 
       <div className="w-full max-w-sm">
-        {/* Titre */}
-        <h1 className="login-title text-2xl sm:text-3xl font-bold text-center mb-3">
+        <h1 className="login-title text-xl sm:text-2xl text-center mb-3">
           D&amp;D MANAGER
         </h1>
 
-        {/* Slogan */}
-        <p className="login-slogan text-center text-[10px] sm:text-xs mb-6 break-words px-2">
-          FORTIS FORTUNA ADIUVAT
+        <p className="login-slogan text-center text-[10px] sm:text-[11px] mb-10">
+          Campaign Tools
         </p>
 
-        {/* Carte formulaire */}
-        <div className="login-card p-5 sm:p-6 rounded-lg">
-          <div className="space-y-4">
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="login-input w-full p-3 rounded text-sm"
-            />
-            <input
-              type="password"
-              placeholder="Mot de passe"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="login-input w-full p-3 rounded text-sm"
-            />
+        <div className="login-card p-6 sm:p-8">
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <div className="login-label">Email</div>
+              <input
+                type="email"
+                placeholder="vous@exemple.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="login-input w-full px-3 py-2.5"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="login-label">Mot de passe</div>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="login-input w-full px-3 py-2.5"
+              />
+            </div>
 
             {message && (
-              <p
-                className="text-xs text-center break-words"
-                style={{
-                  color: '#ff8844',
-                  fontFamily: 'var(--font-cinzel), Cinzel, serif',
-                  letterSpacing: '0.05em'
-                }}
-              >
-                {message}
-              </p>
+              <p className="login-error text-center break-words">{message}</p>
             )}
 
             <button
               type="button"
               onClick={handleLogin}
               disabled={loading}
-              className="login-btn-primary w-full p-3 rounded font-bold text-sm"
+              className="login-btn-primary w-full py-3 text-xs"
             >
-              {loading ? 'CHARGEMENT...' : 'SE CONNECTER'}
+              {loading ? 'Chargement…' : 'Se connecter'}
             </button>
+
+            <div className="login-divider" />
+
             <button
               type="button"
               onClick={handleRegister}
               disabled={loading}
-              className="login-btn-secondary w-full p-3 rounded font-bold text-sm"
+              className="login-btn-secondary w-full py-3 text-xs"
             >
-              CRÉER UN COMPTE
+              Créer un compte
             </button>
           </div>
         </div>

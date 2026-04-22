@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useId, CSSProperties } from 'react'
+import { useState, useEffect, useId, CSSProperties } from 'react'
 import { supabase } from '@/lib/supabase'
 
 type DiceType = { label: string; sides: number }
@@ -106,11 +106,24 @@ export default function DiceLauncher() {
   const [rolling, setRolling] = useState(false)
   const [results, setResults] = useState<number[]>([])
   const [showParticles, setShowParticles] = useState(false)
+  const [critEffect, setCritEffect] = useState<'success' | 'fail' | null>(null)
+
+  // Shake de l'écran entier pendant un échec critique
+  useEffect(() => {
+    if (critEffect !== 'fail') return
+    document.body.classList.add('crit-body-shake')
+    const t = setTimeout(() => document.body.classList.remove('crit-body-shake'), 500)
+    return () => {
+      clearTimeout(t)
+      document.body.classList.remove('crit-body-shake')
+    }
+  }, [critEffect])
 
   const lancer = async () => {
     setRolling(true)
     setShowParticles(false)
     setResults([])
+    setCritEffect(null)
 
     await new Promise((r) => setTimeout(r, 1000))
 
@@ -122,6 +135,19 @@ export default function DiceLauncher() {
     setRolling(false)
     setShowParticles(true)
     setTimeout(() => setShowParticles(false), 1400)
+
+    // Effet critique UNIQUEMENT sur d20.
+    // Si plusieurs d20 sont lancés, un seul 20 ou un seul 1 suffit à déclencher l'effet.
+    // Priorité au succès critique si les deux sortent simultanément.
+    if (selectedDice.sides === 20) {
+      if (jets.includes(20)) {
+        setCritEffect('success')
+        setTimeout(() => setCritEffect(null), 2000)
+      } else if (jets.includes(1)) {
+        setCritEffect('fail')
+        setTimeout(() => setCritEffect(null), 2000)
+      }
+    }
 
     if (share) {
       const { data: { user } } = await supabase.auth.getUser()
@@ -160,14 +186,232 @@ export default function DiceLauncher() {
           100% { transform: scale(1) rotate(0deg); opacity: 1; }
         }
         .result-pop { animation: result-pop .5s cubic-bezier(.17,.67,.35,1.4) forwards; }
+
+        /* ===== Effets CRITIQUE — réservés au d20 ===== */
+
+        /* Flash plein écran — succès (or) */
+        @keyframes crit-flash-gold {
+          0%   { opacity: 0.85; }
+          60%  { opacity: 0.25; }
+          100% { opacity: 0; }
+        }
+        .crit-flash-gold {
+          background:
+            radial-gradient(circle at center, rgba(254,240,138,0.9) 0%, rgba(201,168,76,0.85) 35%, rgba(139,105,20,0.7) 70%, rgba(0,0,0,0) 100%);
+          animation: crit-flash-gold 500ms ease-out forwards;
+        }
+
+        /* Flash plein écran — échec (rouge sang) */
+        @keyframes crit-flash-red {
+          0%   { opacity: 0.9; }
+          60%  { opacity: 0.3; }
+          100% { opacity: 0; }
+        }
+        .crit-flash-red {
+          background:
+            radial-gradient(circle at center, rgba(220,38,38,0.9) 0%, rgba(139,0,0,0.85) 40%, rgba(69,10,10,0.9) 80%, rgba(0,0,0,0.95) 100%);
+          animation: crit-flash-red 500ms ease-out forwards;
+        }
+
+        /* Grand chiffre central — succès */
+        @keyframes crit-number-gold {
+          0%   { transform: translate(-50%, -50%) scale(0) rotate(-20deg); opacity: 0; filter: blur(8px); }
+          20%  { transform: translate(-50%, -50%) scale(1.4) rotate(8deg); opacity: 1; filter: blur(0); }
+          35%  { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+          80%  { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+          100% { transform: translate(-50%, -50%) scale(1.15) rotate(0deg); opacity: 0; }
+        }
+        .crit-number-gold { animation: crit-number-gold 2s ease-out forwards; }
+
+        /* Grand chiffre central — échec */
+        @keyframes crit-number-red {
+          0%   { transform: translate(-50%, -50%) scale(0) rotate(10deg); opacity: 0; filter: blur(6px); }
+          20%  { transform: translate(-50%, -50%) scale(1.35) rotate(-4deg); opacity: 1; filter: blur(0); }
+          35%  { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+          80%  { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+          100% { transform: translate(-50%, -50%) scale(0.9) rotate(0deg); opacity: 0; }
+        }
+        .crit-number-red { animation: crit-number-red 2s ease-out forwards; }
+
+        /* Texte CRITIQUE ! sous le chiffre — succès */
+        @keyframes crit-text-gold {
+          0%, 20%   { transform: translateX(-50%) scale(0); opacity: 0; }
+          35%  { transform: translateX(-50%) scale(1.15); opacity: 1; }
+          45%  { transform: translateX(-50%) scale(1); opacity: 1; }
+          85%  { transform: translateX(-50%) scale(1); opacity: 1; }
+          100% { transform: translateX(-50%) scale(0.95); opacity: 0; }
+        }
+        .crit-text-gold { animation: crit-text-gold 2s ease-out forwards; }
+
+        /* Texte ÉCHEC CRITIQUE — animation glitch */
+        @keyframes crit-text-glitch {
+          0%, 20%   { transform: translateX(-50%) translate(0,0) skew(0); opacity: 0; }
+          22%  { transform: translateX(-50%) translate(-4px,-2px) skew(-2deg); opacity: 1; }
+          25%  { transform: translateX(-50%) translate(3px,1px) skew(2deg); opacity: 1; }
+          28%  { transform: translateX(-50%) translate(-2px,2px) skew(0); opacity: 1; }
+          32%  { transform: translateX(-50%) translate(1px,-1px) skew(1deg); opacity: 1; }
+          36%  { transform: translateX(-50%) translate(0,0) skew(0); opacity: 1; }
+          82%  { transform: translateX(-50%) translate(0,0) skew(0); opacity: 1; }
+          86%  { transform: translateX(-50%) translate(-2px,1px) skew(-1deg); opacity: 1; }
+          100% { transform: translateX(-50%) translate(0,0); opacity: 0; }
+        }
+        .crit-text-glitch { animation: crit-text-glitch 2s linear forwards; }
+
+        /* Particules dorées explosant du centre */
+        @keyframes crit-particle {
+          0%   { transform: translate(-50%,-50%) scale(0.6); opacity: 1; }
+          30%  { opacity: 1; }
+          100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0); opacity: 0; }
+        }
+        .crit-particle { animation: crit-particle 1.4s cubic-bezier(.2,.6,.3,1) forwards; }
+
+        /* Gouttes de sang tombant du haut */
+        @keyframes crit-blood-drop {
+          0%   { transform: translateY(-60px) scaleY(0.3); opacity: 0; }
+          15%  { opacity: 0.9; }
+          100% { transform: translateY(110vh) scaleY(1.6); opacity: 0.7; }
+        }
+        .crit-blood-drop { animation: crit-blood-drop 1.7s cubic-bezier(.3,.2,.6,1) forwards; }
+
+        /* Shake appliqué au body pendant un échec */
+        @keyframes crit-shake {
+          0%,100% { transform: translate(0,0); }
+          10% { transform: translate(-5px, 2px); }
+          20% { transform: translate(6px, -3px); }
+          30% { transform: translate(-6px, 1px); }
+          40% { transform: translate(5px, -2px); }
+          50% { transform: translate(-4px, 3px); }
+          60% { transform: translate(5px, 2px); }
+          70% { transform: translate(-5px, -2px); }
+          80% { transform: translate(4px, 3px); }
+          90% { transform: translate(-2px, -4px); }
+        }
+        body.crit-body-shake { animation: crit-shake 500ms ease-in-out; }
       `}</style>
+
+      {critEffect && (
+        <div className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden">
+          {/* Flash plein écran (500ms) */}
+          <div
+            className={
+              critEffect === 'success'
+                ? 'crit-flash-gold absolute inset-0'
+                : 'crit-flash-red absolute inset-0'
+            }
+          />
+
+          {/* Grand chiffre central (80px) */}
+          <div
+            className={
+              critEffect === 'success' ? 'crit-number-gold' : 'crit-number-red'
+            }
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              fontSize: 'min(200px, 45vw)',
+              fontWeight: 900,
+              lineHeight: 1,
+              color: critEffect === 'success' ? '#C9A84C' : '#8B0000',
+              textShadow:
+                critEffect === 'success'
+                  ? '0 0 40px rgba(201,168,76,0.95), 0 0 80px rgba(254,240,138,0.8), 0 0 120px rgba(201,168,76,0.6)'
+                  : '0 0 40px rgba(139,0,0,0.95), 0 0 80px rgba(220,38,38,0.7), 0 0 120px rgba(69,10,10,0.5)',
+              fontFamily: 'var(--font-cinzel), Cinzel, serif'
+            }}
+          >
+            {critEffect === 'success' ? '20' : '1'}
+          </div>
+
+          {/* Texte sous le chiffre */}
+          <div
+            className={
+              critEffect === 'success' ? 'crit-text-gold' : 'crit-text-glitch'
+            }
+            style={{
+              position: 'absolute',
+              top: 'calc(50% + min(130px, 28vw))',
+              left: '50%',
+              fontSize: 'clamp(20px, 5vw, 36px)',
+              fontWeight: 700,
+              letterSpacing: '0.18em',
+              color: critEffect === 'success' ? '#fef08a' : '#dc2626',
+              textShadow:
+                critEffect === 'success'
+                  ? '0 0 16px rgba(201,168,76,0.9), 0 0 32px rgba(254,240,138,0.6)'
+                  : '0 0 10px rgba(139,0,0,0.9), 0 0 24px rgba(220,38,38,0.6)',
+              fontFamily: 'var(--font-cinzel), Cinzel, serif',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {critEffect === 'success' ? 'CRITIQUE !' : 'ÉCHEC CRITIQUE'}
+          </div>
+
+          {/* Particules dorées pour le succès (24 étoiles explosent du centre) */}
+          {critEffect === 'success' &&
+            Array.from({ length: 28 }).map((_, i) => {
+              const angle = (i / 28) * Math.PI * 2 + Math.random() * 0.3
+              const distance = 180 + Math.random() * 220
+              const dx = Math.cos(angle) * distance
+              const dy = Math.sin(angle) * distance
+              const size = 6 + Math.random() * 8
+              const palette = ['#fde047', '#fef08a', '#C9A84C', '#ffffff', '#e0c470']
+              const color = palette[i % palette.length]
+              return (
+                <span
+                  key={i}
+                  className="crit-particle"
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    width: `${size}px`,
+                    height: `${size}px`,
+                    borderRadius: '50%',
+                    background: color,
+                    boxShadow: `0 0 ${size * 2}px ${color}, 0 0 ${size * 4}px rgba(201,168,76,0.6)`,
+                    animationDelay: `${100 + Math.random() * 150}ms`,
+                    ['--dx' as string]: `${dx}px`,
+                    ['--dy' as string]: `${dy}px`
+                  } as CSSProperties}
+                />
+              )
+            })}
+
+          {/* Gouttes de sang pour l'échec (10 drops qui tombent du haut) */}
+          {critEffect === 'fail' &&
+            Array.from({ length: 12 }).map((_, i) => {
+              const leftPct = Math.random() * 100
+              const width = 4 + Math.random() * 5
+              const height = 30 + Math.random() * 50
+              const delay = Math.random() * 400
+              return (
+                <span
+                  key={i}
+                  className="crit-blood-drop"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: `${leftPct}%`,
+                    width: `${width}px`,
+                    height: `${height}px`,
+                    borderRadius: '50% 50% 50% 50% / 30% 30% 70% 70%',
+                    background:
+                      'linear-gradient(180deg, rgba(139,0,0,0.9) 0%, rgba(69,10,10,0.95) 60%, rgba(0,0,0,0.9) 100%)',
+                    boxShadow: '0 0 6px rgba(139,0,0,0.8)',
+                    animationDelay: `${delay}ms`
+                  } as CSSProperties}
+                />
+              )
+            })}
+        </div>
+      )}
 
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-4 right-4 md:bottom-6 md:right-6 w-14 h-14 rounded-full bg-yellow-500 text-gray-900 text-2xl font-bold shadow-2xl hover:scale-110 hover:bg-yellow-400 transition-transform z-[70] flex items-center justify-center"
+        className="fixed right-4 md:right-6 w-14 h-14 rounded-full bg-yellow-500 text-gray-900 text-2xl font-bold shadow-2xl hover:scale-110 hover:bg-yellow-400 transition-transform z-[70] flex items-center justify-center bottom-[calc(64px+env(safe-area-inset-bottom)+0.75rem)] md:bottom-[max(1.5rem,env(safe-area-inset-bottom))]"
         style={{
-          bottom: 'max(1rem, env(safe-area-inset-bottom))',
           right: 'max(1rem, env(safe-area-inset-right))'
         }}
         aria-label="Lanceur de dés"
@@ -176,15 +420,13 @@ export default function DiceLauncher() {
       </button>
 
       {open && (
-        <>
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setOpen(false)}
+        >
           <div
-            className="fixed inset-0 bg-black/40 z-[60]"
-            onClick={() => setOpen(false)}
-            aria-hidden="true"
-          />
-          <div
-            className="fixed right-4 left-4 md:left-auto md:right-6 md:w-80 max-h-[calc(100vh-100px)] overflow-y-auto bg-gray-800 rounded-xl shadow-2xl border border-gray-700 z-[70]"
-            style={{ bottom: '80px' }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full md:w-80 max-w-[90vw] max-h-[80vh] overflow-y-auto bg-gray-800 rounded-xl shadow-2xl border border-gray-700"
           >
           <div className="p-4 border-b border-gray-700 flex items-center justify-between sticky top-0 bg-gray-800 z-10">
             <h3 className="text-lg font-bold text-yellow-500">🎲 Lanceur de dés</h3>
@@ -324,7 +566,7 @@ export default function DiceLauncher() {
             )}
           </div>
         </div>
-        </>
+        </div>
       )}
     </>
   )

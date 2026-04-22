@@ -44,6 +44,25 @@ body {
 
 
 /* ---- 1. Tokens Tailwind par thème ---- */
+html[data-theme="eclipsed"] {
+  --color-gray-900: #0a0b0d;
+  --color-gray-800: #12141a;
+  --color-gray-700: #1a1d24;
+  --color-gray-600: #242830;
+  --color-yellow-500: #C9A84C;
+
+  --premium-accent: #C9A84C;
+  --premium-accent-soft: rgba(201, 168, 76, 0.15);
+  --premium-accent-strong: rgba(201, 168, 76, 0.35);
+  --premium-accent-tip: #e0c470;
+  --premium-ornament: transparent;
+  --premium-ornament-tip: transparent;
+  --premium-overlay: rgba(10, 11, 13, 1);
+  --premium-texture: none;
+  --premium-inset: transparent;
+  --premium-inset-strong: transparent;
+}
+
 html[data-theme="runique"] {
   --color-gray-900: #0f0a1e;
   --color-gray-800: #1a1332;
@@ -356,4 +375,129 @@ html[data-theme="royal"] .bg-yellow-500 {
 html[data-theme="royal"] .border-gray-700,
 html[data-theme="royal"] .border-gray-600 {
   border-color: #8B0000 !important;
+}
+
+
+/* ============================================================================
+   ECLIPSED FORGE — neutralise tout le traitement premium : pas de Cinzel,
+   pas d'ornements, pas d'animations, pas de texture, pas de dégradés.
+   Tout est porté par la sobriété : fond noir, bordures fines, accent or
+   uniquement sur titres et actions principales.
+   ============================================================================
+*/
+
+/* Typographie Inter, pas de Cinzel */
+html[data-theme="eclipsed"],
+html[data-theme="eclipsed"] body {
+  font-family: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+html[data-theme="eclipsed"] h1,
+html[data-theme="eclipsed"] h2,
+html[data-theme="eclipsed"] h3,
+html[data-theme="eclipsed"] button {
+  font-family: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif !important;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+}
+
+html[data-theme="eclipsed"] h1 { letter-spacing: 0.16em; font-weight: 500; }
+html[data-theme="eclipsed"] h2 { letter-spacing: 0.12em; font-weight: 500; }
+html[data-theme="eclipsed"] h3 { letter-spacing: 0.10em; font-weight: 500; }
+
+/* Fond : pas de texture, pas d'overlay — juste le noir */
+html[data-theme="eclipsed"] body,
+html[data-theme="eclipsed"] .bg-gray-900 {
+  background-image: none !important;
+  background-color: #0a0b0d !important;
+}
+
+/* Cartes : pas de pulse, pas d'ornements, pas de shadow lourde.
+   Bordure or 15% très discrète, radius 10px. */
+html[data-theme="eclipsed"] .bg-gray-800:not(.theme-no-deco),
+html[data-theme="eclipsed"] .bg-gray-800 {
+  position: static;
+  animation: none !important;
+  border: 1px solid rgba(201, 168, 76, 0.15) !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  border-radius: 10px;
+}
+
+html[data-theme="eclipsed"] .bg-gray-800::before,
+html[data-theme="eclipsed"] .bg-gray-800::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Accent or : pas de text-shadow, lisible et net */
+html[data-theme="eclipsed"] .text-yellow-500 {
+  color: #C9A84C !important;
+  text-shadow: none !important;
+}
+
+/* Boutons accent : aplati, bordure or, pas de dégradé lourd */
+html[data-theme="eclipsed"] .bg-yellow-500 {
+  background-image: none !important;
+  background-color: #C9A84C !important;
+  color: #0a0b0d !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+html[data-theme="eclipsed"] .bg-yellow-500:hover {
+  background-color: #d4b558 !important;
+}
+
+/* Bordures génériques : or très discret */
+html[data-theme="eclipsed"] .border-gray-700,
+html[data-theme="eclipsed"] .border-gray-600 {
+  border-color: rgba(201, 168, 76, 0.15) !important;
+}
+
+/* Inputs : fond très sombre, bordure fine, focus or discret */
+html[data-theme="eclipsed"] input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+html[data-theme="eclipsed"] textarea,
+html[data-theme="eclipsed"] select {
+  background-color: #0a0b0d !important;
+  border: 1px solid rgba(201, 168, 76, 0.15) !important;
+  color: #e8e8ec !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+html[data-theme="eclipsed"] input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):focus,
+html[data-theme="eclipsed"] textarea:focus,
+html[data-theme="eclipsed"] select:focus {
+  border-color: rgba(201, 168, 76, 0.55) !important;
+  box-shadow: 0 0 0 1px rgba(201, 168, 76, 0.15) !important;
+  outline: none !important;
+}
+
+/* Bordure dorée animée sous header : remplacée par un trait or fixe 1px */
+html[data-theme="eclipsed"] .theme-header-border {
+  border-bottom: 1px solid rgba(201, 168, 76, 0.15) !important;
+}
+html[data-theme="eclipsed"] .theme-header-border > .theme-header-glow {
+  display: none !important;
+}
+
+/* Texte corps cohérent */
+html[data-theme="eclipsed"] {
+  color: #e8e8ec;
+}
+
+/* Scrollbar discrète (WebKit) */
+html[data-theme="eclipsed"] ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+html[data-theme="eclipsed"] ::-webkit-scrollbar-track {
+  background: #0a0b0d;
+}
+html[data-theme="eclipsed"] ::-webkit-scrollbar-thumb {
+  background: rgba(201, 168, 76, 0.2);
+  border-radius: 4px;
+}
+html[data-theme="eclipsed"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(201, 168, 76, 0.35);
 }

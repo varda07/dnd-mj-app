@@ -90,6 +90,12 @@ export default function SoundBox() {
     }
   }, [])
 
+  useEffect(() => {
+    const onExternalOpen = () => setOpen(true)
+    window.addEventListener('soundbox:open', onExternalOpen)
+    return () => window.removeEventListener('soundbox:open', onExternalOpen)
+  }, [])
+
   const urlFor = (amb: Ambiance) => customUrls[amb.id] || amb.url
 
   const toggle = async (amb: Ambiance) => {
@@ -168,7 +174,7 @@ export default function SoundBox() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-4 left-4 md:bottom-6 md:left-6 w-14 h-14 rounded-full bg-yellow-500 text-gray-900 text-2xl font-bold shadow-2xl hover:scale-110 hover:bg-yellow-400 transition-transform z-[70] flex items-center justify-center"
+        className="hidden md:flex fixed md:bottom-6 md:left-6 w-14 h-14 rounded-full bg-yellow-500 text-gray-900 text-2xl font-bold shadow-2xl hover:scale-110 hover:bg-yellow-400 transition-transform z-[70] items-center justify-center"
         style={{
           bottom: 'max(1rem, env(safe-area-inset-bottom))',
           left: 'max(1rem, env(safe-area-inset-left))'

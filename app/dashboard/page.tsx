@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Combat from './combat/page'
 import {
@@ -44,6 +44,7 @@ export default function Dashboard() {
   const [themeActuel, setThemeActuel] = useState<ThemeKey>(DEFAULT_THEME)
   const menuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  const pathname = usePathname()
 
   useEffect(() => {
     const load = async () => {
@@ -233,14 +234,14 @@ export default function Dashboard() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-900 text-white">
-      <div className="bg-gray-800 p-3 sm:p-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-gray-700 theme-header-border theme-no-deco">
-        <div className="min-w-0 justify-self-start">
-          <h1 className="text-base sm:text-xl font-bold text-yellow-500 truncate text-center sm:text-left">
+    <main className="min-h-screen bg-gray-900 text-white pb-[calc(56px+env(safe-area-inset-bottom))] md:pb-0">
+      <div className="bg-gray-800 h-12 md:h-auto px-3 md:p-4 flex md:grid md:grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-gray-700 theme-header-border theme-no-deco">
+        <div className="min-w-0 flex-1 md:flex-initial md:justify-self-start">
+          <h1 className="text-[13px] md:text-xl font-medium md:font-bold text-yellow-500 truncate text-left tracking-[0.18em] md:tracking-normal">
             D&D MANAGER
           </h1>
           <p
-            className="text-[11px] uppercase text-center sm:text-left truncate mt-0.5 italic"
+            className="hidden md:block text-[11px] uppercase text-left truncate mt-0.5 italic"
             style={{
               color: THEMES[themeActuel].colors.accent_color,
               opacity: 0.75,
@@ -253,7 +254,7 @@ export default function Dashboard() {
           </p>
           {themeActuel === 'royal' && (
             <div
-              className="flex justify-center mt-2"
+              className="hidden md:flex justify-center mt-2"
               style={{
                 background: '#030100',
                 boxShadow: 'inset 0 0 24px rgba(0,0,0,0.95)',
@@ -400,7 +401,7 @@ export default function Dashboard() {
             </div>
           )}
         </div>
-        <div className="flex bg-gray-700 rounded-lg p-1 justify-self-center">
+        <div className="hidden md:flex bg-gray-700 rounded-lg p-1 md:justify-self-center">
           <button type="button" onClick={() => setInterface('mj')} className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-md text-sm sm:text-base font-bold transition ${interface_ === 'mj' ? 'bg-yellow-500 text-gray-900' : 'text-gray-400 hover:text-white'}`}>
             MJ
           </button>
@@ -408,7 +409,7 @@ export default function Dashboard() {
             Joueur
           </button>
         </div>
-        <div className="relative justify-self-end" ref={menuRef}>
+        <div className="relative md:justify-self-end" ref={menuRef}>
           <button
             type="button"
             onClick={() => setMenuOuvert((v) => !v)}
@@ -420,6 +421,25 @@ export default function Dashboard() {
           </button>
           {menuOuvert && (
             <div className="absolute right-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden theme-no-deco">
+              <div className="md:hidden px-4 py-3 border-b border-gray-700">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-gray-500 mb-2">Interface</div>
+                <div className="flex bg-gray-700 rounded-lg p-1">
+                  <button
+                    type="button"
+                    onClick={() => setInterface('mj')}
+                    className={`flex-1 py-1.5 rounded-md text-xs font-bold transition ${interface_ === 'mj' ? 'bg-yellow-500 text-gray-900' : 'text-gray-400'}`}
+                  >
+                    MJ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInterface('joueur')}
+                    className={`flex-1 py-1.5 rounded-md text-xs font-bold transition ${interface_ === 'joueur' ? 'bg-yellow-500 text-gray-900' : 'text-gray-400'}`}
+                  >
+                    Joueur
+                  </button>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -565,15 +585,15 @@ export default function Dashboard() {
 
       {interface_ === 'mj' && (
         <div>
-          <div className="bg-gray-800 border-b border-gray-700 p-3 flex justify-center gap-4 theme-no-deco">
-            <button type="button" onClick={() => setModeMJ('travail')} className={`px-6 py-2 rounded-lg font-bold transition ${modeMJ === 'travail' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>
+          <div className="bg-gray-800 border-b border-gray-700 px-3 py-1.5 md:p-3 flex justify-center gap-2 md:gap-4 theme-no-deco">
+            <button type="button" onClick={() => setModeMJ('travail')} className={`flex-1 md:flex-initial px-3 md:px-6 py-1.5 md:py-2 rounded-md md:rounded-lg text-xs md:text-base font-medium md:font-bold tracking-wider transition ${modeMJ === 'travail' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>
               📜 Forge
             </button>
-            <button type="button" onClick={() => setModeMJ('action')} className={`px-6 py-2 rounded-lg font-bold transition ${modeMJ === 'action' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'}`}>
+            <button type="button" onClick={() => setModeMJ('action')} className={`flex-1 md:flex-initial px-3 md:px-6 py-1.5 md:py-2 rounded-md md:rounded-lg text-xs md:text-base font-medium md:font-bold tracking-wider transition ${modeMJ === 'action' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'}`}>
               🗡️ Aventure
             </button>
           </div>
-          <div className="p-6">
+          <div className="p-3 md:p-6">
             {personnagesJoueurs.length > 0 && (
               <div className="bg-gray-800 rounded-lg mb-6 overflow-hidden">
                 <button
@@ -640,23 +660,23 @@ export default function Dashboard() {
             )}
             {modeMJ === 'travail' && (
               <div>
-                <h2 className="text-2xl font-bold text-blue-400 mb-4">📜 Forge</h2>
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <button type="button" onClick={() => router.push('/dashboard/scenarios')} className="bg-gray-800 p-4 rounded-lg hover:bg-gray-700 transition text-left">
-                    <h3 className="text-lg font-bold text-yellow-500">Scenarios</h3>
-                    <p className="text-gray-400 text-sm mt-1">Creer et gerer tes scenarios</p>
+                <h2 className="hidden md:block text-2xl font-bold text-blue-400 mb-4">📜 Forge</h2>
+                <div className="grid grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-6">
+                  <button type="button" onClick={() => router.push('/dashboard/scenarios')} className="bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
+                    <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">Scenarios</h3>
+                    <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">Creer et gerer tes scenarios</p>
                   </button>
-                  <button type="button" onClick={() => router.push('/dashboard/ennemis')} className="bg-gray-800 p-4 rounded-lg hover:bg-gray-700 transition text-left">
-                    <h3 className="text-lg font-bold text-yellow-500">Ennemis</h3>
-                    <p className="text-gray-400 text-sm mt-1">Creer et gerer tes ennemis</p>
+                  <button type="button" onClick={() => router.push('/dashboard/ennemis')} className="bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
+                    <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">Ennemis</h3>
+                    <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">Creer et gerer tes ennemis</p>
                   </button>
-                  <button type="button" onClick={() => router.push('/dashboard/items')} className="bg-gray-800 p-4 rounded-lg hover:bg-gray-700 transition text-left">
-                    <h3 className="text-lg font-bold text-yellow-500">Items</h3>
-                    <p className="text-gray-400 text-sm mt-1">Creer et gerer tes items</p>
+                  <button type="button" onClick={() => router.push('/dashboard/items')} className="bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
+                    <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">Items</h3>
+                    <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">Creer et gerer tes items</p>
                   </button>
-                  <button type="button" onClick={() => router.push('/dashboard/maps')} className="bg-gray-800 p-4 rounded-lg hover:bg-gray-700 transition text-left">
-                    <h3 className="text-lg font-bold text-yellow-500">Maps</h3>
-                    <p className="text-gray-400 text-sm mt-1">Gerer tes cartes</p>
+                  <button type="button" onClick={() => router.push('/dashboard/maps')} className="bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
+                    <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">Maps</h3>
+                    <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">Gerer tes cartes</p>
                   </button>
                 </div>
                 <div className="bg-gray-800 p-4 rounded-lg">
@@ -713,17 +733,17 @@ export default function Dashboard() {
       )}
 
       {interface_ === 'joueur' && (
-        <div className="p-6">
-          <h2 className="text-2xl font-bold text-yellow-500 mb-4">Interface Joueur</h2>
-          <p className="text-gray-400 mb-4">Bienvenue Aventurier !</p>
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <button type="button" onClick={() => router.push('/dashboard/personnages')} className="bg-gray-800 p-4 rounded-lg hover:bg-gray-700 transition text-left">
-              <h3 className="text-lg font-bold text-yellow-500">Personnages</h3>
-              <p className="text-gray-400 text-sm mt-1">Gerer tes personnages</p>
+        <div className="p-3 md:p-6">
+          <h2 className="hidden md:block text-2xl font-bold text-yellow-500 mb-4">Interface Joueur</h2>
+          <p className="hidden md:block text-gray-400 mb-4">Bienvenue Aventurier !</p>
+          <div className="grid grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-6">
+            <button type="button" onClick={() => router.push('/dashboard/personnages')} className="bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
+              <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">Personnages</h3>
+              <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">Gerer tes personnages</p>
             </button>
-            <button type="button" onClick={() => router.push('/dashboard/sorts')} className="bg-gray-800 p-4 rounded-lg hover:bg-gray-700 transition text-left">
-              <h3 className="text-lg font-bold text-yellow-500">Sorts</h3>
-              <p className="text-gray-400 text-sm mt-1">Gerer tes sorts</p>
+            <button type="button" onClick={() => router.push('/dashboard/sorts')} className="bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
+              <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">Sorts</h3>
+              <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">Gerer tes sorts</p>
             </button>
           </div>
 
@@ -765,6 +785,30 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      <nav
+        className="md:hidden fixed bottom-0 inset-x-0 bg-[#12141a] border-t border-[rgba(201,168,76,0.15)] z-[60] flex items-stretch theme-no-deco"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        {[
+          { id: 'accueil', label: 'Accueil', icon: '⌂', active: pathname === '/dashboard', onClick: () => router.push('/dashboard') },
+          { id: 'biblio', label: 'Bibliothèque', icon: '📚', active: pathname?.startsWith('/dashboard/bibliotheque'), onClick: () => router.push('/dashboard/bibliotheque') },
+          { id: 'combat', label: 'Combat', icon: '⚔', active: pathname?.startsWith('/dashboard/combat'), onClick: () => router.push('/dashboard/combat') },
+          { id: 'sons', label: 'Sons', icon: '🎵', active: false, onClick: () => window.dispatchEvent(new CustomEvent('soundbox:open')) }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={tab.onClick}
+            aria-label={tab.label}
+            className="flex-1 h-14 flex flex-col items-center justify-center gap-0.5 transition"
+            style={{ color: tab.active ? '#C9A84C' : '#6a6a72' }}
+          >
+            <span className="text-base leading-none">{tab.icon}</span>
+            <span className="text-[9px] tracking-wider uppercase">{tab.label}</span>
+          </button>
+        ))}
+      </nav>
     </main>
   )
 }
