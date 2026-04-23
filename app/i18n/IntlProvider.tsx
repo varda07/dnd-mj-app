@@ -23,20 +23,48 @@ export function useLocale(): Ctx {
   return ctx
 }
 
-function readInitialLocale(): Locale {
-  if (typeof window === 'undefined') return 'fr'
-  const stored = window.localStorage.getItem(STORAGE_KEY)
-  if (stored === 'fr' || stored === 'en') return stored
+// Tous les accès à `window` / `localStorage` passent par ces helpers et sont
+// gardés par `typeof window === 'undefined'`. Ils ne doivent être appelés que
+// dans un useEffect ou un event handler côté client ; ne jamais les appeler
+// depuis le rendu initial (sinon hydration mismatch + ENVIRONMENT_FALLBACK
+// au prerender Next.js).
+function readStoredLocale(): Locale | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY)
+    if (stored === 'fr' || stored === 'en') return stored
+  } catch {
+    /* accès storage refusé (mode privé / iframe sandboxée) */
+  }
+  return null
+}
+
+function readNavigatorLocale(): Locale | null {
+  if (typeof window === 'undefined') return null
   const nav = window.navigator?.language?.toLowerCase() ?? ''
   if (nav.startsWith('en')) return 'en'
-  return 'fr'
+  if (nav.startsWith('fr')) return 'fr'
+  return null
+}
+
+function writeStoredLocale(l: Locale) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(STORAGE_KEY, l)
+  } catch {
+    /* quota plein / mode privé */
+  }
 }
 
 export default function IntlProvider({ children }: { children: ReactNode }) {
+  // On démarre toujours sur 'fr' côté serveur pour que le HTML prerendered
+  // soit stable. La locale réelle est hydratée dans useEffect (client-only).
   const [locale, setLocaleState] = useState<Locale>('fr')
 
   useEffect(() => {
-    setLocaleState(readInitialLocale())
+    const stored = readStoredLocale() ?? readNavigatorLocale()
+    if (stored && stored !== locale) setLocaleState(stored)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -53,11 +81,7 @@ export default function IntlProvider({ children }: { children: ReactNode }) {
       if (raw === 'fr' || raw === 'en') {
         if (cancelled) return
         setLocaleState(raw)
-        try {
-          window.localStorage.setItem(STORAGE_KEY, raw)
-        } catch {
-          /* quota / private mode */
-        }
+        writeStoredLocale(raw)
       }
     }
     load()
@@ -68,11 +92,7 @@ export default function IntlProvider({ children }: { children: ReactNode }) {
 
   const setLocale = async (l: Locale) => {
     setLocaleState(l)
-    try {
-      window.localStorage.setItem(STORAGE_KEY, l)
-    } catch {
-      /* ignore */
-    }
+    writeStoredLocale(l)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const { data: existing } = await supabase

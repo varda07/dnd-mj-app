@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
@@ -41,7 +41,18 @@ const GRID_COLS = 20
 const GRID_ROWS = 12
 const CELL_SIZE = 32
 
+// useSearchParams exige un <Suspense> parent pour que la page compile au
+// build (même en force-dynamic). On garde Combat comme default export pour
+// ne pas casser `import Combat from './combat/page'` côté dashboard.
 export default function Combat() {
+  return (
+    <Suspense fallback={null}>
+      <CombatInner />
+    </Suspense>
+  )
+}
+
+function CombatInner() {
   const searchParams = useSearchParams()
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [scenarioId, setScenarioId] = useState('')

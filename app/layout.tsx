@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Cinzel, Inter } from "next/font/google";
 import "./globals.css";
 import IntlProvider from "./i18n/IntlProvider";
@@ -29,7 +29,6 @@ export const metadata: Metadata = {
   title: "D&D Manager",
   description: "Gestionnaire de campagnes D&D — scénarios, personnages, combats",
   manifest: "/manifest.json",
-  themeColor: "#C9A84C",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -44,6 +43,12 @@ export const metadata: Metadata = {
       { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
     ],
   },
+};
+
+// Depuis Next.js 14, themeColor et d'autres options de viewport doivent être
+// exportés séparément via `viewport` — pas dans `metadata`.
+export const viewport: Viewport = {
+  themeColor: "#C9A84C",
 };
 
 export default function RootLayout({
@@ -62,7 +67,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#C9A84C" />
+        {/* theme-color est émis par `export const viewport` — pas de <meta> manuel. */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="D&D Manager" />
