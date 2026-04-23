@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 type Scenario = { id: string; nom: string; bg_image_url: string | null }
@@ -31,6 +32,7 @@ const GRID_ROWS = 12
 const CELL_SIZE = 32
 
 export default function Combat() {
+  const searchParams = useSearchParams()
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [scenarioId, setScenarioId] = useState('')
   const [personnages, setPersonnages] = useState<BaseParticipant[]>([])
@@ -50,6 +52,13 @@ export default function Combat() {
   useEffect(() => {
     fetchScenarios()
   }, [])
+
+  useEffect(() => {
+    const sid = searchParams.get('scenario_id')
+    if (sid && scenarios.some((s) => s.id === sid)) {
+      setScenarioId(sid)
+    }
+  }, [scenarios, searchParams])
 
   useEffect(() => {
     if (scenarioId) fetchCombatData()

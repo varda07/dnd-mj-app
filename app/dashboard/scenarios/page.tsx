@@ -257,6 +257,9 @@ export default function Scenarios() {
                   <button type="button" onClick={() => inviterJoueur(scenario.id)} className="text-green-400 text-sm">
                     Inviter un joueur
                   </button>
+                  <button type="button" onClick={() => router.push(`/dashboard/scenarios/${scenario.id}/notes`)} className="text-yellow-400 text-sm">
+                    📝 Notes
+                  </button>
                   <button type="button" onClick={() => commencerEdition(scenario)} className="text-blue-400 text-sm">
                     Modifier
                   </button>

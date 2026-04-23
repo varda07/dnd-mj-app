@@ -77,6 +77,29 @@ export default function ExplorationPage() {
   const [view, setView] = useState({ x: 0, y: 0, scale: 1 })
   const viewRef = useRef(view)
   viewRef.current = view
+  const imgSizeRef = useRef(imgSize)
+  imgSizeRef.current = imgSize
+
+  const clampPan = (x: number, y: number, scale: number) => {
+    const outer = outerRef.current
+    const img = imgSizeRef.current
+    if (!outer || img.w === 0) return { x, y }
+    const r = outer.getBoundingClientRect()
+    const mw = img.w * scale
+    const mh = img.h * scale
+    // Carte plus PETITE que le canvas (mw ≤ cw) → elle doit rester entièrement
+    //   dans le canvas : view.x ∈ [0, cw - mw].
+    // Carte plus GRANDE que le canvas (mw > cw) → elle doit toujours remplir
+    //   le canvas : view.x ∈ [cw - mw, 0] (valeurs négatives).
+    const minX = Math.min(0, r.width - mw)
+    const maxX = Math.max(0, r.width - mw)
+    const minY = Math.min(0, r.height - mh)
+    const maxY = Math.max(0, r.height - mh)
+    return {
+      x: Math.min(maxX, Math.max(minX, x)),
+      y: Math.min(maxY, Math.max(minY, y))
+    }
+  }
 
   const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map())
   const panRef = useRef<{
@@ -121,19 +144,15 @@ export default function ExplorationPage() {
       const v = viewRef.current
       const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
       const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, v.scale * factor))
-      console.log('[zoom] wheel', e.deltaY, 'nouveau scale:', newScale)
       if (newScale === v.scale) return
       const wx = (px - v.x) / v.scale
       const wy = (py - v.y) / v.scale
-      setView({ scale: newScale, x: px - wx * newScale, y: py - wy * newScale })
+      const cl = clampPan(px - wx * newScale, py - wy * newScale, newScale)
+      setView({ scale: newScale, x: cl.x, y: cl.y })
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
-
-  useEffect(() => {
-    console.log('[zoom] setView appelé avec scale:', view.scale)
-  }, [view])
 
   const fitView = () => {
     const outer = outerRef.current
@@ -142,7 +161,10 @@ export default function ExplorationPage() {
       return
     }
     const r = outer.getBoundingClientRect()
-    const scale = Math.min(r.width / imgSize.w, r.height / imgSize.h, 1)
+    // Fit-to-screen : la carte rentre entièrement dans le canvas, la plus
+    // grande dimension colle un bord, l'autre est centrée.
+    const rawScale = Math.min(r.width / imgSize.w, r.height / imgSize.h)
+    const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, rawScale))
     const x = (r.width - imgSize.w * scale) / 2
     const y = (r.height - imgSize.h * scale) / 2
     setView({ scale, x, y })
@@ -164,7 +186,8 @@ export default function ExplorationPage() {
       if (newScale === v.scale) return v
       const wx = (px - v.x) / v.scale
       const wy = (py - v.y) / v.scale
-      return { scale: newScale, x: px - wx * newScale, y: py - wy * newScale }
+      const cl = clampPan(px - wx * newScale, py - wy * newScale, newScale)
+      return { scale: newScale, x: cl.x, y: cl.y }
     })
   }
 
@@ -206,7 +229,6 @@ export default function ExplorationPage() {
         .select('id, nom, image_url')
         .eq('mj_id', userId)
         .order('nom')
-      console.log('[exploration] maps fetched:', { userId, count: data?.length, data, error })
       if (error) console.error('[exploration] erreur maps :', error)
       setMaps(data ?? [])
     }
@@ -307,7 +329,6 @@ export default function ExplorationPage() {
     element: HTMLElement,
     pointerId: number
   ) => {
-    console.log('[marker-drag] start', { kind, key, isMJ, hasExploration: !!explorationRef.current })
     if (!isMJ) return
     const cur = explorationRef.current
     if (!cur) return
@@ -335,7 +356,6 @@ export default function ExplorationPage() {
       pointerId,
       element
     }
-    console.log('[marker-drag] ref set', markerDragRef.current)
   }
 
   const advanceMarkerDrag = (clientX: number, clientY: number) => {
@@ -370,7 +390,6 @@ export default function ExplorationPage() {
     } catch {}
     if (mDrag.moved && explorationRef.current) {
       const arr = explorationRef.current[mDrag.kind] as Placed[]
-      console.log('[marker-drag] save', mDrag.kind, arr.find((p) => p.key === mDrag.key))
       await saveExploration({ [mDrag.kind]: arr } as Partial<ExplorationRow>)
     }
     return true
@@ -488,7 +507,8 @@ export default function ExplorationPage() {
       )
       const wx = (pinch.cx - pinch.startViewX) / pinch.startScale
       const wy = (pinch.cy - pinch.startViewY) / pinch.startScale
-      setView({ scale: newScale, x: pinch.cx - wx * newScale, y: pinch.cy - wy * newScale })
+      const cl = clampPan(pinch.cx - wx * newScale, pinch.cy - wy * newScale, newScale)
+      setView({ scale: newScale, x: cl.x, y: cl.y })
       return
     }
 
@@ -503,11 +523,14 @@ export default function ExplorationPage() {
     // Pan UNIQUEMENT avec exactement 1 pointeur
     const pan = panRef.current
     if (pan && pointersRef.current.size === 1) {
-      setView((v) => ({
-        ...v,
-        x: pan.viewX + (e.clientX - pan.startX),
-        y: pan.viewY + (e.clientY - pan.startY)
-      }))
+      setView((v) => {
+        const cl = clampPan(
+          pan.viewX + (e.clientX - pan.startX),
+          pan.viewY + (e.clientY - pan.startY),
+          v.scale
+        )
+        return { ...v, x: cl.x, y: cl.y }
+      })
     }
   }
 
@@ -598,7 +621,6 @@ export default function ExplorationPage() {
   }
 
   const setMap = async (url: string) => {
-    console.log('[exploration] setMap:', { url, isMJ, explorationId: exploration?.id })
     if (!isMJ) return
     updateLocal({ map_image_url: url })
     setImgSize({ w: 0, h: 0 })
@@ -607,7 +629,6 @@ export default function ExplorationPage() {
       .update({ map_image_url: url })
       .eq('scenario_id', scenarioId)
     if (error) console.error('[exploration] setMap save échec :', error)
-    else console.log('[exploration] map sauvegardée pour scenario', scenarioId)
   }
 
   const onUploadMap = async (file: File) => {
@@ -671,8 +692,8 @@ export default function ExplorationPage() {
           <h1 className="text-2xl font-bold text-yellow-500">🗺️ Exploration</h1>
         </div>
 
-        <div className="grid md:grid-cols-[300px_1fr] gap-4">
-          <aside className="space-y-3">
+        <div className="flex flex-col md:flex-row gap-4">
+          <aside className="space-y-3 md:w-[300px] md:flex-shrink-0">
             <div className="bg-gray-800 rounded-lg p-3 space-y-2">
               <label className="text-gray-400 text-xs">Scénario</label>
               <select
@@ -843,7 +864,9 @@ export default function ExplorationPage() {
                   </label>
                   <button
                     type="button"
-                    onClick={() => router.push('/dashboard')}
+                    onClick={() =>
+                      router.push(`/dashboard/combat?scenario_id=${scenarioId}`)
+                    }
                     className="w-full p-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded text-sm"
                   >
                     ⚔️ Lancer Combat
@@ -863,8 +886,17 @@ export default function ExplorationPage() {
           <div
             ref={outerRef}
             data-outer-wrap
-            className="relative bg-gray-800 rounded-lg overflow-hidden"
-            style={{ height: 'calc(100vh - 200px)', minHeight: 400, touchAction: 'none' }}
+            className="flex-1 min-w-0 bg-gray-800 rounded-lg"
+            style={{
+              position: 'relative',
+              width: '100%',
+              height: 'calc(100vh - 200px)',
+              minHeight: 400,
+              overflow: 'hidden',
+              contain: 'paint',
+              isolation: 'isolate',
+              touchAction: 'none'
+            }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -1108,10 +1140,11 @@ export default function ExplorationPage() {
                     e.stopPropagation()
                     fitView()
                   }}
-                  className="w-7 h-7 rounded-full text-gray-200 hover:bg-gray-700"
-                  title="Ajuster à l'écran"
+                  className="w-7 h-7 rounded-full text-gray-200 hover:bg-gray-700 flex items-center justify-center"
+                  title="Recentrer la carte"
+                  aria-label="Recentrer la carte"
                 >
-                  ⌖
+                  🎯
                 </button>
               </div>
             )}
@@ -1178,8 +1211,6 @@ function PlacedMarker({
   const fontPx = 12 * scaleRatio
   const iconPx = 18 * scaleRatio
   const labelPx = 10 * scaleRatio
-
-  console.log('[marker] render avec viewScale:', viewScale, 'size:', size)
 
   return (
     <div

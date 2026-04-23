@@ -420,7 +420,7 @@ export default function Dashboard() {
             ☰
           </button>
           {menuOuvert && (
-            <div className="absolute right-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden theme-no-deco">
+            <div className="fixed top-12 right-2 w-64 max-h-[calc(100vh-60px)] overflow-y-auto md:absolute md:top-auto md:right-0 md:mt-2 md:max-h-none md:overflow-hidden bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-[100] theme-no-deco">
               <div className="md:hidden px-4 py-3 border-b border-gray-700">
                 <div className="text-[10px] uppercase tracking-[0.18em] text-gray-500 mb-2">Interface</div>
                 <div className="flex bg-gray-700 rounded-lg p-1">
@@ -451,6 +451,19 @@ export default function Dashboard() {
                 className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2 text-sm"
               >
                 📚 Bibliothèque
+              </button>
+              <div className="border-t border-gray-700" />
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOuvert(false)
+                  setThemeOuvert(false)
+                  setRejoindreOuvert(false)
+                  router.push('/dashboard/sorts')
+                }}
+                className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2 text-sm"
+              >
+                ✨ Sorts
               </button>
               <div className="border-t border-gray-700" />
               <button
@@ -589,7 +602,14 @@ export default function Dashboard() {
             <button type="button" onClick={() => setModeMJ('travail')} className={`flex-1 md:flex-initial px-3 md:px-6 py-1.5 md:py-2 rounded-md md:rounded-lg text-xs md:text-base font-medium md:font-bold tracking-wider transition ${modeMJ === 'travail' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>
               📜 Forge
             </button>
-            <button type="button" onClick={() => setModeMJ('action')} className={`flex-1 md:flex-initial px-3 md:px-6 py-1.5 md:py-2 rounded-md md:rounded-lg text-xs md:text-base font-medium md:font-bold tracking-wider transition ${modeMJ === 'action' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'}`}>
+            <button
+              type="button"
+              onClick={() => router.push('/dashboard/personnages')}
+              className="md:hidden flex-1 px-3 py-1.5 rounded-md text-xs font-medium tracking-wider transition text-gray-400 hover:text-white"
+            >
+              🧙 Personnages
+            </button>
+            <button type="button" onClick={() => setModeMJ('action')} className={`hidden md:inline-flex md:flex-initial md:px-6 md:py-2 md:rounded-lg md:text-base md:font-bold tracking-wider transition ${modeMJ === 'action' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'}`}>
               🗡️ Aventure
             </button>
           </div>
@@ -793,7 +813,7 @@ export default function Dashboard() {
         {[
           { id: 'accueil', label: 'Accueil', icon: '⌂', active: pathname === '/dashboard', onClick: () => router.push('/dashboard') },
           { id: 'biblio', label: 'Bibliothèque', icon: '📚', active: pathname?.startsWith('/dashboard/bibliotheque'), onClick: () => router.push('/dashboard/bibliotheque') },
-          { id: 'combat', label: 'Combat', icon: '⚔', active: pathname?.startsWith('/dashboard/combat'), onClick: () => router.push('/dashboard/combat') },
+          { id: 'aventure', label: 'Aventure', icon: '🗡', active: pathname?.startsWith('/dashboard/aventure') || pathname?.startsWith('/dashboard/combat') || pathname?.startsWith('/dashboard/exploration'), onClick: () => router.push('/dashboard/aventure') },
           { id: 'sons', label: 'Sons', icon: '🎵', active: false, onClick: () => window.dispatchEvent(new CustomEvent('soundbox:open')) }
         ].map((tab) => (
           <button

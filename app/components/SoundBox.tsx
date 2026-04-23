@@ -194,15 +194,13 @@ export default function SoundBox() {
       </button>
 
       {open && (
-        <>
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setOpen(false)}
+        >
           <div
-            className="fixed inset-0 bg-black/40 z-[60]"
-            onClick={() => setOpen(false)}
-            aria-hidden="true"
-          />
-          <div
-            className="fixed left-4 right-4 md:right-auto md:left-6 md:w-80 max-h-[calc(100vh-100px)] overflow-y-auto bg-gray-800 rounded-xl shadow-2xl border border-gray-700 z-[70]"
-            style={{ bottom: '80px' }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full md:w-80 max-w-[90vw] max-h-[80vh] overflow-y-auto bg-gray-800 rounded-xl shadow-2xl border border-gray-700"
           >
             <div className="p-4 border-b border-gray-700 flex items-center justify-between sticky top-0 bg-gray-800 z-10">
               <h3 className="text-lg font-bold text-yellow-500">
@@ -386,7 +384,7 @@ export default function SoundBox() {
               )}
             </div>
           </div>
-        </>
+        </div>
       )}
     </>
   )

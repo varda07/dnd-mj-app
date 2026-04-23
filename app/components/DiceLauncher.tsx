@@ -98,6 +98,14 @@ function DiceShape({
   )
 }
 
+type JetRow = {
+  id: string
+  type_de: string
+  nombre: number
+  resultats: number[]
+  created_at: string
+}
+
 export default function DiceLauncher() {
   const [open, setOpen] = useState(false)
   const [selectedDice, setSelectedDice] = useState<DiceType>(DICE[5])
@@ -107,6 +115,31 @@ export default function DiceLauncher() {
   const [results, setResults] = useState<number[]>([])
   const [showParticles, setShowParticles] = useState(false)
   const [critEffect, setCritEffect] = useState<'success' | 'fail' | null>(null)
+  const [activeTab, setActiveTab] = useState<'lancer' | 'historique'>('lancer')
+  const [historique, setHistorique] = useState<JetRow[]>([])
+  const [historiqueLoading, setHistoriqueLoading] = useState(false)
+
+  const fetchHistorique = async () => {
+    setHistoriqueLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      setHistorique([])
+      setHistoriqueLoading(false)
+      return
+    }
+    const { data } = await supabase
+      .from('jets_de_des')
+      .select('id, type_de, nombre, resultats, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(20)
+    setHistorique((data ?? []) as JetRow[])
+    setHistoriqueLoading(false)
+  }
+
+  useEffect(() => {
+    if (open && activeTab === 'historique') fetchHistorique()
+  }, [open, activeTab])
 
   // Shake de l'écran entier pendant un échec critique
   useEffect(() => {
@@ -149,14 +182,14 @@ export default function DiceLauncher() {
       }
     }
 
-    if (share) {
-      const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
       await supabase.from('jets_de_des').insert({
-        user_id: user?.id,
+        user_id: user.id,
         type_de: selectedDice.label,
         nombre: count,
         resultats: jets,
-        partage: true
+        partage: share
       })
     }
   }
@@ -440,6 +473,106 @@ export default function DiceLauncher() {
             </button>
           </div>
 
+          <div className="flex border-b border-gray-700 sticky top-[56px] bg-gray-800 z-10">
+            <button
+              type="button"
+              onClick={() => setActiveTab('lancer')}
+              className={`flex-1 py-2 text-sm font-bold transition ${
+                activeTab === 'lancer'
+                  ? 'text-yellow-500 border-b-2 border-yellow-500'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              🎲 Lancer
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('historique')}
+              className={`flex-1 py-2 text-sm font-bold transition ${
+                activeTab === 'historique'
+                  ? 'text-yellow-500 border-b-2 border-yellow-500'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              📜 Historique
+            </button>
+          </div>
+
+          {activeTab === 'historique' ? (
+            <div className="p-4 space-y-2">
+              {historiqueLoading && (
+                <p className="text-gray-500 text-sm text-center">Chargement...</p>
+              )}
+              {!historiqueLoading && historique.length === 0 && (
+                <p className="text-gray-500 text-sm text-center">Aucun jet enregistré.</p>
+              )}
+              {!historiqueLoading &&
+                historique.map((jet) => {
+                  const total = jet.resultats.reduce((a, b) => a + b, 0)
+                  const isD20 = jet.type_de === 'd20'
+                  const hasCritSuccess = isD20 && jet.resultats.includes(20)
+                  const hasCritFail = isD20 && jet.resultats.includes(1)
+                  const date = new Date(jet.created_at)
+                  const dateLabel = date.toLocaleString('fr-FR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })
+                  return (
+                    <div
+                      key={jet.id}
+                      className={`p-3 rounded-lg border ${
+                        hasCritSuccess
+                          ? 'bg-yellow-500/10 border-yellow-500'
+                          : hasCritFail
+                          ? 'bg-red-600/10 border-red-600'
+                          : 'bg-gray-900 border-gray-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-bold text-gray-200">
+                          {jet.nombre}
+                          {jet.type_de}
+                        </span>
+                        <span
+                          className={`text-sm font-bold ${
+                            hasCritSuccess
+                              ? 'text-yellow-400'
+                              : hasCritFail
+                              ? 'text-red-400'
+                              : 'text-yellow-500'
+                          }`}
+                        >
+                          Total : {total}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1 mb-1">
+                        {jet.resultats.map((r, i) => {
+                          const isCritS = isD20 && r === 20
+                          const isCritF = isD20 && r === 1
+                          return (
+                            <span
+                              key={i}
+                              className={`px-2 py-0.5 rounded text-xs font-mono font-bold ${
+                                isCritS
+                                  ? 'bg-yellow-500 text-gray-900'
+                                  : isCritF
+                                  ? 'bg-red-600 text-white'
+                                  : 'bg-gray-700 text-gray-200'
+                              }`}
+                            >
+                              {r}
+                            </span>
+                          )
+                        })}
+                      </div>
+                      <p className="text-[10px] text-gray-500">{dateLabel}</p>
+                    </div>
+                  )
+                })}
+            </div>
+          ) : (
           <div className="p-4 space-y-3">
             <div>
               <label className="text-gray-400 text-sm">Type de dé</label>
@@ -565,6 +698,7 @@ export default function DiceLauncher() {
               <p className="text-green-400 text-xs text-center">✓ Résultat partagé</p>
             )}
           </div>
+          )}
         </div>
         </div>
       )}
