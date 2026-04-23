@@ -25,6 +25,7 @@ type Scenario = {
   public: boolean
   nb_copies: number
   auteur_username: string | null
+  nb_chapitres?: number
 }
 
 export default function Scenarios() {
@@ -100,7 +101,23 @@ export default function Scenarios() {
       .select('*')
       .eq('mj_id', user.id)
       .order('created_at', { ascending: false })
-    if (data) setScenarios(data)
+    if (!data) return
+
+    // Compte des chapitres par scénario (un seul round-trip).
+    const ids = data.map((s: { id: string }) => s.id)
+    let countMap = new Map<string, number>()
+    if (ids.length > 0) {
+      const { data: chaps } = await supabase
+        .from('chapitres')
+        .select('scenario_id')
+        .in('scenario_id', ids)
+      ;(chaps ?? []).forEach((c: { scenario_id: string }) => {
+        countMap.set(c.scenario_id, (countMap.get(c.scenario_id) ?? 0) + 1)
+      })
+    }
+    setScenarios(
+      data.map((s) => ({ ...s, nb_chapitres: countMap.get(s.id) ?? 0 })) as Scenario[]
+    )
   }
 
   const sauvegarderScenario = async () => {
@@ -324,9 +341,22 @@ export default function Scenarios() {
           {scenarios.length === 0 && <p className="text-gray-400">{t('empty')}</p>}
           {scenarios.map((scenario) => (
             <div key={scenario.id} className="bg-gray-800 p-4 rounded-lg">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-white">{scenario.nom}</h3>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-3 flex-wrap min-w-0">
+                  <h3 className="text-lg font-bold text-white truncate">{scenario.nom}</h3>
+                  <span className="text-xs text-gray-500 bg-gray-900/50 border border-gray-700 rounded-full px-2 py-0.5">
+                    📖 {scenario.nb_chapitres ?? 0} chapitre{(scenario.nb_chapitres ?? 0) > 1 ? 's' : ''}
+                  </span>
+                </div>
                 <div className="flex gap-3 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/dashboard/scenarios/${scenario.id}/edit`)}
+                    className="text-yellow-400 text-sm font-bold"
+                    title="Éditer (chapitres, éléments liés)"
+                  >
+                    📖 Éditer
+                  </button>
                   <button type="button" onClick={() => inviterJoueur(scenario.id)} className="text-green-400 text-sm">
                     {t('invite_player')}
                   </button>

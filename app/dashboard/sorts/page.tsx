@@ -15,14 +15,10 @@ import {
   validerEnveloppe
 } from '@/app/lib/import-export'
 
-type Personnage = {
-  id: string
-  nom: string
-}
-
 type Sort = {
   id: string
-  personnage_id: string
+  user_id: string | null
+  personnage_id: string | null
   nom: string
   niveau: number
   ecole: string
@@ -30,7 +26,6 @@ type Sort = {
   portee: string | null
   duree: string | null
   description: string
-  disponible: boolean
   public: boolean
   nb_copies: number
   auteur_username: string | null
@@ -57,11 +52,12 @@ type SpellCardProps = {
   portee: string | null
   duree: string | null
   description: string
-  disponible: boolean
+  disponible?: boolean
   personnageNom?: string
+  badge?: string
 }
 
-function SpellCard({
+export function SpellCard({
   nom,
   niveau,
   ecole,
@@ -70,7 +66,8 @@ function SpellCard({
   duree,
   description,
   disponible,
-  personnageNom
+  personnageNom,
+  badge
 }: SpellCardProps) {
   const ts = useTranslations('spells')
   return (
@@ -154,22 +151,27 @@ function SpellCard({
         </p>
       </div>
 
-      {/* Badge disponible/utilisé */}
-      <div
-        className="px-4 py-2 flex items-center justify-between text-[11px] tracking-wider uppercase border-t"
-        style={{
-          borderColor: 'rgba(201,168,76,0.2)',
-          background: 'rgba(0,0,0,0.25)'
-        }}
-      >
-        <span style={{ color: '#6a6a72' }}>{personnageNom ?? ''}</span>
-        <span
-          className="font-semibold"
-          style={{ color: disponible ? '#10b981' : '#dc2626' }}
+      {/* Pied de carte : contexte (perso) + statut. Les deux sont optionnels —
+          pour un modèle pur on n'affiche que le badge optionnel. */}
+      {(personnageNom || typeof disponible === 'boolean' || badge) && (
+        <div
+          className="px-4 py-2 flex items-center justify-between text-[11px] tracking-wider uppercase border-t"
+          style={{
+            borderColor: 'rgba(201,168,76,0.2)',
+            background: 'rgba(0,0,0,0.25)'
+          }}
         >
-          {disponible ? ts('available_short') : ts('used_short')}
-        </span>
-      </div>
+          <span style={{ color: '#6a6a72' }}>{personnageNom ?? badge ?? ''}</span>
+          {typeof disponible === 'boolean' && (
+            <span
+              className="font-semibold"
+              style={{ color: disponible ? '#10b981' : '#dc2626' }}
+            >
+              {disponible ? ts('available_short') : ts('used_short')}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -215,10 +217,7 @@ function SpellOrnament({ position }: { position: 'tl' | 'tr' | 'bl' | 'br' }) {
 }
 
 export default function Sorts() {
-  const [personnages, setPersonnages] = useState<Personnage[]>([])
   const [sorts, setSorts] = useState<Sort[]>([])
-  const [personnageId, setPersonnageId] = useState('')
-  const [filtrePersonnageId, setFiltrePersonnageId] = useState('')
   const [nom, setNom] = useState('')
   const [niveau, setNiveau] = useState('0')
   const [ecole, setEcole] = useState(ECOLES[0])
@@ -226,7 +225,6 @@ export default function Sorts() {
   const [portee, setPortee] = useState('')
   const [duree, setDuree] = useState('')
   const [description, setDescription] = useState('')
-  const [disponible, setDisponible] = useState(true)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -234,7 +232,6 @@ export default function Sorts() {
   const tc = useTranslations('common')
 
   useEffect(() => {
-    fetchPersonnages()
     fetchSorts()
   }, [])
 
@@ -246,13 +243,11 @@ export default function Sorts() {
     setPortee('')
     setDuree('')
     setDescription('')
-    setDisponible(true)
     setEditingId(null)
   }
 
   const commencerEdition = (sort: Sort) => {
     setEditingId(sort.id)
-    setPersonnageId(sort.personnage_id)
     setNom(sort.nom)
     setNiveau(String(sort.niveau))
     setEcole(sort.ecole || ECOLES[0])
@@ -260,25 +255,13 @@ export default function Sorts() {
     setPortee(sort.portee ?? '')
     setDuree(sort.duree ?? '')
     setDescription(sort.description ?? '')
-    setDisponible(sort.disponible)
     setMessage('')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const fetchPersonnages = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data } = await supabase
-      .from('personnages')
-      .select('id, nom')
-      .eq('joueur_id', user.id)
-      .order('nom')
-    if (data) {
-      setPersonnages(data)
-      if (data.length > 0 && !personnageId) setPersonnageId(data[0].id)
-    }
-  }
-
+  // Les sorts sont désormais des modèles user-owned (user_id). On inclut aussi
+  // les lignes héritées (personnage_id lié à un de nos persos, user_id=null)
+  // pour ne pas masquer du contenu qui n'aurait pas encore été migré.
   const fetchSorts = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -286,34 +269,42 @@ export default function Sorts() {
       .from('personnages')
       .select('id')
       .eq('joueur_id', user.id)
-    const ids = (mesPersos ?? []).map((p) => p.id)
-    if (ids.length === 0) {
-      setSorts([])
-      return
+    const persoIds = (mesPersos ?? []).map((p) => p.id)
+    const orFilters = [`user_id.eq.${user.id}`]
+    if (persoIds.length > 0) {
+      orFilters.push(`personnage_id.in.(${persoIds.join(',')})`)
     }
     const { data } = await supabase
       .from('sorts')
       .select('*')
-      .in('personnage_id', ids)
+      .or(orFilters.join(','))
       .order('niveau')
       .order('nom')
-    if (data) setSorts(data)
+    if (data) {
+      // Déduplication défensive (un sort peut matcher les deux filtres pendant
+      // la période de transition).
+      const uniq = new Map<string, Sort>()
+      for (const s of data as Sort[]) uniq.set(s.id, s)
+      setSorts(Array.from(uniq.values()))
+    }
   }
 
   const sauvegarderSort = async () => {
-    if (!personnageId) return setMessage(ts('need_character'))
     if (!nom) return setMessage(tc('required'))
     setLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      setLoading(false)
+      return
+    }
     const payload = {
-      personnage_id: personnageId,
       nom,
       niveau: parseInt(niveau),
       ecole,
       temps_incantation: tempsIncantation || null,
       portee: portee || null,
       duree: duree || null,
-      description,
-      disponible
+      description
     }
     if (editingId) {
       const { error } = await supabase.from('sorts').update(payload).eq('id', editingId)
@@ -324,7 +315,9 @@ export default function Sorts() {
         fetchSorts()
       }
     } else {
-      const { error } = await supabase.from('sorts').insert(payload)
+      const { error } = await supabase
+        .from('sorts')
+        .insert({ ...payload, user_id: user.id, personnage_id: null })
       if (error) setMessage(error.message)
       else {
         setMessage(ts('created'))
@@ -333,11 +326,6 @@ export default function Sorts() {
       }
     }
     setLoading(false)
-  }
-
-  const toggleDisponible = async (sort: Sort) => {
-    await supabase.from('sorts').update({ disponible: !sort.disponible }).eq('id', sort.id)
-    fetchSorts()
   }
 
   const supprimerSort = async (id: string) => {
@@ -354,17 +342,15 @@ export default function Sorts() {
   const importerSort = () => {
     ouvrirSelecteurFichier(async (f) => {
       try {
-        if (!personnageId) {
-          setMessage(ts('need_character'))
-          return
-        }
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
         const raw = await lireFichierJSON(f)
         const env = validerEnveloppe<Record<string, unknown>>(raw, ['sort'])
         const clean = nettoyer(env.data)
-        const nom = typeof clean.nom === 'string' && clean.nom.trim() !== '' ? clean.nom : 'Sort importé'
+        const nomImport = typeof clean.nom === 'string' && clean.nom.trim() !== '' ? clean.nom : 'Sort importé'
         const { error } = await supabase
           .from('sorts')
-          .insert({ ...clean, nom, personnage_id: personnageId })
+          .insert({ ...clean, nom: nomImport, user_id: user.id, personnage_id: null })
         if (error) throw error
         setMessage(tc('import_ok'))
         fetchSorts()
@@ -397,14 +383,7 @@ export default function Sorts() {
     else fetchSorts()
   }
 
-  const nomPersonnage = (id: string) => personnages.find((p) => p.id === id)?.nom ?? 'Inconnu'
-
-  const sortsAffiches = filtrePersonnageId
-    ? sorts.filter((s) => s.personnage_id === filtrePersonnageId)
-    : sorts
-
-  const previewPersoNom =
-    personnages.find((p) => p.id === personnageId)?.nom ?? '—'
+  const sortsAffiches = sorts
 
   const inputCls =
     'w-full p-2.5 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm focus:border-yellow-600'
@@ -437,19 +416,9 @@ export default function Sorts() {
             )}
           </div>
 
-          {personnages.length === 0 ? (
-            <p className="p-5 text-gray-400 text-sm">{ts('need_character')}</p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_320px] gap-5 p-5">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_320px] gap-5 p-5">
               {/* Formulaire */}
               <div className="order-2 md:order-1 space-y-3">
-                <div>
-                  <label className={labelCls}>{ts('character')}</label>
-                  <select value={personnageId} onChange={(e) => setPersonnageId(e.target.value)} className={inputCls}>
-                    {personnages.map((p) => <option key={p.id} value={p.id}>{p.nom}</option>)}
-                  </select>
-                </div>
-
                 <div>
                   <label className={labelCls}>{ts('name_label')}</label>
                   <input type="text" placeholder={ts('name_ph')} value={nom} onChange={(e) => setNom(e.target.value)} className={inputCls} />
@@ -490,11 +459,6 @@ export default function Sorts() {
                   <textarea placeholder={ts('description_ph')} value={description} onChange={(e) => setDescription(e.target.value)} className={`${inputCls} h-28 resize-none`} />
                 </div>
 
-                <label className="flex items-center gap-2 text-gray-300 text-sm cursor-pointer">
-                  <input type="checkbox" checked={disponible} onChange={(e) => setDisponible(e.target.checked)} className="w-4 h-4 accent-yellow-500" />
-                  <span>{ts('available')}</span>
-                </label>
-
                 {message && <p className="text-yellow-400 text-sm">{message}</p>}
 
                 <button
@@ -520,12 +484,9 @@ export default function Sorts() {
                   portee={portee || null}
                   duree={duree || null}
                   description={description}
-                  disponible={disponible}
-                  personnageNom={previewPersoNom}
                 />
               </div>
             </div>
-          )}
         </div>
 
         {/* Liste des sorts en grille */}
@@ -535,12 +496,6 @@ export default function Sorts() {
               {ts('grimoire')} ({sortsAffiches.length})
             </h2>
             <div className="flex items-center gap-2 flex-wrap">
-              {personnages.length > 0 && (
-                <select value={filtrePersonnageId} onChange={(e) => setFiltrePersonnageId(e.target.value)} className="p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-xs">
-                  <option value="">{ts('all_characters')}</option>
-                  {personnages.map((p) => <option key={p.id} value={p.id}>{p.nom}</option>)}
-                </select>
-              )}
               <button
                 type="button"
                 onClick={importerSort}
@@ -566,17 +521,8 @@ export default function Sorts() {
                   portee={sort.portee}
                   duree={sort.duree}
                   description={sort.description}
-                  disponible={sort.disponible}
-                  personnageNom={nomPersonnage(sort.personnage_id)}
                 />
                 <div className="flex flex-wrap gap-2 px-1">
-                  <button
-                    type="button"
-                    onClick={() => toggleDisponible(sort)}
-                    className="flex-1 px-2 py-1.5 rounded text-[11px] tracking-wider uppercase border border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-300"
-                  >
-                    {sort.disponible ? ts('mark_used') : ts('restore')}
-                  </button>
                   <button
                     type="button"
                     onClick={() => togglerPublic(sort)}

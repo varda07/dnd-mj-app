@@ -144,6 +144,11 @@ export default function Personnages() {
     overStat: StatKey | null
   } | null>(null)
   const dragStartRef = useRef<{ pointerId: number; el: HTMLElement } | null>(null)
+  const [sortsTemplates, setSortsTemplates] = useState<
+    { id: string; nom: string; niveau: number; ecole: string | null }[]
+  >([])
+  const [sortsInitiauxIds, setSortsInitiauxIds] = useState<Set<string>>(new Set())
+  const [sortsPanelOuvert, setSortsPanelOuvert] = useState(false)
   const t = useTranslations('characters')
   const tc = useTranslations('common')
 
@@ -158,7 +163,29 @@ export default function Personnages() {
   useEffect(() => {
     fetchPersonnages()
     fetchScenarios()
+    fetchSortsTemplates()
   }, [])
+
+  const fetchSortsTemplates = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('sorts')
+      .select('id, nom, niveau, ecole')
+      .eq('user_id', user.id)
+      .order('niveau')
+      .order('nom')
+    if (data) setSortsTemplates(data)
+  }
+
+  const toggleSortInitial = (id: string) => {
+    setSortsInitiauxIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   const fetchScenarios = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -238,6 +265,8 @@ export default function Personnages() {
     setImageActuelle('')
     setScenarioId('')
     setCropperKey((k) => k + 1)
+    setSortsInitiauxIds(new Set())
+    setSortsPanelOuvert(false)
   }
 
   const commencerEdition = (perso: Personnage) => {
@@ -569,9 +598,28 @@ export default function Personnages() {
         fetchPersonnages()
       }
     } else {
-      const { error } = await supabase.from('personnages').insert({ ...payload, joueur_id: user?.id })
-      if (error) setMessage(error.message)
-      else {
+      const { data: nouveau, error } = await supabase
+        .from('personnages')
+        .insert({ ...payload, joueur_id: user?.id })
+        .select('id')
+        .single()
+      if (error) {
+        setMessage(error.message)
+      } else {
+        // Attribution des sorts sélectionnés dans le formulaire (optionnel).
+        if (nouveau && sortsInitiauxIds.size > 0) {
+          const rows = Array.from(sortsInitiauxIds).map((sid) => ({
+            personnage_id: nouveau.id,
+            sort_id: sid,
+            disponible: true
+          }))
+          const { error: errJunction } = await supabase
+            .from('personnage_sorts')
+            .insert(rows)
+          if (errJunction) {
+            console.error('[perso create] attribuer sorts :', errJunction)
+          }
+        }
         setMessage(t('created'))
         resetForm()
         fetchPersonnages()
@@ -1140,6 +1188,58 @@ export default function Personnages() {
               aspect={1}
               label={editingId ? "Nouvelle image (laisser vide pour garder l'actuelle)" : 'Image du personnage'}
             />
+
+            {/* Attribution optionnelle de sorts à la création — caché en édition
+                (passer par la fiche pour gérer les sorts d'un perso existant). */}
+            {!editingId && sortsTemplates.length > 0 && (
+              <div className="bg-gray-900/50 border border-gray-700 rounded-lg overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setSortsPanelOuvert((v) => !v)}
+                  className="w-full flex items-center justify-between p-3 hover:bg-gray-800/60 transition text-left"
+                  aria-expanded={sortsPanelOuvert}
+                >
+                  <span className="text-sm font-bold text-yellow-500">
+                    ✨ Sorts à attribuer ({sortsInitiauxIds.size}/{sortsTemplates.length})
+                  </span>
+                  <span className="text-yellow-500 text-sm">
+                    {sortsPanelOuvert ? '▾' : '▸'}
+                  </span>
+                </button>
+                {sortsPanelOuvert && (
+                  <div className="border-t border-gray-700 p-3 space-y-1 max-h-60 overflow-y-auto">
+                    <p className="text-[11px] text-gray-500 italic mb-2">
+                      Optionnel — tu pourras toujours en ajouter depuis la fiche du personnage.
+                    </p>
+                    {sortsTemplates.map((tpl) => {
+                      const checked = sortsInitiauxIds.has(tpl.id)
+                      return (
+                        <label
+                          key={tpl.id}
+                          className={`flex items-center gap-2 p-1.5 rounded cursor-pointer text-xs ${
+                            checked
+                              ? 'bg-yellow-500/10 border border-yellow-600/50'
+                              : 'bg-gray-800 border border-gray-700 hover:bg-gray-700/60'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleSortInitial(tpl.id)}
+                            className="w-3.5 h-3.5 accent-yellow-500"
+                          />
+                          <span className="flex-1 truncate text-gray-200">{tpl.nom}</span>
+                          <span className="text-[10px] text-gray-500">
+                            {tpl.niveau === 0 ? 'Tour' : `Niv. ${tpl.niveau}`}
+                            {tpl.ecole ? ` · ${tpl.ecole}` : ''}
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
             {message && <p className="text-yellow-400 text-sm">{message}</p>}
 

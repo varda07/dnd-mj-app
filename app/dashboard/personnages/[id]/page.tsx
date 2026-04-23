@@ -52,12 +52,21 @@ type Personnage = {
 }
 
 type Sort = {
-  id: string
+  id: string                  // sorts.id
+  junction_id: string         // personnage_sorts.id — pour update/delete
   nom: string
   niveau: number
   ecole: string | null
   description: string | null
   disponible: boolean
+}
+
+type SortTemplate = {
+  id: string
+  nom: string
+  niveau: number
+  ecole: string | null
+  description: string | null
 }
 
 type SaveState = 'saved' | 'pending' | 'saving' | 'error'
@@ -156,6 +165,10 @@ export default function FichePersonnage() {
   const [sorts, setSorts] = useState<Sort[]>([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [sortsModalOpen, setSortsModalOpen] = useState(false)
+  const [sortsTemplates, setSortsTemplates] = useState<SortTemplate[]>([])
+  const [templatesLoading, setTemplatesLoading] = useState(false)
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState<Set<string>>(new Set())
   const [saveState, setSaveState] = useState<SaveState>('saved')
   const [saveError, setSaveError] = useState<string | null>(null)
   const [colonnesManquantes, setColonnesManquantes] = useState<string[]>([])
@@ -181,18 +194,16 @@ export default function FichePersonnage() {
         setLoading(false)
         return
       }
-      const [{ data: p }, { data: s }] = await Promise.all([
+      const [{ data: p }, { data: ps }] = await Promise.all([
         supabase
           .from('personnages')
           .select('*')
           .eq('id', id)
           .maybeSingle(),
         supabase
-          .from('sorts')
-          .select('id, nom, niveau, ecole, description, disponible')
+          .from('personnage_sorts')
+          .select('id, disponible, sorts(id, nom, niveau, ecole, description)')
           .eq('personnage_id', id)
-          .order('niveau')
-          .order('nom')
       ])
       if (!p) {
         setNotFound(true)
@@ -211,7 +222,31 @@ export default function FichePersonnage() {
         )
       }
       setPerso(normalize(p as Record<string, unknown>))
-      setSorts(s ?? [])
+      const assignedRows = (ps ?? []) as Array<{
+        id: string
+        disponible: boolean
+        sorts:
+          | { id: string; nom: string; niveau: number; ecole: string | null; description: string | null }
+          | { id: string; nom: string; niveau: number; ecole: string | null; description: string | null }[]
+          | null
+      }>
+      const sortsAssigned: Sort[] = assignedRows
+        .map((row) => {
+          const s = Array.isArray(row.sorts) ? row.sorts[0] : row.sorts
+          if (!s) return null
+          return {
+            id: s.id,
+            junction_id: row.id,
+            nom: s.nom,
+            niveau: s.niveau,
+            ecole: s.ecole,
+            description: s.description,
+            disponible: row.disponible
+          }
+        })
+        .filter((x): x is Sort => x !== null)
+        .sort((a, b) => a.niveau - b.niveau || a.nom.localeCompare(b.nom))
+      setSorts(sortsAssigned)
       setSaveState('saved')
       setSaveError(null)
       setLoading(false)
@@ -373,6 +408,110 @@ export default function FichePersonnage() {
       'armes',
       perso.armes.filter((_, idx) => idx !== i)
     )
+  }
+
+  // === Attribution de sorts depuis la bibliothèque de modèles user-owned ===
+  const ouvrirAttribuer = async () => {
+    setSortsModalOpen(true)
+    setSelectedTemplateIds(new Set())
+    setTemplatesLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const assignedIds = new Set(sorts.map((s) => s.id))
+    const { data } = await supabase
+      .from('sorts')
+      .select('id, nom, niveau, ecole, description')
+      .eq('user_id', user.id)
+      .order('niveau')
+      .order('nom')
+    const dispos = ((data ?? []) as SortTemplate[]).filter((s) => !assignedIds.has(s.id))
+    setSortsTemplates(dispos)
+    setTemplatesLoading(false)
+  }
+
+  const toggleTemplateSelection = (id: string) => {
+    setSelectedTemplateIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const attribuerSelected = async () => {
+    if (!perso || selectedTemplateIds.size === 0) {
+      setSortsModalOpen(false)
+      return
+    }
+    const rows = Array.from(selectedTemplateIds).map((sid) => ({
+      personnage_id: perso.id,
+      sort_id: sid,
+      disponible: true
+    }))
+    const { data, error } = await supabase
+      .from('personnage_sorts')
+      .insert(rows)
+      .select('id, disponible, sorts(id, nom, niveau, ecole, description)')
+    if (error) {
+      console.error('[fiche] attribuer sorts :', error)
+      return
+    }
+    const ajoutes: Sort[] = ((data ?? []) as Array<{
+      id: string
+      disponible: boolean
+      sorts:
+        | { id: string; nom: string; niveau: number; ecole: string | null; description: string | null }
+        | { id: string; nom: string; niveau: number; ecole: string | null; description: string | null }[]
+        | null
+    }>)
+      .map((row) => {
+        const s = Array.isArray(row.sorts) ? row.sorts[0] : row.sorts
+        if (!s) return null
+        return {
+          id: s.id,
+          junction_id: row.id,
+          nom: s.nom,
+          niveau: s.niveau,
+          ecole: s.ecole,
+          description: s.description,
+          disponible: row.disponible
+        }
+      })
+      .filter((x): x is Sort => x !== null)
+    setSorts((prev) =>
+      [...prev, ...ajoutes].sort(
+        (a, b) => a.niveau - b.niveau || a.nom.localeCompare(b.nom)
+      )
+    )
+    setSortsModalOpen(false)
+  }
+
+  const toggleSortDisponible = async (s: Sort) => {
+    const nouvelle = !s.disponible
+    const { error } = await supabase
+      .from('personnage_sorts')
+      .update({ disponible: nouvelle })
+      .eq('id', s.junction_id)
+    if (error) {
+      console.error('[fiche] toggle sort :', error)
+      return
+    }
+    setSorts((prev) =>
+      prev.map((x) => (x.junction_id === s.junction_id ? { ...x, disponible: nouvelle } : x))
+    )
+  }
+
+  const retirerSort = async (s: Sort) => {
+    if (!window.confirm(`Retirer « ${s.nom} » de ce personnage ?`)) return
+    const { error } = await supabase
+      .from('personnage_sorts')
+      .delete()
+      .eq('id', s.junction_id)
+    if (error) {
+      console.error('[fiche] retirer sort :', error)
+      return
+    }
+    setSorts((prev) => prev.filter((x) => x.junction_id !== s.junction_id))
   }
 
   if (loading) {
@@ -963,17 +1102,33 @@ export default function FichePersonnage() {
               </div>
             </Panel>
 
-            {sortsConnus.length > 0 && (
-              <Panel title="Sorts connus">
+            <Panel title="Sorts connus">
+              <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
+                <p className="text-xs text-gray-500">
+                  {sortsConnus.length + sortsAttaque.length} sort(s) attribué(s)
+                </p>
+                {isOwner && (
+                  <button
+                    type="button"
+                    onClick={ouvrirAttribuer}
+                    className="px-3 py-1.5 rounded text-xs font-bold bg-yellow-600 hover:bg-yellow-500 text-gray-900"
+                  >
+                    ➕ Attribuer des sorts
+                  </button>
+                )}
+              </div>
+              {sortsConnus.length === 0 ? (
+                <p className="text-gray-500 italic text-sm">Aucun sort attribué à ce personnage.</p>
+              ) : (
                 <div className="space-y-2">
                   {sortsConnus.map((s) => (
                     <div
-                      key={s.id}
+                      key={s.junction_id}
                       className={`bg-stone-900/60 border border-yellow-800/30 rounded p-2 ${
                         !s.disponible ? 'opacity-50' : ''
                       }`}
                     >
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
                         <span className="text-yellow-100 font-bold">{s.nom}</span>
                         <span className="text-xs text-gray-500">
                           Niv. {s.niveau}
@@ -983,11 +1138,29 @@ export default function FichePersonnage() {
                       {s.description && (
                         <p className="text-gray-400 text-xs italic mt-1">{s.description}</p>
                       )}
+                      {isOwner && (
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => toggleSortDisponible(s)}
+                            className="px-2 py-1 text-[10px] uppercase tracking-wider rounded border border-gray-700 bg-stone-800 hover:bg-stone-700 text-gray-300"
+                          >
+                            {s.disponible ? 'Marquer utilisé' : 'Restaurer'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => retirerSort(s)}
+                            className="px-2 py-1 text-[10px] uppercase tracking-wider rounded border border-red-900 bg-red-950/40 text-red-300 hover:bg-red-900/40 ml-auto"
+                          >
+                            Retirer ce sort
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
-              </Panel>
-            )}
+              )}
+            </Panel>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Panel title="Caractéristiques de classe">
@@ -1053,6 +1226,94 @@ export default function FichePersonnage() {
           </div>
         </div>
       </div>
+
+      {sortsModalOpen && (
+        <div
+          className="fixed inset-0 z-[90] bg-black/70 flex items-center justify-center p-4"
+          onClick={() => setSortsModalOpen(false)}
+        >
+          <div
+            className="bg-stone-800 border-2 border-yellow-600 rounded-lg shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-yellow-800/50 flex items-center justify-between">
+              <h3 className="text-yellow-500 font-bold">➕ Attribuer des sorts</h3>
+              <button
+                type="button"
+                onClick={() => setSortsModalOpen(false)}
+                className="text-gray-400 hover:text-white text-2xl leading-none w-8 h-8"
+                aria-label="Fermer"
+              >
+                ×
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {templatesLoading ? (
+                <p className="text-gray-400 text-sm">Chargement…</p>
+              ) : sortsTemplates.length === 0 ? (
+                <p className="text-gray-400 text-sm italic">
+                  Aucun sort disponible. Crée des sorts dans la page Sorts pour pouvoir les attribuer.
+                </p>
+              ) : (
+                <ul className="space-y-1">
+                  {sortsTemplates.map((tpl) => {
+                    const checked = selectedTemplateIds.has(tpl.id)
+                    return (
+                      <li key={tpl.id}>
+                        <label
+                          className={`flex items-start gap-3 p-2 rounded cursor-pointer border ${
+                            checked
+                              ? 'bg-yellow-500/10 border-yellow-600/60'
+                              : 'bg-stone-900/50 border-stone-700 hover:bg-stone-700/40'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleTemplateSelection(tpl.id)}
+                            className="mt-1 w-4 h-4 accent-yellow-500 flex-shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-baseline gap-2 flex-wrap">
+                              <span className="text-yellow-100 font-bold">{tpl.nom}</span>
+                              <span className="text-[11px] text-gray-500">
+                                {tpl.niveau === 0 ? 'Tour' : `Niv. ${tpl.niveau}`}
+                                {tpl.ecole ? ` · ${tpl.ecole}` : ''}
+                              </span>
+                            </div>
+                            {tpl.description && (
+                              <p className="text-gray-400 text-xs italic mt-1 line-clamp-2">
+                                {tpl.description}
+                              </p>
+                            )}
+                          </div>
+                        </label>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+            <div className="p-3 border-t border-yellow-800/50 flex gap-2">
+              <button
+                type="button"
+                onClick={attribuerSelected}
+                disabled={selectedTemplateIds.size === 0}
+                className="flex-1 px-3 py-2 rounded bg-yellow-500 text-gray-900 font-bold hover:bg-yellow-400 disabled:opacity-50"
+              >
+                Attribuer ({selectedTemplateIds.size})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortsModalOpen(false)}
+                className="px-3 py-2 rounded bg-stone-700 text-white hover:bg-stone-600"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {rollMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-stone-800 border-2 border-yellow-600 rounded-lg p-4 shadow-2xl animate-pulse">
