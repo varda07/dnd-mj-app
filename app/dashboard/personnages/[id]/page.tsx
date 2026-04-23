@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
+import { CONDITIONS_MAP, isConditionKey, type ConditionKey } from '@/app/data/conditions'
 
 type StatKey = 'force' | 'dexterite' | 'constitution' | 'intelligence' | 'sagesse' | 'charisme'
 
@@ -44,6 +46,7 @@ type Personnage = {
   exploits: string
   langues: string
   autres_maitrises: string
+  conditions: ConditionKey[]
 }
 
 type Sort = {
@@ -136,7 +139,10 @@ const normalize = (row: Record<string, unknown>): Personnage => ({
   traits_classe: (row.traits_classe as string) ?? '',
   exploits: (row.exploits as string) ?? '',
   langues: (row.langues as string) ?? '',
-  autres_maitrises: (row.autres_maitrises as string) ?? ''
+  autres_maitrises: (row.autres_maitrises as string) ?? '',
+  conditions: Array.isArray(row.conditions)
+    ? (row.conditions as unknown[]).filter(isConditionKey)
+    : []
 })
 
 export default function FichePersonnage() {
@@ -160,6 +166,7 @@ export default function FichePersonnage() {
 
   const loadedRef = useRef(false)
   const colonnesDispoRef = useRef<Set<string>>(new Set())
+  const tCond = useTranslations('conditions')
 
   useEffect(() => {
     if (!id) return
@@ -457,6 +464,47 @@ export default function FichePersonnage() {
               Exécute <code className="text-red-100">supabase/setup.sql</code> dans
               le SQL Editor de Supabase pour les créer.
             </p>
+          </div>
+        )}
+
+        {perso.conditions.length > 0 && (
+          <div className="bg-purple-900/30 border border-purple-600/50 rounded-lg p-3 mb-4">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-purple-300 mb-2">
+              {tCond('title')}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {perso.conditions.map((cle) => {
+                const c = CONDITIONS_MAP[cle]
+                if (!c) return null
+                const nomTr = tCond(cle)
+                return (
+                  <span
+                    key={cle}
+                    className="group relative inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-800/60 border border-purple-400/60 text-purple-50 text-sm cursor-help"
+                    title={`${nomTr} — ${c.description}`}
+                  >
+                    <span className="text-base leading-none">{c.icone}</span>
+                    <span className="font-medium">{nomTr}</span>
+                    <span
+                      className="pointer-events-none absolute left-1/2 -translate-x-1/2 top-full mt-1 z-20 hidden group-hover:block w-64 p-2 rounded bg-gray-900 border border-purple-500/60 text-[11px] text-gray-200 shadow-xl"
+                      style={{ letterSpacing: 'normal', textTransform: 'none', fontWeight: 400 }}
+                    >
+                      <span className="block font-bold text-purple-200 mb-1">
+                        {c.icone} {nomTr}
+                      </span>
+                      <span className="block text-gray-300 mb-1">{c.description}</span>
+                      {c.effets.length > 0 && (
+                        <span className="block text-gray-400 text-[10px]">
+                          {c.effets.map((eff, i) => (
+                            <span key={i} className="block">• {eff}</span>
+                          ))}
+                        </span>
+                      )}
+                    </span>
+                  </span>
+                )
+              })}
+            </div>
           </div>
         )}
 

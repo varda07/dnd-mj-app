@@ -1,7 +1,17 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
+import {
+  construireEnveloppe,
+  lireFichierJSON,
+  nettoyer,
+  ouvrirSelecteurFichier,
+  slugFichier,
+  telechargerJSON,
+  validerEnveloppe
+} from '@/app/lib/import-export'
 
 type Personnage = {
   id: string
@@ -19,6 +29,9 @@ type Sort = {
   duree: string | null
   description: string
   disponible: boolean
+  public: boolean
+  nb_copies: number
+  auteur_username: string | null
 }
 
 const ECOLES = [
@@ -57,6 +70,7 @@ function SpellCard({
   disponible,
   personnageNom
 }: SpellCardProps) {
+  const ts = useTranslations('spells')
   return (
     <div
       className="relative rounded-xl overflow-hidden flex flex-col theme-no-deco"
@@ -151,7 +165,7 @@ function SpellCard({
           className="font-semibold"
           style={{ color: disponible ? '#10b981' : '#dc2626' }}
         >
-          {disponible ? '● Disponible' : '○ Utilisé'}
+          {disponible ? ts('available_short') : ts('used_short')}
         </span>
       </div>
     </div>
@@ -214,6 +228,8 @@ export default function Sorts() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
+  const ts = useTranslations('spells')
+  const tc = useTranslations('common')
 
   useEffect(() => {
     fetchPersonnages()
@@ -283,8 +299,8 @@ export default function Sorts() {
   }
 
   const sauvegarderSort = async () => {
-    if (!personnageId) return setMessage('Sélectionne un personnage !')
-    if (!nom) return setMessage('Le nom du sort est obligatoire !')
+    if (!personnageId) return setMessage(ts('need_character'))
+    if (!nom) return setMessage(tc('required'))
     setLoading(true)
     const payload = {
       personnage_id: personnageId,
@@ -301,7 +317,7 @@ export default function Sorts() {
       const { error } = await supabase.from('sorts').update(payload).eq('id', editingId)
       if (error) setMessage(error.message)
       else {
-        setMessage('Sort modifié !')
+        setMessage(ts('modified'))
         resetForm()
         fetchSorts()
       }
@@ -309,7 +325,7 @@ export default function Sorts() {
       const { error } = await supabase.from('sorts').insert(payload)
       if (error) setMessage(error.message)
       else {
-        setMessage('Sort ajouté !')
+        setMessage(ts('created'))
         resetForm()
         fetchSorts()
       }
@@ -323,9 +339,60 @@ export default function Sorts() {
   }
 
   const supprimerSort = async (id: string) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible.')) return
+    if (!window.confirm(tc('confirm_delete'))) return
     await supabase.from('sorts').delete().eq('id', id)
     fetchSorts()
+  }
+
+  const exporterSort = (s: Sort) => {
+    const env = construireEnveloppe('sort', nettoyer(s as unknown as Record<string, unknown>))
+    telechargerJSON(`sort-${slugFichier(s.nom)}.json`, env)
+  }
+
+  const importerSort = () => {
+    ouvrirSelecteurFichier(async (f) => {
+      try {
+        if (!personnageId) {
+          setMessage(ts('need_character'))
+          return
+        }
+        const raw = await lireFichierJSON(f)
+        const env = validerEnveloppe<Record<string, unknown>>(raw, ['sort'])
+        const clean = nettoyer(env.data)
+        const nom = typeof clean.nom === 'string' && clean.nom.trim() !== '' ? clean.nom : 'Sort importé'
+        const { error } = await supabase
+          .from('sorts')
+          .insert({ ...clean, nom, personnage_id: personnageId })
+        if (error) throw error
+        setMessage(tc('import_ok'))
+        fetchSorts()
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        setMessage(tc('import_error', { message: msg }))
+      }
+    })
+  }
+
+  const togglerPublic = async (sort: Sort) => {
+    const rendrePublic = !sort.public
+    let auteurUsername = sort.auteur_username ?? null
+    if (rendrePublic && !auteurUsername) {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', user.id)
+          .maybeSingle()
+        auteurUsername = profile?.username ?? user.email ?? 'Anonyme'
+      }
+    }
+    const { error } = await supabase
+      .from('sorts')
+      .update({ public: rendrePublic, auteur_username: auteurUsername })
+      .eq('id', sort.id)
+    if (error) setMessage(error.message)
+    else fetchSorts()
   }
 
   const nomPersonnage = (id: string) => personnages.find((p) => p.id === id)?.nom ?? 'Inconnu'
@@ -346,16 +413,16 @@ export default function Sorts() {
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center gap-4 mb-6">
           <button type="button" onClick={() => window.location.href = '/dashboard'} className="text-gray-400 hover:text-white text-sm">
-            ← Retour
+            ← {tc('back')}
           </button>
-          <h1 className="text-xl md:text-2xl font-bold text-yellow-500 tracking-wider">✨ Sorts</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-yellow-500 tracking-wider">{ts('title')}</h1>
         </div>
 
         {/* Bloc création/édition : aperçu live + formulaire */}
         <div className="bg-gray-800 rounded-lg mb-8 overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-700 flex items-center justify-between">
             <h2 className="text-[13px] tracking-[0.18em] uppercase text-yellow-500">
-              {editingId ? 'Modifier le sort' : 'Nouveau sort'}
+              {editingId ? ts('edit_title') : ts('create_title')}
             </h2>
             {editingId && (
               <button
@@ -363,38 +430,38 @@ export default function Sorts() {
                 onClick={resetForm}
                 className="text-xs text-gray-400 hover:text-white"
               >
-                Annuler l&apos;édition
+                {ts('cancel_edit')}
               </button>
             )}
           </div>
 
           {personnages.length === 0 ? (
-            <p className="p-5 text-gray-400 text-sm">Crée d&apos;abord un personnage pour lui ajouter des sorts.</p>
+            <p className="p-5 text-gray-400 text-sm">{ts('need_character')}</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-[1fr_320px] gap-5 p-5">
               {/* Formulaire */}
               <div className="order-2 md:order-1 space-y-3">
                 <div>
-                  <label className={labelCls}>Personnage</label>
+                  <label className={labelCls}>{ts('character')}</label>
                   <select value={personnageId} onChange={(e) => setPersonnageId(e.target.value)} className={inputCls}>
                     {personnages.map((p) => <option key={p.id} value={p.id}>{p.nom}</option>)}
                   </select>
                 </div>
 
                 <div>
-                  <label className={labelCls}>Nom du sort *</label>
-                  <input type="text" placeholder="Boule de feu" value={nom} onChange={(e) => setNom(e.target.value)} className={inputCls} />
+                  <label className={labelCls}>{ts('name_label')}</label>
+                  <input type="text" placeholder={ts('name_ph')} value={nom} onChange={(e) => setNom(e.target.value)} className={inputCls} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className={labelCls}>Niveau</label>
+                    <label className={labelCls}>{ts('level')}</label>
                     <select value={niveau} onChange={(e) => setNiveau(e.target.value)} className={inputCls}>
-                      {NIVEAUX.map((n) => <option key={n} value={n}>{n === 0 ? 'Tour (0)' : `Niveau ${n}`}</option>)}
+                      {NIVEAUX.map((n) => <option key={n} value={n}>{n === 0 ? ts('level_0_short', { n }) : ts('level_n', { n })}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className={labelCls}>École</label>
+                    <label className={labelCls}>{ts('school')}</label>
                     <select value={ecole} onChange={(e) => setEcole(e.target.value)} className={inputCls}>
                       {ECOLES.map((e) => <option key={e} value={e}>{e}</option>)}
                     </select>
@@ -403,27 +470,27 @@ export default function Sorts() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className={labelCls}>Incantation</label>
+                    <label className={labelCls}>{ts('casting_time')}</label>
                     <input type="text" placeholder="1 action" value={tempsIncantation} onChange={(e) => setTempsIncantation(e.target.value)} className={inputCls} />
                   </div>
                   <div>
-                    <label className={labelCls}>Portée</label>
+                    <label className={labelCls}>{ts('range')}</label>
                     <input type="text" placeholder="45 m" value={portee} onChange={(e) => setPortee(e.target.value)} className={inputCls} />
                   </div>
                   <div>
-                    <label className={labelCls}>Durée</label>
-                    <input type="text" placeholder="Instantané" value={duree} onChange={(e) => setDuree(e.target.value)} className={inputCls} />
+                    <label className={labelCls}>{ts('duration')}</label>
+                    <input type="text" value={duree} onChange={(e) => setDuree(e.target.value)} className={inputCls} />
                   </div>
                 </div>
 
                 <div>
-                  <label className={labelCls}>Description</label>
-                  <textarea placeholder="Effet du sort, dégâts, sauvegardes…" value={description} onChange={(e) => setDescription(e.target.value)} className={`${inputCls} h-28 resize-none`} />
+                  <label className={labelCls}>{ts('description')}</label>
+                  <textarea placeholder={ts('description_ph')} value={description} onChange={(e) => setDescription(e.target.value)} className={`${inputCls} h-28 resize-none`} />
                 </div>
 
                 <label className="flex items-center gap-2 text-gray-300 text-sm cursor-pointer">
                   <input type="checkbox" checked={disponible} onChange={(e) => setDisponible(e.target.checked)} className="w-4 h-4 accent-yellow-500" />
-                  <span>Sort disponible</span>
+                  <span>{ts('available')}</span>
                 </label>
 
                 {message && <p className="text-yellow-400 text-sm">{message}</p>}
@@ -434,14 +501,14 @@ export default function Sorts() {
                   disabled={loading}
                   className="w-full p-3 bg-yellow-500 text-gray-900 font-bold rounded hover:bg-yellow-400 disabled:opacity-60 text-sm tracking-wider"
                 >
-                  {loading ? 'Chargement…' : editingId ? 'Enregistrer les modifications' : 'Créer le sort'}
+                  {loading ? tc('loading') : editingId ? ts('save_edit_button') : ts('save_button')}
                 </button>
               </div>
 
               {/* Aperçu live — sur mobile : au-dessus, sur desktop : à droite */}
               <div className="order-1 md:order-2">
                 <div className="text-[10px] uppercase tracking-[0.18em] text-gray-500 mb-2 text-center md:text-left">
-                  Aperçu live
+                  {ts('live_preview')}
                 </div>
                 <SpellCard
                   nom={nom}
@@ -461,20 +528,29 @@ export default function Sorts() {
 
         {/* Liste des sorts en grille */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
             <h2 className="text-[13px] tracking-[0.18em] uppercase text-yellow-500">
-              Grimoire ({sortsAffiches.length})
+              {ts('grimoire')} ({sortsAffiches.length})
             </h2>
-            {personnages.length > 0 && (
-              <select value={filtrePersonnageId} onChange={(e) => setFiltrePersonnageId(e.target.value)} className="p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-xs">
-                <option value="">Tous les personnages</option>
-                {personnages.map((p) => <option key={p.id} value={p.id}>{p.nom}</option>)}
-              </select>
-            )}
+            <div className="flex items-center gap-2 flex-wrap">
+              {personnages.length > 0 && (
+                <select value={filtrePersonnageId} onChange={(e) => setFiltrePersonnageId(e.target.value)} className="p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-xs">
+                  <option value="">{ts('all_characters')}</option>
+                  {personnages.map((p) => <option key={p.id} value={p.id}>{p.nom}</option>)}
+                </select>
+              )}
+              <button
+                type="button"
+                onClick={importerSort}
+                className="px-3 py-1.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs font-bold"
+              >
+                {tc('import_json')}
+              </button>
+            </div>
           </div>
 
           {sortsAffiches.length === 0 && (
-            <p className="text-gray-400 text-sm italic">Aucun sort pour l&apos;instant.</p>
+            <p className="text-gray-400 text-sm italic">{ts('empty')}</p>
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -491,27 +567,46 @@ export default function Sorts() {
                   disponible={sort.disponible}
                   personnageNom={nomPersonnage(sort.personnage_id)}
                 />
-                <div className="flex gap-2 px-1">
+                <div className="flex flex-wrap gap-2 px-1">
                   <button
                     type="button"
                     onClick={() => toggleDisponible(sort)}
                     className="flex-1 px-2 py-1.5 rounded text-[11px] tracking-wider uppercase border border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-300"
                   >
-                    {sort.disponible ? 'Marquer utilisé' : 'Restaurer'}
+                    {sort.disponible ? ts('mark_used') : ts('restore')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => togglerPublic(sort)}
+                    className={`px-2 py-1.5 rounded text-[11px] tracking-wider uppercase border ${
+                      sort.public
+                        ? 'border-green-900 bg-green-950/40 text-green-300 hover:bg-green-900/40'
+                        : 'border-gray-700 bg-gray-800 text-gray-400 hover:bg-gray-700'
+                    }`}
+                  >
+                    {sort.public ? `🌍 (${sort.nb_copies})` : '🔒'}
                   </button>
                   <button
                     type="button"
                     onClick={() => commencerEdition(sort)}
                     className="px-2 py-1.5 rounded text-[11px] tracking-wider uppercase border border-blue-900 bg-blue-950/40 text-blue-300 hover:bg-blue-900/40"
                   >
-                    Modifier
+                    {tc('modify')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => exporterSort(sort)}
+                    className="px-2 py-1.5 rounded text-[11px] tracking-wider uppercase border border-gray-700 bg-gray-800 text-gray-300 hover:bg-gray-700"
+                    title={tc('export_item_title')}
+                  >
+                    📥
                   </button>
                   <button
                     type="button"
                     onClick={() => supprimerSort(sort.id)}
                     className="px-2 py-1.5 rounded text-[11px] tracking-wider uppercase border border-red-900 bg-red-950/40 text-red-300 hover:bg-red-900/40"
                   >
-                    Suppr
+                    {tc('delete')}
                   </button>
                 </div>
               </div>

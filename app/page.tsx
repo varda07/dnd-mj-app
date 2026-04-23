@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { supabase } from '../lib/supabase'
 
 export default function Home() {
@@ -8,6 +9,7 @@ export default function Home() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const t = useTranslations('login')
 
   const handleLogin = async () => {
     setLoading(true)
@@ -30,10 +32,10 @@ export default function Home() {
         stack: error.stack,
         raw: error
       })
-      setMessage(`Erreur création compte : ${error.message}`)
+      setMessage(t('signup_error', { message: error.message }))
     } else {
       console.log('[auth] signUp succès :', data)
-      setMessage('Compte créé avec succès !')
+      setMessage(t('account_created'))
     }
     setLoading(false)
   }
@@ -152,20 +154,20 @@ export default function Home() {
 
       <div className="w-full max-w-sm">
         <h1 className="login-title text-xl sm:text-2xl text-center mb-3">
-          D&amp;D MANAGER
+          {t('app_title')}
         </h1>
 
         <p className="login-slogan text-center text-[10px] sm:text-[11px] mb-10">
-          Campaign Tools
+          {t('app_slogan')}
         </p>
 
         <div className="login-card p-6 sm:p-8">
           <div className="space-y-5">
             <div className="space-y-2">
-              <div className="login-label">Email</div>
+              <div className="login-label">{t('email')}</div>
               <input
                 type="email"
-                placeholder="vous@exemple.com"
+                placeholder={t('email_placeholder')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="login-input w-full px-3 py-2.5"
@@ -173,10 +175,10 @@ export default function Home() {
             </div>
 
             <div className="space-y-2">
-              <div className="login-label">Mot de passe</div>
+              <div className="login-label">{t('password')}</div>
               <input
                 type="password"
-                placeholder="••••••••"
+                placeholder={t('password_placeholder')}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="login-input w-full px-3 py-2.5"
@@ -193,7 +195,7 @@ export default function Home() {
               disabled={loading}
               className="login-btn-primary w-full py-3 text-xs"
             >
-              {loading ? 'Chargement…' : 'Se connecter'}
+              {loading ? '…' : t('sign_in')}
             </button>
 
             <div className="login-divider" />
@@ -204,7 +206,7 @@ export default function Home() {
               disabled={loading}
               className="login-btn-secondary w-full py-3 text-xs"
             >
-              Créer un compte
+              {t('register')}
             </button>
           </div>
         </div>

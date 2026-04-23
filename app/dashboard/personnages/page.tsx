@@ -1,8 +1,18 @@
 'use client'
 
 import { useState, useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react'
+import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import ImageCropper from '@/app/components/ImageCropper'
+import {
+  construireEnveloppe,
+  lireFichierJSON,
+  nettoyer,
+  ouvrirSelecteurFichier,
+  slugFichier,
+  telechargerJSON,
+  validerEnveloppe
+} from '@/app/lib/import-export'
 import {
   RACES,
   CLASSES,
@@ -41,6 +51,9 @@ type Personnage = {
   de_vie: string
   image_url: string
   scenario_id: string | null
+  public: boolean
+  nb_copies: number
+  auteur_username: string | null
 }
 
 type ScenarioOption = { id: string; nom: string }
@@ -129,6 +142,8 @@ export default function Personnages() {
     overStat: StatKey | null
   } | null>(null)
   const dragStartRef = useRef<{ pointerId: number; el: HTMLElement } | null>(null)
+  const t = useTranslations('characters')
+  const tc = useTranslations('common')
 
   const classeObj = findClasse(classe)
   const raceObj = findRace(race)
@@ -507,7 +522,7 @@ export default function Personnages() {
   }
 
   const sauvegarderPersonnage = async () => {
-    if (!nom) return setMessage('Le nom est obligatoire !')
+    if (!nom) return setMessage(t('name_required'))
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -547,7 +562,7 @@ export default function Personnages() {
       const { error } = await supabase.from('personnages').update(payload).eq('id', editingId)
       if (error) setMessage(error.message)
       else {
-        setMessage('Personnage modifié !')
+        setMessage(t('modified'))
         resetForm()
         fetchPersonnages()
       }
@@ -555,7 +570,7 @@ export default function Personnages() {
       const { error } = await supabase.from('personnages').insert({ ...payload, joueur_id: user?.id })
       if (error) setMessage(error.message)
       else {
-        setMessage('Personnage créé !')
+        setMessage(t('created'))
         resetForm()
         fetchPersonnages()
       }
@@ -564,9 +579,56 @@ export default function Personnages() {
   }
 
   const supprimerPersonnage = async (id: string) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible.')) return
+    if (!window.confirm(tc('confirm_delete'))) return
     await supabase.from('personnages').delete().eq('id', id)
     fetchPersonnages()
+  }
+
+  const exporterPersonnage = (p: Personnage) => {
+    const env = construireEnveloppe('personnage', nettoyer(p as unknown as Record<string, unknown>))
+    telechargerJSON(`personnage-${slugFichier(p.nom)}.json`, env)
+  }
+
+  const importerPersonnage = () => {
+    ouvrirSelecteurFichier(async (f) => {
+      try {
+        const raw = await lireFichierJSON(f)
+        const env = validerEnveloppe<Record<string, unknown>>(raw, ['personnage'])
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        const clean = nettoyer(env.data)
+        const nom = typeof clean.nom === 'string' && clean.nom.trim() !== '' ? clean.nom : 'Personnage importé'
+        const { error } = await supabase.from('personnages').insert({ ...clean, nom, joueur_id: user.id })
+        if (error) throw error
+        setMessage(tc('import_ok'))
+        fetchPersonnages()
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        setMessage(tc('import_error', { message: msg }))
+      }
+    })
+  }
+
+  const togglerPublic = async (perso: Personnage) => {
+    const rendrePublic = !perso.public
+    let auteurUsername = perso.auteur_username ?? null
+    if (rendrePublic && !auteurUsername) {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', user.id)
+          .maybeSingle()
+        auteurUsername = profile?.username ?? user.email ?? 'Anonyme'
+      }
+    }
+    const { error } = await supabase
+      .from('personnages')
+      .update({ public: rendrePublic, auteur_username: auteurUsername })
+      .eq('id', perso.id)
+    if (error) setMessage(error.message)
+    else fetchPersonnages()
   }
 
   // Lecture des stats courantes pour afficher les modificateurs
@@ -613,9 +675,9 @@ export default function Personnages() {
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center gap-4 mb-6 flex-wrap">
           <button type="button" onClick={() => window.location.href = '/dashboard'} className="text-gray-400 hover:text-white">
-            Retour
+            {tc('back')}
           </button>
-          <h1 className="text-2xl font-bold text-yellow-500">🧙 Personnages</h1>
+          <h1 className="text-2xl font-bold text-yellow-500">{t('title')}</h1>
           <button
             type="button"
             onClick={() => setAideOuverte(true)}
@@ -629,7 +691,7 @@ export default function Personnages() {
         <div className="bg-gray-800 p-5 md:p-6 rounded-lg mb-6">
           <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
             <h2 className="text-lg font-bold text-yellow-500">
-              {editingId ? 'Modifier le personnage' : 'Créer un personnage'}
+              {editingId ? t('edit_title') : t('create_title')}
             </h2>
             {!editingId && (
               <button
@@ -637,7 +699,7 @@ export default function Personnages() {
                 onClick={genererAleatoire}
                 className="px-3 py-2 text-xs font-bold rounded border border-yellow-600 text-yellow-500 bg-gray-900/50 hover:bg-gray-700 tracking-wider uppercase"
               >
-                🎲 Générateur aléatoire
+                {t('random_gen')}
               </button>
             )}
           </div>
@@ -1111,8 +1173,17 @@ export default function Personnages() {
         </div>
 
         <div className="space-y-4">
-          <h2 className="text-lg font-bold text-yellow-500">Mes personnages</h2>
-          {personnages.length === 0 && <p className="text-gray-400">Aucun personnage créé pour l&apos;instant.</p>}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <h2 className="text-lg font-bold text-yellow-500">{t('my_characters')}</h2>
+            <button
+              type="button"
+              onClick={importerPersonnage}
+              className="px-3 py-1.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs font-bold"
+            >
+              {tc('import_json')}
+            </button>
+          </div>
+          {personnages.length === 0 && <p className="text-gray-400">{t('empty')}</p>}
           {personnages.map((perso) => (
             <div key={perso.id} className="bg-gray-800 p-4 rounded-lg">
               <div className="flex gap-3">
@@ -1134,7 +1205,7 @@ export default function Personnages() {
               {codesVisibles[perso.id] && (
                 <div className="mt-3 p-2 rounded bg-gray-900 border border-green-600/50 flex items-center justify-between gap-2 flex-wrap">
                   <div className="min-w-0">
-                    <p className="text-gray-400 text-xs">Code à donner au MJ :</p>
+                    <p className="text-gray-400 text-xs">{t('share_code_label')}</p>
                     <code className="text-green-300 font-mono font-bold text-lg break-all">{codesVisibles[perso.id]}</code>
                   </div>
                   <div className="flex gap-2">
@@ -1169,16 +1240,31 @@ export default function Personnages() {
 
               <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-gray-700 text-xs">
                 <button type="button" onClick={() => window.location.href = `/dashboard/personnages/${perso.id}`} className="text-yellow-400">
-                  📜 Fiche
+                  {t('sheet')}
                 </button>
                 <button type="button" onClick={() => partagerPersonnage(perso.id)} className="text-green-400">
-                  Partager
+                  {t('share_player')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => togglerPublic(perso)}
+                  className={perso.public ? 'text-green-400' : 'text-gray-400'}
+                >
+                  {perso.public ? `🌍 ${tc('public')} (${perso.nb_copies})` : `🔒 ${tc('private')}`}
                 </button>
                 <button type="button" onClick={() => commencerEdition(perso)} className="text-blue-400">
-                  Modifier
+                  {tc('modify')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => exporterPersonnage(perso)}
+                  className="text-gray-400 hover:text-white"
+                  title={tc('export_item_title')}
+                >
+                  📥
                 </button>
                 <button type="button" onClick={() => supprimerPersonnage(perso.id)} className="text-red-400">
-                  Supprimer
+                  {tc('delete')}
                 </button>
               </div>
             </div>

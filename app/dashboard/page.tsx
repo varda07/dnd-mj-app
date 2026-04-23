@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
+import { useLocale } from '@/app/i18n/IntlProvider'
+import { openGlobalSearch } from '@/app/components/GlobalSearch'
 import Combat from './combat/page'
 import {
   THEMES,
@@ -42,9 +45,14 @@ export default function Dashboard() {
   const [rejoindreOuvert, setRejoindreOuvert] = useState(false)
   const [personnagesOuvert, setPersonnagesOuvert] = useState(false)
   const [themeActuel, setThemeActuel] = useState<ThemeKey>(DEFAULT_THEME)
+  const [langueOuvert, setLangueOuvert] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const pathname = usePathname()
+  const t = useTranslations('dashboard')
+  const tLang = useTranslations('language')
+  const tSearch = useTranslations('search')
+  const { locale, setLocale } = useLocale()
 
   useEffect(() => {
     const load = async () => {
@@ -101,6 +109,7 @@ export default function Dashboard() {
         setMenuOuvert(false)
         setThemeOuvert(false)
         setRejoindreOuvert(false)
+        setLangueOuvert(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -154,40 +163,40 @@ export default function Dashboard() {
   const ajouterPersonnageAuScenario = async () => {
     setMessageMj('')
     const code = codePersonnage.trim().toUpperCase()
-    if (!code) return setMessageMj('Entre un code.')
-    if (!scenarioCibleId) return setMessageMj('Choisis un scénario cible.')
+    if (!code) return setMessageMj(t('enter_code'))
+    if (!scenarioCibleId) return setMessageMj(t('choose_scenario'))
 
     const { data: invit, error: err1 } = await supabase
       .from('codes_invitation')
       .select('id, personnage_id, utilise')
       .eq('code', code)
       .maybeSingle()
-    if (err1 || !invit) return setMessageMj('Code introuvable.')
-    if (invit.utilise) return setMessageMj('Ce code a déjà été utilisé.')
-    if (!invit.personnage_id) return setMessageMj("Ce code n'est pas un code de personnage.")
+    if (err1 || !invit) return setMessageMj(t('code_not_found'))
+    if (invit.utilise) return setMessageMj(t('code_already_used'))
+    if (!invit.personnage_id) return setMessageMj(t('code_not_player'))
 
     const { error: err2 } = await supabase
       .from('personnages')
       .update({ scenario_id: scenarioCibleId })
       .eq('id', invit.personnage_id)
-    if (err2) return setMessageMj('Impossible de lier le personnage : ' + err2.message)
+    if (err2) return setMessageMj(t('cannot_link', { message: err2.message }))
 
     await supabase.from('codes_invitation').update({ utilise: true }).eq('id', invit.id)
 
-    setMessageMj('✓ Personnage ajouté au scénario !')
+    setMessageMj(t('character_added_ok'))
     setCodePersonnage('')
     fetchPersonnagesJoueurs(scenariosMj.map((s) => s.id))
   }
 
   const quitterScenario = async (scenarioId: string) => {
-    if (!confirm('Êtes-vous sûr de vouloir quitter ce scénario ?')) return
+    if (!confirm(t('confirm_leave_scenario'))) return
     const { error } = await supabase
       .from('scenarios_joueurs')
       .delete()
       .eq('scenario_id', scenarioId)
       .eq('joueur_id', userId)
     if (error) {
-      setMessageJoueur('Impossible de quitter : ' + error.message)
+      setMessageJoueur(t('cannot_leave', { message: error.message }))
       return
     }
     setScenariosRejoints((prev) => prev.filter((s) => s.id !== scenarioId))
@@ -196,22 +205,22 @@ export default function Dashboard() {
   const rejoindreScenario = async () => {
     setMessageJoueur('')
     const code = codeScenario.trim().toUpperCase()
-    if (!code) return setMessageJoueur('Entre un code.')
+    if (!code) return setMessageJoueur(t('enter_code'))
 
     const { data: invit, error: err1 } = await supabase
       .from('codes_invitation')
       .select('id, scenario_id, utilise')
       .eq('code', code)
       .maybeSingle()
-    if (err1 || !invit) return setMessageJoueur('Code introuvable.')
-    if (invit.utilise) return setMessageJoueur('Ce code a déjà été utilisé.')
-    if (!invit.scenario_id) return setMessageJoueur("Ce code n'est pas un code de scénario.")
+    if (err1 || !invit) return setMessageJoueur(t('code_not_found'))
+    if (invit.utilise) return setMessageJoueur(t('code_already_used'))
+    if (!invit.scenario_id) return setMessageJoueur(t('code_not_scenario'))
 
     const { error: err2 } = await supabase
       .from('scenarios_joueurs')
       .insert({ scenario_id: invit.scenario_id, joueur_id: userId })
     if (err2 && !err2.message.toLowerCase().includes('duplicate')) {
-      return setMessageJoueur('Impossible de rejoindre : ' + err2.message)
+      return setMessageJoueur(t('cannot_join', { message: err2.message }))
     }
 
     await supabase.from('codes_invitation').update({ utilise: true }).eq('id', invit.id)
@@ -226,9 +235,9 @@ export default function Dashboard() {
       setScenariosRejoints((prev) =>
         prev.some((s) => s.id === scenario.id) ? prev : [...prev, scenario]
       )
-      setMessageJoueur(`✓ Rejoint : ${scenario.nom}`)
+      setMessageJoueur(t('scenario_joined_ok', { nom: scenario.nom }))
     } else {
-      setMessageJoueur('✓ Rejoint.')
+      setMessageJoueur(t('scenario_joined_short'))
     }
     setCodeScenario('')
   }
@@ -238,7 +247,7 @@ export default function Dashboard() {
       <div className="bg-gray-800 h-12 md:h-auto px-3 md:p-4 flex md:grid md:grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-gray-700 theme-header-border theme-no-deco">
         <div className="min-w-0 flex-1 md:flex-initial md:justify-self-start">
           <h1 className="text-[13px] md:text-xl font-medium md:font-bold text-yellow-500 truncate text-left tracking-[0.18em] md:tracking-normal">
-            D&D MANAGER
+            {t('app_title')}
           </h1>
           <p
             className="hidden md:block text-[11px] uppercase text-left truncate mt-0.5 italic"
@@ -403,13 +412,34 @@ export default function Dashboard() {
         </div>
         <div className="hidden md:flex bg-gray-700 rounded-lg p-1 md:justify-self-center">
           <button type="button" onClick={() => setInterface('mj')} className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-md text-sm sm:text-base font-bold transition ${interface_ === 'mj' ? 'bg-yellow-500 text-gray-900' : 'text-gray-400 hover:text-white'}`}>
-            MJ
+            {t('interface_mj')}
           </button>
           <button type="button" onClick={() => setInterface('joueur')} className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-md text-sm sm:text-base font-bold transition ${interface_ === 'joueur' ? 'bg-yellow-500 text-gray-900' : 'text-gray-400 hover:text-white'}`}>
-            Joueur
+            {t('interface_player')}
           </button>
         </div>
-        <div className="relative md:justify-self-end" ref={menuRef}>
+        <div className="relative md:justify-self-end flex items-center gap-1" ref={menuRef}>
+          <button
+            type="button"
+            onClick={openGlobalSearch}
+            aria-label={tSearch('open_tooltip')}
+            title={tSearch('open_tooltip')}
+            className="md:hidden w-10 h-10 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 rounded transition text-lg leading-none"
+          >
+            🔎
+          </button>
+          <button
+            type="button"
+            onClick={openGlobalSearch}
+            title={tSearch('open_tooltip')}
+            className="hidden md:inline-flex items-center gap-2 h-9 px-3 rounded border border-gray-700 bg-gray-900/60 hover:bg-gray-700 text-gray-400 hover:text-white text-xs transition"
+          >
+            <span aria-hidden="true">🔎</span>
+            <span className="tracking-wide">{tSearch('open_tooltip')}</span>
+            <kbd className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-gray-800 border border-gray-600 text-gray-400 font-mono">
+              {tSearch('shortcut')}
+            </kbd>
+          </button>
           <button
             type="button"
             onClick={() => setMenuOuvert((v) => !v)}
@@ -422,21 +452,21 @@ export default function Dashboard() {
           {menuOuvert && (
             <div className="fixed top-12 right-2 w-64 max-h-[calc(100vh-60px)] overflow-y-auto md:absolute md:top-auto md:right-0 md:mt-2 md:max-h-none md:overflow-hidden bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-[100] theme-no-deco">
               <div className="md:hidden px-4 py-3 border-b border-gray-700">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-gray-500 mb-2">Interface</div>
+                <div className="text-[10px] uppercase tracking-[0.18em] text-gray-500 mb-2">{t('interface')}</div>
                 <div className="flex bg-gray-700 rounded-lg p-1">
                   <button
                     type="button"
                     onClick={() => setInterface('mj')}
                     className={`flex-1 py-1.5 rounded-md text-xs font-bold transition ${interface_ === 'mj' ? 'bg-yellow-500 text-gray-900' : 'text-gray-400'}`}
                   >
-                    MJ
+                    {t('interface_mj')}
                   </button>
                   <button
                     type="button"
                     onClick={() => setInterface('joueur')}
                     className={`flex-1 py-1.5 rounded-md text-xs font-bold transition ${interface_ === 'joueur' ? 'bg-yellow-500 text-gray-900' : 'text-gray-400'}`}
                   >
-                    Joueur
+                    {t('interface_player')}
                   </button>
                 </div>
               </div>
@@ -450,7 +480,20 @@ export default function Dashboard() {
                 }}
                 className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2 text-sm"
               >
-                📚 Bibliothèque
+                {t('menu_library')}
+              </button>
+              <div className="border-t border-gray-700" />
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOuvert(false)
+                  setThemeOuvert(false)
+                  setRejoindreOuvert(false)
+                  router.push('/dashboard/communaute')
+                }}
+                className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2 text-sm"
+              >
+                {t('menu_community')}
               </button>
               <div className="border-t border-gray-700" />
               <button
@@ -463,7 +506,7 @@ export default function Dashboard() {
                 }}
                 className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2 text-sm"
               >
-                ✨ Sorts
+                {t('menu_spells')}
               </button>
               <div className="border-t border-gray-700" />
               <button
@@ -472,19 +515,19 @@ export default function Dashboard() {
                 className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center justify-between gap-2 text-sm"
                 aria-expanded={rejoindreOuvert}
               >
-                <span>🎟️ Rejoindre un scénario</span>
+                <span>{t('menu_join_scenario')}</span>
                 <span className="text-xs text-gray-500">{rejoindreOuvert ? '▾' : '▸'}</span>
               </button>
               {rejoindreOuvert && (
                 <div className="bg-gray-900/50 border-t border-gray-700 p-3 space-y-2">
                   <p className="text-gray-400 text-xs">
-                    Entre le code d&apos;invitation donné par ton MJ.
+                    {t('menu_join_placeholder')}
                   </p>
                   <input
                     type="text"
                     value={codeScenario}
                     onChange={(e) => setCodeScenario(e.target.value)}
-                    placeholder="DND-XXXXXX"
+                    placeholder={t('menu_join_code_ph')}
                     className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none font-mono uppercase text-sm"
                   />
                   <button
@@ -492,7 +535,7 @@ export default function Dashboard() {
                     onClick={rejoindreScenario}
                     className="w-full px-3 py-2 bg-yellow-500 text-gray-900 font-bold rounded hover:bg-yellow-400 text-sm"
                   >
-                    Rejoindre
+                    {t('menu_join_button')}
                   </button>
                   {messageJoueur && (
                     <p className="text-yellow-400 text-xs">{messageJoueur}</p>
@@ -506,7 +549,7 @@ export default function Dashboard() {
                 className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center justify-between gap-2 text-sm"
                 aria-expanded={themeOuvert}
               >
-                <span className="flex items-center gap-2">🎨 Thème</span>
+                <span className="flex items-center gap-2">{t('menu_theme')}</span>
                 <span className="text-xs text-gray-500">
                   {THEMES[themeActuel].label} {themeOuvert ? '▾' : '▸'}
                 </span>
@@ -514,7 +557,7 @@ export default function Dashboard() {
               {themeOuvert && (
                 <div className="bg-gray-900/50 border-t border-gray-700 p-2 space-y-1 max-h-80 overflow-y-auto">
                   {THEME_KEYS.map((key) => {
-                    const t = THEMES[key]
+                    const theme = THEMES[key]
                     const actif = themeActuel === key
                     const premium = PREMIUM_THEMES.includes(key)
                     return (
@@ -528,19 +571,19 @@ export default function Dashboard() {
                       >
                         <div
                           className="flex flex-shrink-0 rounded overflow-hidden"
-                          style={{ border: `1px solid ${t.colors.border_color}` }}
+                          style={{ border: `1px solid ${theme.colors.border_color}` }}
                         >
                           <span
                             className="block w-4 h-10"
-                            style={{ backgroundColor: t.colors.bg_primary }}
+                            style={{ backgroundColor: theme.colors.bg_primary }}
                           />
                           <span
                             className="block w-4 h-10"
-                            style={{ backgroundColor: t.colors.bg_secondary }}
+                            style={{ backgroundColor: theme.colors.bg_secondary }}
                           />
                           <span
                             className="block w-4 h-10"
-                            style={{ backgroundColor: t.colors.accent_color }}
+                            style={{ backgroundColor: theme.colors.accent_color }}
                           />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -550,21 +593,21 @@ export default function Dashboard() {
                             }`}
                           >
                             {premium && <span className="mr-1">👑</span>}
-                            {t.label}
+                            {theme.label}
                             {premium && (
                               <span className="ml-1 text-[10px] font-bold tracking-wide text-yellow-500">
-                                — Premium
+                                — {t('premium')}
                               </span>
                             )}
                           </p>
                           <p className="text-xs text-gray-500 truncate">
-                            {t.description}
+                            {theme.description}
                           </p>
                           <p
                             className="text-[10px] font-bold tracking-wider truncate mt-0.5"
-                            style={{ color: t.colors.accent_color }}
+                            style={{ color: theme.colors.accent_color }}
                           >
-                            « {t.slogan} »
+                            « {theme.slogan} »
                           </p>
                         </div>
                         {actif && (
@@ -580,15 +623,58 @@ export default function Dashboard() {
               <div className="border-t border-gray-700" />
               <button
                 type="button"
+                onClick={() => setLangueOuvert((v) => !v)}
+                className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center justify-between gap-2 text-sm"
+                aria-expanded={langueOuvert}
+              >
+                <span>{t('menu_language')}</span>
+                <span className="text-xs text-gray-500">
+                  {locale === 'fr' ? '🇫🇷' : '🇬🇧'} {langueOuvert ? '▾' : '▸'}
+                </span>
+              </button>
+              {langueOuvert && (
+                <div className="bg-gray-900/50 border-t border-gray-700 p-2 space-y-1">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await setLocale('fr')
+                      setLangueOuvert(false)
+                    }}
+                    className={`w-full flex items-center gap-2 p-2 rounded text-left text-sm transition ${
+                      locale === 'fr' ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-700/60'
+                    }`}
+                  >
+                    <span className="flex-1">{tLang('fr')}</span>
+                    {locale === 'fr' && <span className="text-green-400">✓</span>}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await setLocale('en')
+                      setLangueOuvert(false)
+                    }}
+                    className={`w-full flex items-center gap-2 p-2 rounded text-left text-sm transition ${
+                      locale === 'en' ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-700/60'
+                    }`}
+                  >
+                    <span className="flex-1">{tLang('en')}</span>
+                    {locale === 'en' && <span className="text-green-400">✓</span>}
+                  </button>
+                </div>
+              )}
+              <div className="border-t border-gray-700" />
+              <button
+                type="button"
                 onClick={async () => {
                   setMenuOuvert(false)
                   setThemeOuvert(false)
+                  setLangueOuvert(false)
                   await supabase.auth.signOut()
                   router.push('/')
                 }}
                 className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2 text-sm"
               >
-                🚪 Déconnexion
+                {t('menu_logout')}
               </button>
             </div>
           )}
@@ -600,17 +686,17 @@ export default function Dashboard() {
         <div>
           <div className="bg-gray-800 border-b border-gray-700 px-3 py-1.5 md:p-3 flex justify-center gap-2 md:gap-4 theme-no-deco">
             <button type="button" onClick={() => setModeMJ('travail')} className={`flex-1 md:flex-initial px-3 md:px-6 py-1.5 md:py-2 rounded-md md:rounded-lg text-xs md:text-base font-medium md:font-bold tracking-wider transition ${modeMJ === 'travail' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>
-              📜 Forge
+              {t('forge')}
             </button>
             <button
               type="button"
               onClick={() => router.push('/dashboard/personnages')}
               className="md:hidden flex-1 px-3 py-1.5 rounded-md text-xs font-medium tracking-wider transition text-gray-400 hover:text-white"
             >
-              🧙 Personnages
+              {t('characters_tab')}
             </button>
             <button type="button" onClick={() => setModeMJ('action')} className={`hidden md:inline-flex md:flex-initial md:px-6 md:py-2 md:rounded-lg md:text-base md:font-bold tracking-wider transition ${modeMJ === 'action' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'}`}>
-              🗡️ Aventure
+              {t('adventure')}
             </button>
           </div>
           <div className="p-3 md:p-6">
@@ -623,7 +709,7 @@ export default function Dashboard() {
                   className="w-full flex items-center justify-between p-4 hover:bg-gray-700/50 transition text-left"
                 >
                   <h3 className="text-lg font-bold text-yellow-500">
-                    🧙 Personnages des joueurs ({personnagesJoueurs.length})
+                    {t('player_characters_title')} ({personnagesJoueurs.length})
                   </h3>
                   <span
                     className={`text-yellow-500 text-sm transition-transform duration-300 ${
@@ -680,36 +766,40 @@ export default function Dashboard() {
             )}
             {modeMJ === 'travail' && (
               <div>
-                <h2 className="hidden md:block text-2xl font-bold text-blue-400 mb-4">📜 Forge</h2>
+                <h2 className="hidden md:block text-2xl font-bold text-blue-400 mb-4">{t('forge')}</h2>
                 <div className="grid grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-6">
                   <button type="button" onClick={() => router.push('/dashboard/scenarios')} className="bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
-                    <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">Scenarios</h3>
-                    <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">Creer et gerer tes scenarios</p>
+                    <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">{t('forge_scenarios_title')}</h3>
+                    <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">{t('forge_scenarios_desc')}</p>
                   </button>
                   <button type="button" onClick={() => router.push('/dashboard/ennemis')} className="bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
-                    <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">Ennemis</h3>
-                    <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">Creer et gerer tes ennemis</p>
+                    <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">{t('forge_enemies_title')}</h3>
+                    <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">{t('forge_enemies_desc')}</p>
                   </button>
                   <button type="button" onClick={() => router.push('/dashboard/items')} className="bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
-                    <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">Items</h3>
-                    <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">Creer et gerer tes items</p>
+                    <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">{t('forge_items_title')}</h3>
+                    <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">{t('forge_items_desc')}</p>
                   </button>
                   <button type="button" onClick={() => router.push('/dashboard/maps')} className="bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
-                    <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">Maps</h3>
-                    <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">Gerer tes cartes</p>
+                    <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">{t('forge_maps_title')}</h3>
+                    <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">{t('forge_maps_desc')}</p>
+                  </button>
+                  <button type="button" onClick={() => router.push('/dashboard/communaute')} className="col-span-2 bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left border border-yellow-600/30">
+                    <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">{t('forge_community_title')}</h3>
+                    <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">{t('forge_community_desc')}</p>
                   </button>
                 </div>
                 <div className="bg-gray-800 p-4 rounded-lg">
-                  <h3 className="text-lg font-bold text-yellow-500 mb-2">🎟️ Ajouter un personnage joueur</h3>
+                  <h3 className="text-lg font-bold text-yellow-500 mb-2">{t('add_player_title')}</h3>
                   <p className="text-gray-400 text-sm mb-3">
-                    Entre le code partagé par un joueur pour rattacher son personnage à l&apos;un de tes scénarios.
+                    {t('add_player_desc')}
                   </p>
                   <div className="flex flex-col md:flex-row gap-2">
                     <input
                       type="text"
                       value={codePersonnage}
                       onChange={(e) => setCodePersonnage(e.target.value)}
-                      placeholder="DND-XXXXXX"
+                      placeholder={t('menu_join_code_ph')}
                       className="flex-1 p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none font-mono uppercase"
                     />
                     <select
@@ -717,7 +807,7 @@ export default function Dashboard() {
                       onChange={(e) => setScenarioCibleId(e.target.value)}
                       className="flex-1 p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none"
                     >
-                      <option value="">— Choisir un scénario cible —</option>
+                      <option value="">{t('add_player_choose_scenario')}</option>
                       {scenariosMj.map((s) => (
                         <option key={s.id} value={s.id}>{s.nom}</option>
                       ))}
@@ -727,7 +817,7 @@ export default function Dashboard() {
                       onClick={ajouterPersonnageAuScenario}
                       className="px-4 py-3 bg-yellow-500 text-gray-900 font-bold rounded hover:bg-yellow-400"
                     >
-                      Ajouter
+                      {t('add_player_button')}
                     </button>
                   </div>
                   {messageMj && <p className="text-yellow-400 text-sm mt-2">{messageMj}</p>}
@@ -742,7 +832,7 @@ export default function Dashboard() {
                     onClick={() => router.push('/dashboard/exploration')}
                     className="px-4 py-2 rounded-lg font-bold bg-gray-800 border border-yellow-600 text-yellow-500 hover:bg-gray-700"
                   >
-                    🗺️ Exploration
+                    {t('explore')}
                   </button>
                 </div>
                 <Combat />
@@ -754,23 +844,23 @@ export default function Dashboard() {
 
       {interface_ === 'joueur' && (
         <div className="p-3 md:p-6">
-          <h2 className="hidden md:block text-2xl font-bold text-yellow-500 mb-4">Interface Joueur</h2>
-          <p className="hidden md:block text-gray-400 mb-4">Bienvenue Aventurier !</p>
+          <h2 className="hidden md:block text-2xl font-bold text-yellow-500 mb-4">{t('player_welcome_title')}</h2>
+          <p className="hidden md:block text-gray-400 mb-4">{t('player_welcome_msg')}</p>
           <div className="grid grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-6">
             <button type="button" onClick={() => router.push('/dashboard/personnages')} className="bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
-              <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">Personnages</h3>
-              <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">Gerer tes personnages</p>
+              <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">{t('characters_tab')}</h3>
+              <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">{t('player_characters_manage_desc')}</p>
             </button>
             <button type="button" onClick={() => router.push('/dashboard/sorts')} className="bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
-              <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">Sorts</h3>
-              <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">Gerer tes sorts</p>
+              <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">{t('menu_spells')}</h3>
+              <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">{t('player_spells_manage_desc')}</p>
             </button>
           </div>
 
           <div className="bg-gray-800 p-4 rounded-lg">
-            <h3 className="text-lg font-bold text-yellow-500 mb-2">📜 Scénarios rejoints</h3>
+            <h3 className="text-lg font-bold text-yellow-500 mb-2">{t('joined_scenarios_title')}</h3>
             {scenariosRejoints.length === 0 ? (
-              <p className="text-gray-400 text-sm">Aucun scénario rejoint pour l&apos;instant.</p>
+              <p className="text-gray-400 text-sm">{t('no_scenarios_joined')}</p>
             ) : (
               <ul className="flex gap-3 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-2 [scrollbar-width:thin]">
                 {scenariosRejoints.map((s) => (
@@ -788,14 +878,14 @@ export default function Dashboard() {
                         onClick={() => router.push('/dashboard/exploration')}
                         className="px-3 py-1.5 text-xs font-bold bg-gray-800 border border-yellow-600 text-yellow-500 rounded hover:bg-gray-700 transition"
                       >
-                        🗺️ Explorer
+                        {t('explore')}
                       </button>
                       <button
                         type="button"
                         onClick={() => quitterScenario(s.id)}
                         className="px-3 py-1.5 text-xs font-bold bg-red-600 text-white rounded hover:bg-red-500 transition"
                       >
-                        Quitter
+                        {t('leave')}
                       </button>
                     </div>
                   </li>
@@ -811,10 +901,10 @@ export default function Dashboard() {
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {[
-          { id: 'accueil', label: 'Accueil', icon: '⌂', active: pathname === '/dashboard', onClick: () => router.push('/dashboard') },
-          { id: 'biblio', label: 'Bibliothèque', icon: '📚', active: pathname?.startsWith('/dashboard/bibliotheque'), onClick: () => router.push('/dashboard/bibliotheque') },
-          { id: 'aventure', label: 'Aventure', icon: '🗡', active: pathname?.startsWith('/dashboard/aventure') || pathname?.startsWith('/dashboard/combat') || pathname?.startsWith('/dashboard/exploration'), onClick: () => router.push('/dashboard/aventure') },
-          { id: 'sons', label: 'Sons', icon: '🎵', active: false, onClick: () => window.dispatchEvent(new CustomEvent('soundbox:open')) }
+          { id: 'accueil', label: t('nav_home'), icon: '⌂', active: pathname === '/dashboard', onClick: () => router.push('/dashboard') },
+          { id: 'biblio', label: t('nav_library'), icon: '📚', active: pathname?.startsWith('/dashboard/bibliotheque'), onClick: () => router.push('/dashboard/bibliotheque') },
+          { id: 'aventure', label: t('nav_adventure'), icon: '🗡', active: pathname?.startsWith('/dashboard/aventure') || pathname?.startsWith('/dashboard/combat') || pathname?.startsWith('/dashboard/exploration'), onClick: () => router.push('/dashboard/aventure') },
+          { id: 'sons', label: t('nav_sounds'), icon: '🎵', active: false, onClick: () => window.dispatchEvent(new CustomEvent('soundbox:open')) }
         ].map((tab) => (
           <button
             key={tab.id}

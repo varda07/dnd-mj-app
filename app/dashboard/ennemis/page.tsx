@@ -1,8 +1,18 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import ImageCropper from '@/app/components/ImageCropper'
+import {
+  construireEnveloppe,
+  lireFichierJSON,
+  nettoyer,
+  ouvrirSelecteurFichier,
+  slugFichier,
+  telechargerJSON,
+  validerEnveloppe
+} from '@/app/lib/import-export'
 
 type Ennemi = {
   id: string
@@ -19,6 +29,9 @@ type Ennemi = {
   notes: string
   scenario_id: string | null
   image_url: string | null
+  public: boolean
+  nb_copies: number
+  auteur_username: string | null
 }
 
 type ScenarioOption = { id: string; nom: string }
@@ -43,6 +56,9 @@ export default function Ennemis() {
   const [file, setFile] = useState<File | null>(null)
   const [imageActuelle, setImageActuelle] = useState('')
   const [cropperKey, setCropperKey] = useState(0)
+  const t = useTranslations('enemies')
+  const tc = useTranslations('common')
+  const ti = useTranslations('items')
 
   useEffect(() => {
     fetchEnnemis()
@@ -110,7 +126,7 @@ export default function Ennemis() {
   }
 
   const sauvegarderEnnemi = async () => {
-    if (!nom) return setMessage('Le nom est obligatoire !')
+    if (!nom) return setMessage(tc('required'))
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -147,7 +163,7 @@ export default function Ennemis() {
       const { error } = await supabase.from('ennemis').update(payload).eq('id', editingId)
       if (error) setMessage(error.message)
       else {
-        setMessage('Ennemi modifié !')
+        setMessage(t('modified'))
         resetForm()
         fetchEnnemis()
       }
@@ -159,7 +175,7 @@ export default function Ennemis() {
       })
       if (error) setMessage(error.message)
       else {
-        setMessage('Ennemi créé !')
+        setMessage(t('created'))
         resetForm()
         fetchEnnemis()
       }
@@ -168,9 +184,59 @@ export default function Ennemis() {
   }
 
   const supprimerEnnemi = async (id: string) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible.')) return
+    if (!window.confirm(tc('confirm_delete'))) return
     await supabase.from('ennemis').delete().eq('id', id)
     fetchEnnemis()
+  }
+
+  const exporterEnnemi = (e: Ennemi) => {
+    const env = construireEnveloppe('ennemi', nettoyer(e as unknown as Record<string, unknown>))
+    telechargerJSON(`ennemi-${slugFichier(e.nom)}.json`, env)
+  }
+
+  const importerEnnemi = () => {
+    ouvrirSelecteurFichier(async (f) => {
+      try {
+        const raw = await lireFichierJSON(f)
+        const env = validerEnveloppe<Record<string, unknown>>(raw, ['ennemi'])
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        const clean = nettoyer(env.data)
+        const nom = typeof clean.nom === 'string' && clean.nom.trim() !== '' ? clean.nom : 'Ennemi importé'
+        const hp_max = typeof clean.hp_max === 'number' ? clean.hp_max : 10
+        const { error } = await supabase
+          .from('ennemis')
+          .insert({ ...clean, nom, hp_actuel: hp_max, mj_id: user.id })
+        if (error) throw error
+        setMessage(tc('import_ok'))
+        fetchEnnemis()
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        setMessage(tc('import_error', { message: msg }))
+      }
+    })
+  }
+
+  const togglerPublic = async (ennemi: Ennemi) => {
+    const rendrePublic = !ennemi.public
+    let auteurUsername = ennemi.auteur_username ?? null
+    if (rendrePublic && !auteurUsername) {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', user.id)
+          .maybeSingle()
+        auteurUsername = profile?.username ?? user.email ?? 'Anonyme'
+      }
+    }
+    const { error } = await supabase
+      .from('ennemis')
+      .update({ public: rendrePublic, auteur_username: auteurUsername })
+      .eq('id', ennemi.id)
+    if (error) setMessage(error.message)
+    else fetchEnnemis()
   }
 
   return (
@@ -178,32 +244,32 @@ export default function Ennemis() {
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center gap-4 mb-6">
           <button type="button" onClick={() => window.location.href = '/dashboard'} className="text-gray-400 hover:text-white">
-            Retour
+            {tc('back')}
           </button>
-          <h1 className="text-2xl font-bold text-yellow-500">👹 Ennemis</h1>
+          <h1 className="text-2xl font-bold text-yellow-500">{t('title')}</h1>
         </div>
         <div className="bg-gray-800 p-6 rounded-lg mb-6">
-          <h2 className="text-lg font-bold text-yellow-500 mb-4">{editingId ? "Modifier l'ennemi" : 'Créer un ennemi'}</h2>
+          <h2 className="text-lg font-bold text-yellow-500 mb-4">{editingId ? t('edit_title') : t('create_title')}</h2>
           <div className="space-y-3">
-            <input type="text" placeholder="Nom de l'ennemi *" value={nom} onChange={(e) => setNom(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
+            <input type="text" placeholder={t('name_ph')} value={nom} onChange={(e) => setNom(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
             <div>
-              <label className="text-gray-400 text-sm">Scénario</label>
+              <label className="text-gray-400 text-sm">{ti('scenario')}</label>
               <select value={scenarioId} onChange={(e) => setScenarioId(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none">
-                <option value="">Aucun scénario</option>
+                <option value="">{ti('no_scenario')}</option>
                 {scenarios.map((s) => <option key={s.id} value={s.id}>{s.nom}</option>)}
               </select>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-gray-400 text-sm">Points de vie</label>
+                <label className="text-gray-400 text-sm">{t('hp')}</label>
                 <input type="number" value={hp} onChange={(e) => setHp(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
               </div>
               <div>
-                <label className="text-gray-400 text-sm">Armure</label>
+                <label className="text-gray-400 text-sm">{t('armor')}</label>
                 <input type="number" value={armure} onChange={(e) => setArmure(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
               </div>
             </div>
-            <p className="text-gray-400 text-sm font-bold">Caractéristiques</p>
+            <p className="text-gray-400 text-sm font-bold">{t('stats')}</p>
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="text-gray-400 text-sm">Force</label>
@@ -230,7 +296,7 @@ export default function Ennemis() {
                 <input type="number" value={charisme} onChange={(e) => setCharisme(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
               </div>
             </div>
-            <textarea placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none h-24" />
+            <textarea placeholder={t('notes_ph')} value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none h-24" />
             <ImageCropper
               key={cropperKey}
               inputId="ennemi-file"
@@ -242,19 +308,28 @@ export default function Ennemis() {
             {message && <p className="text-yellow-400 text-sm">{message}</p>}
             <div className="flex gap-2">
               <button type="button" onClick={sauvegarderEnnemi} disabled={loading} className="flex-1 p-3 bg-yellow-500 text-gray-900 font-bold rounded">
-                {loading ? 'Chargement...' : editingId ? 'Modifier' : 'Créer'}
+                {loading ? tc('loading') : editingId ? tc('modify') : tc('create')}
               </button>
               {editingId && (
                 <button type="button" onClick={resetForm} className="px-4 p-3 bg-gray-700 text-white font-bold rounded hover:bg-gray-600">
-                  Annuler
+                  {tc('cancel')}
                 </button>
               )}
             </div>
           </div>
         </div>
         <div className="space-y-4">
-          <h2 className="text-lg font-bold text-yellow-500">Mes ennemis</h2>
-          {ennemis.length === 0 && <p className="text-gray-400">Aucun ennemi créé pour l'instant.</p>}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <h2 className="text-lg font-bold text-yellow-500">{t('my_enemies')}</h2>
+            <button
+              type="button"
+              onClick={importerEnnemi}
+              className="px-3 py-1.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs font-bold"
+            >
+              {tc('import_json')}
+            </button>
+          </div>
+          {ennemis.length === 0 && <p className="text-gray-400">{t('empty')}</p>}
           {ennemis.map((ennemi) => (
             <div key={ennemi.id} className="bg-gray-800 p-4 rounded-lg">
               <div className="flex gap-4">
@@ -266,14 +341,30 @@ export default function Ennemis() {
                   />
                 )}
                 <div className="flex-1">
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                     <h3 className="text-lg font-bold text-white">{ennemi.nom}</h3>
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => togglerPublic(ennemi)}
+                        className={`text-sm ${ennemi.public ? 'text-green-400' : 'text-gray-400'}`}
+                        title={ennemi.public ? `Partagé — ${ennemi.nb_copies} copie(s)` : 'Partager à la communauté'}
+                      >
+                        {ennemi.public ? `🌍 Public (${ennemi.nb_copies})` : '🔒 Privé'}
+                      </button>
                       <button type="button" onClick={() => commencerEdition(ennemi)} className="text-blue-400 text-sm">
-                        Modifier
+                        {tc('modify')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => exporterEnnemi(ennemi)}
+                        className="text-gray-400 hover:text-white text-sm"
+                        title={tc('export_item_title')}
+                      >
+                        📥
                       </button>
                       <button type="button" onClick={() => supprimerEnnemi(ennemi.id)} className="text-red-400 text-sm">
-                        Supprimer
+                        {tc('delete')}
                       </button>
                     </div>
                   </div>

@@ -36,6 +36,8 @@ type MindLink = {
   noeud_from: string
   noeud_to: string
   label: string | null
+  couleur: string | null
+  annotation: string | null
 }
 
 type ScenarioLite = { id: string; nom: string }
@@ -46,6 +48,30 @@ const TYPE_META: Record<NodeType, { label: string; icon: string; color: string }
   evenement: { label: 'Événement', icon: '⚡', color: '#f97316' },
   indice: { label: 'Indice', icon: '🔍', color: '#22c55e' }
 }
+
+// Palette des couleurs de liens. La clé est stockée en base ('or', 'rouge', …)
+// et la valeur hex est utilisée pour le rendu SVG.
+type ColorKey = 'auto' | 'or' | 'rouge' | 'vert' | 'bleu' | 'violet' | 'gris'
+
+const LINK_COLORS: Record<Exclude<ColorKey, 'auto'>, { label: string; hex: string }> = {
+  or: { label: 'Or', hex: '#eab308' },
+  rouge: { label: 'Rouge', hex: '#ef4444' },
+  vert: { label: 'Vert', hex: '#22c55e' },
+  bleu: { label: 'Bleu', hex: '#3b82f6' },
+  violet: { label: 'Violet', hex: '#a855f7' },
+  gris: { label: 'Gris', hex: '#6b7280' }
+}
+
+const ANNOTATION_MAX = 50
+
+const isColorKey = (v: string | null | undefined): v is ColorKey =>
+  v === 'auto' ||
+  v === 'or' ||
+  v === 'rouge' ||
+  v === 'vert' ||
+  v === 'bleu' ||
+  v === 'violet' ||
+  v === 'gris'
 
 const MIN_SCALE = 0.1
 const MAX_SCALE = 5
@@ -64,6 +90,11 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
   const [contextMenu, setContextMenu] = useState<
     | { kind: 'node'; x: number; y: number; nodeId: string }
     | { kind: 'link'; x: number; y: number; linkId: string }
+    | null
+  >(null)
+  const [linkEditor, setLinkEditor] = useState<
+    | { mode: 'create'; from: string; to: string; couleur: ColorKey; annotation: string }
+    | { mode: 'edit'; link: MindLink; couleur: ColorKey; annotation: string }
     | null
   >(null)
   const [view, setView] = useState({ x: 0, y: 0, scale: 1 })
@@ -199,7 +230,7 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
     if (data) setNodes((ns) => [...ns, data as MindNode])
   }
 
-  const connect = async (from: string, to: string) => {
+  const connect = (from: string, to: string) => {
     if (from === to) return
     if (
       links.some(
@@ -209,16 +240,62 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
       )
     )
       return
-    const { data, error } = await supabase
-      .from('mindmap_liens')
-      .insert({ scenario_id: scenarioId, noeud_from: from, noeud_to: to })
-      .select()
-      .single()
-    if (error) {
-      console.error('[mindmap] insert lien échec :', error)
-      return
+    // Ouvre l'éditeur de lien — l'insert est fait dans `saveLink`.
+    setLinkEditor({
+      mode: 'create',
+      from,
+      to,
+      couleur: 'auto',
+      annotation: ''
+    })
+  }
+
+  const saveLink = async () => {
+    if (!linkEditor) return
+    const couleur = linkEditor.couleur
+    const annotation = linkEditor.annotation.slice(0, ANNOTATION_MAX)
+    if (linkEditor.mode === 'create') {
+      const { data, error } = await supabase
+        .from('mindmap_liens')
+        .insert({
+          scenario_id: scenarioId,
+          noeud_from: linkEditor.from,
+          noeud_to: linkEditor.to,
+          couleur,
+          annotation
+        })
+        .select()
+        .single()
+      if (error) {
+        console.error('[mindmap] insert lien échec :', error)
+        return
+      }
+      if (data) setLinks((ls) => [...ls, data as MindLink])
+    } else {
+      const id = linkEditor.link.id
+      const { error } = await supabase
+        .from('mindmap_liens')
+        .update({ couleur, annotation })
+        .eq('id', id)
+      if (error) {
+        console.error('[mindmap] update lien échec :', error)
+        return
+      }
+      setLinks((ls) =>
+        ls.map((l) => (l.id === id ? { ...l, couleur, annotation } : l))
+      )
     }
-    if (data) setLinks((ls) => [...ls, data as MindLink])
+    setLinkEditor(null)
+  }
+
+  const openEditLink = (link: MindLink) => {
+    setLinkEditor({
+      mode: 'edit',
+      link,
+      couleur: isColorKey(link.couleur) ? link.couleur : 'auto',
+      annotation: link.annotation ?? ''
+    })
+    setContextMenu(null)
   }
 
   const deleteNode = async (id: string) => {
@@ -570,12 +647,57 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
             height="1"
             style={{ position: 'absolute', overflow: 'visible', pointerEvents: 'none' }}
           >
+            <defs>
+              {links.map((l) => {
+                const a = nodes.find((n) => n.id === l.noeud_from)
+                const b = nodes.find((n) => n.id === l.noeud_to)
+                if (!a || !b) return null
+                const key = isColorKey(l.couleur) ? l.couleur : 'auto'
+                if (key !== 'auto' || a.type === b.type) return null
+                const c1 = TYPE_META[a.type].color
+                const c2 = TYPE_META[b.type].color
+                return (
+                  <linearGradient
+                    key={l.id}
+                    id={`mindmap-grad-${l.id}`}
+                    x1={a.position_x}
+                    y1={a.position_y}
+                    x2={b.position_x}
+                    y2={b.position_y}
+                    gradientUnits="userSpaceOnUse"
+                  >
+                    <stop offset="0%" stopColor={c1} />
+                    <stop offset="100%" stopColor={c2} />
+                  </linearGradient>
+                )
+              })}
+            </defs>
             {links.map((l) => {
               const a = nodes.find((n) => n.id === l.noeud_from)
               const b = nodes.find((n) => n.id === l.noeud_to)
               if (!a || !b) return null
+              const key = isColorKey(l.couleur) ? l.couleur : 'auto'
+              let stroke: string
+              if (key === 'auto') {
+                if (a.type === b.type) {
+                  stroke = TYPE_META[a.type].color
+                } else {
+                  stroke = `url(#mindmap-grad-${l.id})`
+                }
+              } else {
+                stroke = LINK_COLORS[key].hex
+              }
+              const mx = (a.position_x + b.position_x) / 2
+              const my = (a.position_y + b.position_y) / 2
+              const annotation = (l.annotation ?? '').trim()
+              // Largeur en "unités monde" : l'annotation va être rendue sans scale
+              // via vectorEffect sur le texte pas possible ; on garde simple et on
+              // laisse le scale l'agrandir — sinon le texte serait minuscule à
+              // faible zoom. Compromis acceptable pour un label court.
+              const annotationWidth = Math.min(160, annotation.length * 7 + 16)
               return (
                 <g key={l.id}>
+                  {/* Zone cliquable invisible plus large */}
                   <line
                     x1={a.position_x}
                     y1={a.position_y}
@@ -588,18 +710,49 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
                     onPointerDown={(e) => onLinkPointerDown(e, l)}
                     onContextMenu={(e) => onLinkContextMenu(e, l)}
                     style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
-                  />
+                  >
+                    <title>{annotation || 'Lien'}</title>
+                  </line>
                   <line
                     x1={a.position_x}
                     y1={a.position_y}
                     x2={b.position_x}
                     y2={b.position_y}
-                    stroke="#eab308"
+                    stroke={stroke}
                     strokeWidth={2}
                     strokeOpacity={0.85}
                     vectorEffect="non-scaling-stroke"
                     style={{ pointerEvents: 'none' }}
                   />
+                  {annotation && (
+                    <g
+                      pointerEvents="none"
+                      transform={`translate(${mx}, ${my})`}
+                    >
+                      <rect
+                        x={-annotationWidth / 2}
+                        y={-9}
+                        width={annotationWidth}
+                        height={18}
+                        rx={4}
+                        ry={4}
+                        fill="rgba(10,11,13,0.85)"
+                        stroke="rgba(234,179,8,0.35)"
+                        strokeWidth={0.5}
+                      />
+                      <text
+                        x={0}
+                        y={0}
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        fill="#e8e8ec"
+                        fontSize={11}
+                        fontFamily="system-ui, sans-serif"
+                      >
+                        {annotation.length > 24 ? annotation.slice(0, 23) + '…' : annotation}
+                      </text>
+                    </g>
+                  )}
                 </g>
               )
             })}
@@ -781,17 +934,31 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
                 </>
               )}
               {contextMenu.kind === 'link' && (
-                <button
-                  type="button"
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    deleteLink(contextMenu.linkId)
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-gray-800 flex items-center gap-2"
-                >
-                  🗑️ Supprimer le lien
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const l = links.find((ll) => ll.id === contextMenu.linkId)
+                      if (l) openEditLink(l)
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-yellow-400 hover:bg-gray-800 flex items-center gap-2"
+                  >
+                    🎨 Couleur / annotation
+                  </button>
+                  <button
+                    type="button"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      deleteLink(contextMenu.linkId)
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-gray-800 flex items-center gap-2"
+                  >
+                    🗑️ Supprimer le lien
+                  </button>
+                </>
               )}
             </div>
           </>
@@ -924,6 +1091,139 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
           </div>
         </aside>
       )}
+
+      {linkEditor && (() => {
+        const fromId = linkEditor.mode === 'create' ? linkEditor.from : linkEditor.link.noeud_from
+        const toId = linkEditor.mode === 'create' ? linkEditor.to : linkEditor.link.noeud_to
+        const a = nodes.find((n) => n.id === fromId)
+        const b = nodes.find((n) => n.id === toId)
+        const autoHint =
+          a && b
+            ? a.type === b.type
+              ? TYPE_META[a.type].label
+              : `${TYPE_META[a.type].label} ↔ ${TYPE_META[b.type].label}`
+            : ''
+        return (
+          <div
+            className="fixed inset-0 bg-black/60 z-[80] flex items-center justify-center p-4"
+            onClick={() => setLinkEditor(null)}
+          >
+            <div
+              className="bg-gray-800 border-2 border-yellow-600 rounded-lg shadow-2xl w-full max-w-md p-4 space-y-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-yellow-500 font-bold">
+                {linkEditor.mode === 'create' ? '🔗 Nouveau lien' : '🎨 Modifier le lien'}
+              </h3>
+              {a && b && (
+                <p className="text-gray-300 text-sm flex items-center gap-2 flex-wrap">
+                  <span
+                    className="px-2 py-0.5 rounded-full text-xs font-bold"
+                    style={{ backgroundColor: `${TYPE_META[a.type].color}33`, color: TYPE_META[a.type].color }}
+                  >
+                    {TYPE_META[a.type].icon} {a.titre || TYPE_META[a.type].label}
+                  </span>
+                  <span className="text-gray-500">↔</span>
+                  <span
+                    className="px-2 py-0.5 rounded-full text-xs font-bold"
+                    style={{ backgroundColor: `${TYPE_META[b.type].color}33`, color: TYPE_META[b.type].color }}
+                  >
+                    {TYPE_META[b.type].icon} {b.titre || TYPE_META[b.type].label}
+                  </span>
+                </p>
+              )}
+
+              <div>
+                <label className="text-[11px] uppercase tracking-[0.18em] text-gray-400 block mb-2">
+                  Couleur
+                </label>
+                <div className="grid grid-cols-7 gap-2">
+                  {(['auto', 'or', 'rouge', 'vert', 'bleu', 'violet', 'gris'] as ColorKey[]).map((key) => {
+                    const actif = linkEditor.couleur === key
+                    const commun = {
+                      'aria-label': key === 'auto' ? 'Couleur auto' : LINK_COLORS[key].label,
+                      title: key === 'auto' ? `Couleur auto (${autoHint})` : LINK_COLORS[key].label,
+                      onClick: () =>
+                        setLinkEditor((prev) => (prev ? { ...prev, couleur: key } : prev)),
+                      className: `relative w-10 h-10 rounded-full border-2 transition ${
+                        actif ? 'border-yellow-400 scale-110' : 'border-gray-700 hover:border-gray-500'
+                      }`
+                    }
+                    if (key === 'auto') {
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          {...commun}
+                          style={{
+                            background:
+                              'conic-gradient(from 45deg, #3b82f6, #a855f7, #f97316, #22c55e, #3b82f6)'
+                          }}
+                        >
+                          <span className="absolute inset-0 flex items-center justify-center text-white text-[10px] font-bold drop-shadow">
+                            A
+                          </span>
+                        </button>
+                      )
+                    }
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        {...commun}
+                        style={{ backgroundColor: LINK_COLORS[key].hex }}
+                      />
+                    )
+                  })}
+                </div>
+                {linkEditor.couleur === 'auto' && autoHint && (
+                  <p className="text-[11px] text-gray-500 mt-2 italic">
+                    Auto → dérivé des types ({autoHint}).
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="text-[11px] uppercase tracking-[0.18em] text-gray-400 block mb-1">
+                  Annotation (optionnel)
+                </label>
+                <input
+                  type="text"
+                  maxLength={ANNOTATION_MAX}
+                  value={linkEditor.annotation}
+                  onChange={(e) =>
+                    setLinkEditor((prev) =>
+                      prev ? { ...prev, annotation: e.target.value } : prev
+                    )
+                  }
+                  placeholder="Ex : ami de jeunesse, caché dans…"
+                  className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm"
+                />
+                <p className="text-[11px] text-gray-500 mt-1 text-right">
+                  {linkEditor.annotation.length}/{ANNOTATION_MAX}
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={saveLink}
+                  className="flex-1 p-2 bg-yellow-500 text-gray-900 font-bold rounded hover:bg-yellow-400"
+                >
+                  {linkEditor.mode === 'create' ? 'Créer le lien' : 'Enregistrer'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLinkEditor(null)}
+                  className="px-4 p-2 bg-gray-700 text-white rounded hover:bg-gray-600"
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {editingNode && (
         <div

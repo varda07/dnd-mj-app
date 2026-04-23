@@ -2,7 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
+import {
+  CONDITIONS,
+  CONDITIONS_MAP,
+  isConditionKey,
+  type ConditionKey
+} from '@/app/data/conditions'
 
 type Scenario = { id: string; nom: string; bg_image_url: string | null }
 
@@ -13,6 +20,7 @@ type BaseParticipant = {
   hp_actuel: number
   dexterite: number
   image_url?: string | null
+  conditions: ConditionKey[]
 }
 
 type Participant = BaseParticipant & { kind: 'perso' | 'ennemi' }
@@ -48,6 +56,10 @@ export default function Combat() {
   const [uploadingBg, setUploadingBg] = useState(false)
   const [showVictory, setShowVictory] = useState(false)
   const [attributionTarget, setAttributionTarget] = useState<Record<string, string>>({})
+  const [menuConditionsPour, setMenuConditionsPour] = useState<string | null>(null)
+  const tCombat = useTranslations('combat')
+  const tc = useTranslations('common')
+  const tCond = useTranslations('conditions')
 
   useEffect(() => {
     fetchScenarios()
@@ -85,16 +97,24 @@ export default function Combat() {
     const [{ data: p }, { data: e }, { data: it }] = await Promise.all([
       supabase
         .from('personnages')
-        .select('id, nom, hp_max, hp_actuel, dexterite, image_url')
+        .select('id, nom, hp_max, hp_actuel, dexterite, image_url, conditions')
         .eq('scenario_id', scenarioId),
       supabase
         .from('ennemis')
-        .select('id, nom, hp_max, hp_actuel, dexterite, image_url')
+        .select('id, nom, hp_max, hp_actuel, dexterite, image_url, conditions')
         .eq('scenario_id', scenarioId),
       supabase.from('items').select('*').eq('scenario_id', scenarioId)
     ])
-    const persos = p ?? []
-    const enns = e ?? []
+    const normaliseConditions = (raw: unknown): ConditionKey[] =>
+      Array.isArray(raw) ? raw.filter(isConditionKey) : []
+    const persos = (p ?? []).map((x) => ({
+      ...x,
+      conditions: normaliseConditions((x as { conditions?: unknown }).conditions)
+    }))
+    const enns = (e ?? []).map((x) => ({
+      ...x,
+      conditions: normaliseConditions((x as { conditions?: unknown }).conditions)
+    }))
     setPersonnages(persos)
     setEnnemis(enns)
     setItems(it ?? [])
@@ -197,6 +217,31 @@ export default function Combat() {
     if (selectedPieceId) {
       setPositions((prev) => ({ ...prev, [selectedPieceId]: { x, y } }))
       setSelectedPieceId(null)
+    }
+  }
+
+  const basculerCondition = async (p: Participant, cle: ConditionKey) => {
+    const present = p.conditions.includes(cle)
+    const nouvelles = present
+      ? p.conditions.filter((c) => c !== cle)
+      : [...p.conditions, cle]
+    const table = p.kind === 'perso' ? 'personnages' : 'ennemis'
+    const { error } = await supabase
+      .from(table)
+      .update({ conditions: nouvelles })
+      .eq('id', p.id)
+    if (error) {
+      console.error('[combat] maj conditions :', error)
+      return
+    }
+    if (p.kind === 'perso') {
+      setPersonnages((ps) =>
+        ps.map((pp) => (pp.id === p.id ? { ...pp, conditions: nouvelles } : pp))
+      )
+    } else {
+      setEnnemis((es) =>
+        es.map((ee) => (ee.id === p.id ? { ...ee, conditions: nouvelles } : ee))
+      )
     }
   }
 
@@ -328,17 +373,16 @@ export default function Combat() {
             onClick={() => (window.location.href = '/dashboard')}
             className="text-gray-400 hover:text-white"
           >
-            Retour
+            {tc('back')}
           </button>
-          <h1 className="text-2xl font-bold text-yellow-500">⚔️ Combat</h1>
+          <h1 className="text-2xl font-bold text-yellow-500">{tCombat('title')}</h1>
         </div>
 
         <div className="bg-gray-800 p-4 rounded-lg mb-4">
-          <label className="text-gray-400 text-sm">Scénario actif</label>
+          <label className="text-gray-400 text-sm">{tCombat('scenario_active')}</label>
           {scenarios.length === 0 ? (
             <div className="mt-2 p-3 rounded border border-red-500 bg-red-900/30 text-red-200 text-sm">
-              ⚠️ Aucun scénario trouvé. Vérifie la console du navigateur (F12) pour les erreurs Supabase,
-              ou va créer un scénario dans <span className="font-bold">Dashboard → Scénarios</span>.
+              {tCombat('no_scenario_warning')}
             </div>
           ) : (
             <select
@@ -347,7 +391,7 @@ export default function Combat() {
               disabled={combatDemarre}
               className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none mt-1 disabled:opacity-60"
             >
-              <option value="">— Choisir un scénario —</option>
+              <option value="">{tCombat('choose_scenario')}</option>
               {scenarios.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.nom}
@@ -359,13 +403,13 @@ export default function Combat() {
 
         {scenarioId && !combatDemarre && (
           <div className="bg-gray-800 p-4 rounded-lg mb-4">
-            <h2 className="text-lg font-bold text-yellow-500 mb-3">Sélection des participants</h2>
+            <h2 className="text-lg font-bold text-yellow-500 mb-3">{tCombat('selection_title')}</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-blue-400 font-bold">
-                    Personnages ({nbPersosSel}/{personnages.length})
+                    {tCombat('characters')} ({nbPersosSel}/{personnages.length})
                   </h3>
                   {personnages.length > 0 && (
                     <div className="flex gap-2 text-xs">
@@ -374,7 +418,7 @@ export default function Combat() {
                         onClick={() => toggleAll('perso', true)}
                         className="text-gray-400 hover:text-white"
                       >
-                        Tout
+                        {tCombat('all')}
                       </button>
                       <span className="text-gray-600">|</span>
                       <button
@@ -382,14 +426,14 @@ export default function Combat() {
                         onClick={() => toggleAll('perso', false)}
                         className="text-gray-400 hover:text-white"
                       >
-                        Aucun
+                        {tCombat('none')}
                       </button>
                     </div>
                   )}
                 </div>
                 {personnages.length === 0 ? (
                   <p className="text-gray-500 text-sm italic">
-                    Aucun personnage lié à ce scénario.
+                    {tCombat('no_linked_characters')}
                   </p>
                 ) : (
                   <div className="space-y-1 max-h-64 overflow-y-auto">
@@ -423,7 +467,7 @@ export default function Combat() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-red-400 font-bold">
-                    Ennemis ({nbEnnemisSel}/{ennemis.length})
+                    {tCombat('enemies')} ({nbEnnemisSel}/{ennemis.length})
                   </h3>
                   {ennemis.length > 0 && (
                     <div className="flex gap-2 text-xs">
@@ -432,7 +476,7 @@ export default function Combat() {
                         onClick={() => toggleAll('ennemi', true)}
                         className="text-gray-400 hover:text-white"
                       >
-                        Tout
+                        {tCombat('all')}
                       </button>
                       <span className="text-gray-600">|</span>
                       <button
@@ -440,14 +484,14 @@ export default function Combat() {
                         onClick={() => toggleAll('ennemi', false)}
                         className="text-gray-400 hover:text-white"
                       >
-                        Aucun
+                        {tCombat('none')}
                       </button>
                     </div>
                   )}
                 </div>
                 {ennemis.length === 0 ? (
                   <p className="text-gray-500 text-sm italic">
-                    Aucun ennemi lié à ce scénario.
+                    {tCombat('no_linked_enemies')}
                   </p>
                 ) : (
                   <div className="space-y-1 max-h-64 overflow-y-auto">
@@ -485,7 +529,7 @@ export default function Combat() {
               disabled={selectedIds.size === 0}
               className="w-full px-4 py-3 bg-yellow-500 text-gray-900 font-bold rounded hover:bg-yellow-400 disabled:opacity-50"
             >
-              ⚔️ Démarrer le combat ({selectedIds.size} participant{selectedIds.size > 1 ? 's' : ''})
+              {tCombat('start')} ({tCombat('participants_count', { n: selectedIds.size })})
             </button>
           </div>
         )}
@@ -494,7 +538,7 @@ export default function Combat() {
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4">
             <div className="space-y-4">
               <div className="bg-gray-800 p-4 rounded-lg">
-                <h2 className="text-lg font-bold text-yellow-500 mb-3">Initiative</h2>
+                <h2 className="text-lg font-bold text-yellow-500 mb-3">{tCombat('initiative')}</h2>
                 <div className="flex gap-2 mb-3 flex-wrap">
                   <button
                     type="button"
@@ -502,7 +546,7 @@ export default function Combat() {
                     disabled={participantsEnCombat.length === 0}
                     className="px-4 py-2 bg-yellow-500 text-gray-900 font-bold rounded hover:bg-yellow-400 disabled:opacity-50"
                   >
-                    🎲 Lancer l&apos;initiative
+                    {tCombat('roll_initiative')}
                   </button>
                   <button
                     type="button"
@@ -510,7 +554,7 @@ export default function Combat() {
                     disabled={ordre.length === 0}
                     className="px-4 py-2 bg-blue-600 text-white font-bold rounded hover:bg-blue-500 disabled:opacity-50"
                   >
-                    ⏭ Tour suivant
+                    {tCombat('next_turn')}
                   </button>
                   <button
                     type="button"
@@ -518,12 +562,12 @@ export default function Combat() {
                     disabled={showVictory}
                     className="px-4 py-2 bg-green-600 text-white font-bold rounded hover:bg-green-500 disabled:opacity-50"
                   >
-                    🏆 Terminer le combat
+                    {tCombat('end_combat')}
                   </button>
                 </div>
                 {ordre.length === 0 ? (
                   <p className="text-gray-400 text-sm">
-                    Lance l&apos;initiative pour déterminer l&apos;ordre du tour (d20 + modificateur de Dextérité).
+                    {tCombat('no_initiative_yet')}
                   </p>
                 ) : (
                   <div className="flex flex-wrap gap-2">
@@ -547,13 +591,13 @@ export default function Combat() {
 
               <div className="bg-gray-800 p-4 rounded-lg">
                 <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                  <h2 className="text-lg font-bold text-yellow-500">Grille de combat</h2>
-                  <span className="text-gray-400 text-xs">1 case = 1,5 m</span>
+                  <h2 className="text-lg font-bold text-yellow-500">{tCombat('grid_title')}</h2>
+                  <span className="text-gray-400 text-xs">{tCombat('grid_legend')}</span>
                 </div>
 
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
                   <label className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-sm cursor-pointer text-white">
-                    {uploadingBg ? 'Upload...' : '🖼️ Choisir une image de fond'}
+                    {uploadingBg ? tCombat('uploading_bg') : tCombat('choose_bg')}
                     <input
                       type="file"
                       accept="image/*"
@@ -572,14 +616,14 @@ export default function Combat() {
                       onClick={retirerBg}
                       className="px-3 py-1.5 bg-gray-700 hover:bg-red-900/50 rounded text-sm text-gray-300"
                     >
-                      ✕ Retirer l&apos;image
+                      {tCombat('remove_bg')}
                     </button>
                   )}
                 </div>
 
                 {selectedPieceId && (
                   <p className="text-yellow-400 text-sm mb-2">
-                    ➜ Clique sur une case vide pour déplacer la pièce, ou re-clique dessus pour désélectionner.
+                    {tCombat('move_hint')}
                   </p>
                 )}
                 <div className="overflow-auto">
@@ -649,26 +693,26 @@ export default function Combat() {
                 </div>
                 <div className="flex gap-4 text-xs text-gray-400 mt-3">
                   <span className="flex items-center gap-1">
-                    <span className="inline-block w-3 h-3 rounded-full bg-blue-500" /> Personnages
+                    <span className="inline-block w-3 h-3 rounded-full bg-blue-500" /> {tCombat('characters')}
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="inline-block w-3 h-3 rounded-full bg-red-500" /> Ennemis
+                    <span className="inline-block w-3 h-3 rounded-full bg-red-500" /> {tCombat('enemies')}
                   </span>
                 </div>
               </div>
 
               <div className="bg-gray-800 p-4 rounded-lg">
-                <h2 className="text-lg font-bold text-yellow-500 mb-3">🎁 Récompenses</h2>
+                <h2 className="text-lg font-bold text-yellow-500 mb-3">{tCombat('rewards')}</h2>
                 {items.length === 0 ? (
                   <p className="text-gray-400 text-sm">
-                    Aucun item lié à ce scénario. Crée des items dans la page Items et lie-les au scénario.
+                    {tCombat('no_items_linked')}
                   </p>
                 ) : (
                   <div className="space-y-4">
                     <div>
-                      <p className="text-gray-300 text-sm font-bold mb-2">Disponibles ({itemsDisponibles.length})</p>
+                      <p className="text-gray-300 text-sm font-bold mb-2">{tCombat('available_items')} ({itemsDisponibles.length})</p>
                       {itemsDisponibles.length === 0 ? (
-                        <p className="text-gray-500 text-sm italic">Tous les items ont été attribués.</p>
+                        <p className="text-gray-500 text-sm italic">{tCombat('all_attributed')}</p>
                       ) : (
                         <div className="space-y-2">
                           {itemsDisponibles.map((i) => (
@@ -695,8 +739,8 @@ export default function Combat() {
                                 >
                                   <option value="">
                                     {personnages.length === 0
-                                      ? 'Aucun personnage dans le scénario'
-                                      : 'Choisir un personnage...'}
+                                      ? tCombat('no_character_in_scenario')
+                                      : tCombat('choose_character')}
                                   </option>
                                   {personnages.map((p) => (
                                     <option key={p.id} value={p.id}>
@@ -710,7 +754,7 @@ export default function Combat() {
                                   disabled={!attributionTarget[i.id]}
                                   className="px-3 py-2 bg-yellow-500 text-gray-900 font-bold rounded text-sm hover:bg-yellow-400 disabled:opacity-50"
                                 >
-                                  Attribuer
+                                  {tCombat('attribute')}
                                 </button>
                               </div>
                             </div>
@@ -722,7 +766,7 @@ export default function Combat() {
                     {itemsAttribues.length > 0 && (
                       <div>
                         <p className="text-gray-300 text-sm font-bold mb-2">
-                          Attribués ({itemsAttribues.length})
+                          {tCombat('attributed_items')} ({itemsAttribues.length})
                         </p>
                         <div className="space-y-2">
                           {itemsAttribues.map((i) => (
@@ -741,7 +785,7 @@ export default function Combat() {
                                 onClick={() => retirerAttribution(i.id)}
                                 className="text-red-400 hover:text-red-300 text-xs"
                               >
-                                Retirer
+                                {tCombat('remove_attrib')}
                               </button>
                             </div>
                           ))}
@@ -754,9 +798,9 @@ export default function Combat() {
             </div>
 
             <div className="bg-gray-800 p-4 rounded-lg lg:sticky lg:top-4 lg:self-start max-h-[85vh] overflow-y-auto">
-              <h2 className="text-lg font-bold text-yellow-500 mb-3">Points de vie</h2>
+              <h2 className="text-lg font-bold text-yellow-500 mb-3">{tCombat('hp_title')}</h2>
               {participantsEnCombat.length === 0 ? (
-                <p className="text-gray-400 text-sm">Aucun participant.</p>
+                <p className="text-gray-400 text-sm">{tCombat('no_participants')}</p>
               ) : (
                 <div className="space-y-2">
                   {participantsEnCombat.map((p) => {
@@ -824,6 +868,107 @@ export default function Combat() {
                             </button>
                           </div>
                         </div>
+
+                        <div className="mt-2 pt-2 border-t border-gray-700/60">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="text-[10px] uppercase tracking-[0.15em] text-gray-500">
+                              {tCombat('conditions_count', { n: p.conditions.length })}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setMenuConditionsPour((prev) =>
+                                  prev === pieceIdOf(p) ? null : pieceIdOf(p)
+                                )
+                              }
+                              className="px-2 py-0.5 rounded bg-purple-700 hover:bg-purple-600 text-white text-[11px] font-bold"
+                              title={tCombat('add_condition_tooltip')}
+                            >
+                              {tCombat('add_condition')}
+                            </button>
+                          </div>
+
+                          {p.conditions.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-1">
+                              {p.conditions.map((cle) => {
+                                const c = CONDITIONS_MAP[cle]
+                                if (!c) return null
+                                const nomTr = tCond(cle)
+                                return (
+                                  <button
+                                    key={cle}
+                                    type="button"
+                                    onClick={() => basculerCondition(p, cle)}
+                                    className="group relative inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-900/60 border border-purple-500/60 hover:bg-red-900/60 hover:border-red-500/60 text-purple-100 text-[11px] transition"
+                                    title={`${nomTr} — ${c.description} (${tCombat('click_to_remove')})`}
+                                  >
+                                    <span>{c.icone}</span>
+                                    <span>{nomTr}</span>
+                                    <span className="opacity-0 group-hover:opacity-100 transition text-red-200 ml-0.5">
+                                      ✕
+                                    </span>
+                                    <span
+                                      className="pointer-events-none absolute left-0 top-full mt-1 z-20 hidden group-hover:block w-64 p-2 rounded bg-gray-900 border border-purple-600/60 text-[11px] text-gray-200 shadow-xl"
+                                      style={{ letterSpacing: 'normal', textTransform: 'none', fontWeight: 400 }}
+                                    >
+                                      <span className="block font-bold text-purple-200 mb-1">
+                                        {c.icone} {nomTr}
+                                      </span>
+                                      <span className="block text-gray-300 mb-1">{c.description}</span>
+                                      {c.effets.length > 0 && (
+                                        <span className="block text-gray-400 text-[10px]">
+                                          {c.effets.map((eff, i) => (
+                                            <span key={i} className="block">• {eff}</span>
+                                          ))}
+                                        </span>
+                                      )}
+                                    </span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          )}
+
+                          {menuConditionsPour === pieceIdOf(p) && (
+                            <div className="mt-1 p-2 rounded bg-gray-900/90 border border-purple-600/40 max-h-56 overflow-y-auto">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[10px] uppercase tracking-[0.15em] text-purple-300">
+                                  {tCombat('choose_condition')}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setMenuConditionsPour(null)}
+                                  className="text-gray-400 hover:text-white text-xs"
+                                  aria-label="Fermer"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-1 gap-0.5">
+                                {CONDITIONS.map((c) => {
+                                  const active = p.conditions.includes(c.key)
+                                  return (
+                                    <button
+                                      key={c.key}
+                                      type="button"
+                                      onClick={() => basculerCondition(p, c.key)}
+                                      title={c.description}
+                                      className={`flex items-center gap-2 px-2 py-1 rounded text-[11px] text-left transition ${
+                                        active
+                                          ? 'bg-purple-700/60 text-white'
+                                          : 'hover:bg-gray-800 text-gray-300'
+                                      }`}
+                                    >
+                                      <span className="text-base leading-none">{c.icone}</span>
+                                      <span className="flex-1">{tCond(c.key)}</span>
+                                      {active && <span className="text-green-300">✓</span>}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )
                   })}
@@ -837,13 +982,13 @@ export default function Combat() {
       {showVictory && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-6">
           <div className="bg-gradient-to-br from-yellow-600 via-yellow-500 to-yellow-700 p-8 rounded-xl border-4 border-yellow-300 shadow-2xl max-w-lg w-full text-center animate-pulse">
-            <h2 className="text-5xl font-bold text-gray-900 mb-3">🏆 VICTOIRE !</h2>
+            <h2 className="text-5xl font-bold text-gray-900 mb-3">{tCombat('victory')}</h2>
             <p className="text-gray-900 font-bold mb-4 text-lg">
-              Les ennemis sont vaincus. Les PV ont été restaurés.
+              {tCombat('victory_msg')}
             </p>
             {itemsDisponibles.length > 0 ? (
               <div>
-                <p className="text-gray-900 font-bold mb-2">Butin obtenu :</p>
+                <p className="text-gray-900 font-bold mb-2">{tCombat('loot')}</p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {itemsDisponibles.map((i) => (
                     <span
@@ -856,7 +1001,7 @@ export default function Combat() {
                 </div>
               </div>
             ) : (
-              <p className="text-gray-800 italic text-sm">Aucune récompense pour cette rencontre.</p>
+              <p className="text-gray-800 italic text-sm">{tCombat('no_loot')}</p>
             )}
           </div>
         </div>

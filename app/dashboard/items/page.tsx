@@ -1,8 +1,18 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import ImageCropper from '@/app/components/ImageCropper'
+import {
+  construireEnveloppe,
+  lireFichierJSON,
+  nettoyer,
+  ouvrirSelecteurFichier,
+  slugFichier,
+  telechargerJSON,
+  validerEnveloppe
+} from '@/app/lib/import-export'
 
 type Item = {
   id: string
@@ -12,6 +22,9 @@ type Item = {
   rarete: string
   scenario_id: string | null
   image_url: string | null
+  public: boolean
+  nb_copies: number
+  auteur_username: string | null
 }
 
 type ScenarioOption = { id: string; nom: string }
@@ -33,6 +46,8 @@ export default function Items() {
   const [file, setFile] = useState<File | null>(null)
   const [imageActuelle, setImageActuelle] = useState('')
   const [cropperKey, setCropperKey] = useState(0)
+  const t = useTranslations('items')
+  const tc = useTranslations('common')
 
   useEffect(() => {
     fetchItems()
@@ -88,7 +103,7 @@ export default function Items() {
   }
 
   const sauvegarderItem = async () => {
-    if (!nom) return setMessage('Le nom est obligatoire !')
+    if (!nom) return setMessage(tc('required'))
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -119,7 +134,7 @@ export default function Items() {
       const { error } = await supabase.from('items').update(payload).eq('id', editingId)
       if (error) setMessage(error.message)
       else {
-        setMessage('Item modifié !')
+        setMessage(t('modified'))
         resetForm()
         fetchItems()
       }
@@ -127,7 +142,7 @@ export default function Items() {
       const { error } = await supabase.from('items').insert({ ...payload, mj_id: user?.id })
       if (error) setMessage(error.message)
       else {
-        setMessage('Item créé !')
+        setMessage(t('created'))
         resetForm()
         fetchItems()
       }
@@ -136,9 +151,56 @@ export default function Items() {
   }
 
   const supprimerItem = async (id: string) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible.')) return
+    if (!window.confirm(tc('confirm_delete'))) return
     await supabase.from('items').delete().eq('id', id)
     fetchItems()
+  }
+
+  const exporterItem = (i: Item) => {
+    const env = construireEnveloppe('item', nettoyer(i as unknown as Record<string, unknown>))
+    telechargerJSON(`item-${slugFichier(i.nom)}.json`, env)
+  }
+
+  const importerItem = () => {
+    ouvrirSelecteurFichier(async (f) => {
+      try {
+        const raw = await lireFichierJSON(f)
+        const env = validerEnveloppe<Record<string, unknown>>(raw, ['item'])
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        const clean = nettoyer(env.data)
+        const nom = typeof clean.nom === 'string' && clean.nom.trim() !== '' ? clean.nom : 'Item importé'
+        const { error } = await supabase.from('items').insert({ ...clean, nom, mj_id: user.id })
+        if (error) throw error
+        setMessage(tc('import_ok'))
+        fetchItems()
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        setMessage(tc('import_error', { message: msg }))
+      }
+    })
+  }
+
+  const togglerPublic = async (item: Item) => {
+    const rendrePublic = !item.public
+    let auteurUsername = item.auteur_username ?? null
+    if (rendrePublic && !auteurUsername) {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', user.id)
+          .maybeSingle()
+        auteurUsername = profile?.username ?? user.email ?? 'Anonyme'
+      }
+    }
+    const { error } = await supabase
+      .from('items')
+      .update({ public: rendrePublic, auteur_username: auteurUsername })
+      .eq('id', item.id)
+    if (error) setMessage(error.message)
+    else fetchItems()
   }
 
   return (
@@ -146,36 +208,36 @@ export default function Items() {
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center gap-4 mb-6">
           <button type="button" onClick={() => window.location.href = '/dashboard'} className="text-gray-400 hover:text-white">
-            Retour
+            {tc('back')}
           </button>
-          <h1 className="text-2xl font-bold text-yellow-500">🎒 Items</h1>
+          <h1 className="text-2xl font-bold text-yellow-500">{t('title')}</h1>
         </div>
         <div className="bg-gray-800 p-6 rounded-lg mb-6">
-          <h2 className="text-lg font-bold text-yellow-500 mb-4">{editingId ? "Modifier l'item" : 'Créer un item'}</h2>
+          <h2 className="text-lg font-bold text-yellow-500 mb-4">{editingId ? t('edit_title') : t('create_title')}</h2>
           <div className="space-y-3">
-            <input type="text" placeholder="Nom de l'item *" value={nom} onChange={(e) => setNom(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
+            <input type="text" placeholder={t('name_ph')} value={nom} onChange={(e) => setNom(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-gray-400 text-sm">Type</label>
+                <label className="text-gray-400 text-sm">{t('type')}</label>
                 <select value={type} onChange={(e) => setType(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none">
-                  {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  {TYPES.map((ty) => <option key={ty} value={ty}>{ty}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-gray-400 text-sm">Rareté</label>
+                <label className="text-gray-400 text-sm">{t('rarity')}</label>
                 <select value={rarete} onChange={(e) => setRarete(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none">
                   {RARETES.map((r) => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
             </div>
             <div>
-              <label className="text-gray-400 text-sm">Scénario</label>
+              <label className="text-gray-400 text-sm">{t('scenario')}</label>
               <select value={scenarioId} onChange={(e) => setScenarioId(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none">
-                <option value="">Aucun scénario</option>
+                <option value="">{t('no_scenario')}</option>
                 {scenarios.map((s) => <option key={s.id} value={s.id}>{s.nom}</option>)}
               </select>
             </div>
-            <textarea placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none h-24" />
+            <textarea placeholder={tc('description')} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none h-24" />
             <ImageCropper
               key={cropperKey}
               inputId="item-file"
@@ -187,19 +249,28 @@ export default function Items() {
             {message && <p className="text-yellow-400 text-sm">{message}</p>}
             <div className="flex gap-2">
               <button type="button" onClick={sauvegarderItem} disabled={loading} className="flex-1 p-3 bg-yellow-500 text-gray-900 font-bold rounded">
-                {loading ? 'Chargement...' : editingId ? 'Modifier' : 'Créer'}
+                {loading ? tc('loading') : editingId ? tc('modify') : tc('create')}
               </button>
               {editingId && (
                 <button type="button" onClick={resetForm} className="px-4 p-3 bg-gray-700 text-white font-bold rounded hover:bg-gray-600">
-                  Annuler
+                  {tc('cancel')}
                 </button>
               )}
             </div>
           </div>
         </div>
         <div className="space-y-4">
-          <h2 className="text-lg font-bold text-yellow-500">Mes items</h2>
-          {items.length === 0 && <p className="text-gray-400">Aucun item créé pour l'instant.</p>}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <h2 className="text-lg font-bold text-yellow-500">{t('my_items')}</h2>
+            <button
+              type="button"
+              onClick={importerItem}
+              className="px-3 py-1.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs font-bold"
+            >
+              {tc('import_json')}
+            </button>
+          </div>
+          {items.length === 0 && <p className="text-gray-400">{t('empty')}</p>}
           {items.map((item) => (
             <div key={item.id} className="bg-gray-800 p-4 rounded-lg">
               <div className="flex gap-4">
@@ -211,14 +282,30 @@ export default function Items() {
                   />
                 )}
                 <div className="flex-1">
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                     <h3 className="text-lg font-bold text-white">{item.nom}</h3>
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => togglerPublic(item)}
+                        className={`text-sm ${item.public ? 'text-green-400' : 'text-gray-400'}`}
+                        title={item.public ? `Partagé — ${item.nb_copies} copie(s)` : 'Partager à la communauté'}
+                      >
+                        {item.public ? `🌍 Public (${item.nb_copies})` : '🔒 Privé'}
+                      </button>
                       <button type="button" onClick={() => commencerEdition(item)} className="text-blue-400 text-sm">
-                        Modifier
+                        {tc('modify')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => exporterItem(item)}
+                        className="text-gray-400 hover:text-white text-sm"
+                        title={tc('export_item_title')}
+                      >
+                        📥
                       </button>
                       <button type="button" onClick={() => supprimerItem(item.id)} className="text-red-400 text-sm">
-                        Supprimer
+                        {tc('delete')}
                       </button>
                     </div>
                   </div>

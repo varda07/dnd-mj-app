@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Cinzel, Inter } from "next/font/google";
 import "./globals.css";
+import IntlProvider from "./i18n/IntlProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -68,7 +69,9 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icon-512.png" />
         <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <IntlProvider>{children}</IntlProvider>
+      </body>
     </html>
   );
 }

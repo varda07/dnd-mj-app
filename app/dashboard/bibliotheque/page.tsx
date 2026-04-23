@@ -2,7 +2,21 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
+import {
+  construireEnveloppe,
+  lireFichierJSON,
+  nettoyer,
+  ouvrirSelecteurFichier,
+  telechargerJSON,
+  validerEnveloppe
+} from '@/app/lib/import-export'
+
+// Normalise une chaîne pour comparaison : casse + diacritiques.
+// "Épée éclair" → "epee eclair" — évite qu'une recherche "epee" rate l'élément.
+const normaliser = (v: string) =>
+  v.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 
 type Scenario = {
   id: string
@@ -62,20 +76,23 @@ type Sort = {
 
 type Onglet = 'scenarios' | 'personnages' | 'ennemis' | 'items' | 'maps' | 'sorts'
 
-const ONGLETS: { id: Onglet; label: string; emoji: string }[] = [
-  { id: 'scenarios', label: 'Scénarios', emoji: '📖' },
-  { id: 'personnages', label: 'Personnages', emoji: '🧙' },
-  { id: 'ennemis', label: 'Ennemis', emoji: '👹' },
-  { id: 'items', label: 'Items', emoji: '🎒' },
-  { id: 'maps', label: 'Maps', emoji: '🗺️' },
-  { id: 'sorts', label: 'Sorts', emoji: '✨' }
-]
+const ONGLET_KEY: Record<Onglet, string> = {
+  scenarios: 'tab_scenarios',
+  personnages: 'tab_characters',
+  ennemis: 'tab_enemies',
+  items: 'tab_items',
+  maps: 'tab_maps',
+  sorts: 'tab_spells'
+}
+const ONGLETS: Onglet[] = ['scenarios', 'personnages', 'ennemis', 'items', 'maps', 'sorts']
 
 export default function Bibliotheque() {
   const router = useRouter()
   const [onglet, setOnglet] = useState<Onglet>('scenarios')
   const [recherche, setRecherche] = useState('')
   const [loading, setLoading] = useState(true)
+  const t = useTranslations('library')
+  const tc = useTranslations('common')
 
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [personnages, setPersonnages] = useState<Personnage[]>([])
@@ -83,68 +100,69 @@ export default function Bibliotheque() {
   const [items, setItems] = useState<Item[]>([])
   const [maps, setMaps] = useState<MapItem[]>([])
   const [sorts, setSorts] = useState<Sort[]>([])
+  const [ioMessage, setIoMessage] = useState('')
 
-  useEffect(() => {
-    const fetchAll = async () => {
-      setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        setLoading(false)
-        return
-      }
-      const uid = user.id
-      const [s, p, e, i, m] = await Promise.all([
-        supabase
-          .from('scenarios')
-          .select('id, nom, description, bg_image_url')
-          .eq('mj_id', uid)
-          .order('nom'),
-        supabase
-          .from('personnages')
-          .select('id, nom, race, classe, niveau, hp_max, hp_actuel, image_url, scenario_id')
-          .eq('joueur_id', uid)
-          .order('nom'),
-        supabase
-          .from('ennemis')
-          .select('id, nom, hp_max, hp_actuel, armure, image_url, scenario_id')
-          .eq('mj_id', uid)
-          .order('nom'),
-        supabase
-          .from('items')
-          .select('id, nom, description, type, rarete, image_url, scenario_id')
-          .eq('mj_id', uid)
-          .order('nom'),
-        supabase
-          .from('maps')
-          .select('id, nom, description, image_url')
-          .eq('mj_id', uid)
-          .order('nom')
-      ])
-      if (s.data) setScenarios(s.data)
-      if (p.data) setPersonnages(p.data)
-      if (e.data) setEnnemis(e.data)
-      if (i.data) setItems(i.data)
-      if (m.data) setMaps(m.data)
-      const mesPersosIds = (p.data ?? []).map((pp) => pp.id)
-      if (mesPersosIds.length > 0) {
-        const { data: so } = await supabase
-          .from('sorts')
-          .select('id, nom, niveau, ecole, description, disponible, personnage_id')
-          .in('personnage_id', mesPersosIds)
-          .order('niveau')
-          .order('nom')
-        if (so) setSorts(so)
-      } else {
-        setSorts([])
-      }
+  const fetchAll = async () => {
+    setLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
       setLoading(false)
+      return
     }
+    const uid = user.id
+    const [s, p, e, i, m] = await Promise.all([
+      supabase
+        .from('scenarios')
+        .select('id, nom, description, bg_image_url')
+        .eq('mj_id', uid)
+        .order('nom'),
+      supabase
+        .from('personnages')
+        .select('id, nom, race, classe, niveau, hp_max, hp_actuel, image_url, scenario_id')
+        .eq('joueur_id', uid)
+        .order('nom'),
+      supabase
+        .from('ennemis')
+        .select('id, nom, hp_max, hp_actuel, armure, image_url, scenario_id')
+        .eq('mj_id', uid)
+        .order('nom'),
+      supabase
+        .from('items')
+        .select('id, nom, description, type, rarete, image_url, scenario_id')
+        .eq('mj_id', uid)
+        .order('nom'),
+      supabase
+        .from('maps')
+        .select('id, nom, description, image_url')
+        .eq('mj_id', uid)
+        .order('nom')
+    ])
+    if (s.data) setScenarios(s.data)
+    if (p.data) setPersonnages(p.data)
+    if (e.data) setEnnemis(e.data)
+    if (i.data) setItems(i.data)
+    if (m.data) setMaps(m.data)
+    const mesPersosIds = (p.data ?? []).map((pp) => pp.id)
+    if (mesPersosIds.length > 0) {
+      const { data: so } = await supabase
+        .from('sorts')
+        .select('id, nom, niveau, ecole, description, disponible, personnage_id')
+        .in('personnage_id', mesPersosIds)
+        .order('niveau')
+        .order('nom')
+      if (so) setSorts(so)
+    } else {
+      setSorts([])
+    }
+    setLoading(false)
+  }
+  useEffect(() => {
     fetchAll()
   }, [])
 
-  const q = recherche.trim().toLowerCase()
+  const q = normaliser(recherche.trim())
   const match = (...champs: (string | null | undefined)[]) =>
-    !q || champs.some((c) => c && c.toLowerCase().includes(q))
+    !q || champs.some((c) => c && normaliser(c).includes(q))
 
   const nomScenario = (id: string | null) =>
     id ? scenarios.find((s) => s.id === id)?.nom ?? null : null
@@ -196,9 +214,169 @@ export default function Bibliotheque() {
 
   const vide = (
     <p className="text-gray-400 italic">
-      {q ? 'Aucun résultat pour cette recherche.' : 'Rien à afficher.'}
+      {q ? t('no_results') : t('empty')}
     </p>
   )
+
+  const exporterToutLaBibliotheque = async () => {
+    setIoMessage('')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const uid = user.id
+
+    // Récupère les lignes complètes (pas celles déjà filtrées côté UI, qui
+    // manquent des colonnes) pour un export exhaustif.
+    const [fs, fp, fe, fi, fm] = await Promise.all([
+      supabase.from('scenarios').select('*').eq('mj_id', uid),
+      supabase.from('personnages').select('*').eq('joueur_id', uid),
+      supabase.from('ennemis').select('*').eq('mj_id', uid),
+      supabase.from('items').select('*').eq('mj_id', uid),
+      supabase.from('maps').select('*').eq('mj_id', uid)
+    ])
+    const persosComplets = (fp.data ?? []) as Record<string, unknown>[]
+    const persosMap = new Map<string, string>()
+    persosComplets.forEach((p) => persosMap.set(String(p.id), String(p.nom ?? '')))
+    const persoIds = persosComplets.map((p) => String(p.id))
+
+    const fs_data = fs.data ?? []
+    const fe_data = fe.data ?? []
+    const fi_data = fi.data ?? []
+    const fm_data = fm.data ?? []
+    let fsorts: Record<string, unknown>[] = []
+    if (persoIds.length > 0) {
+      const { data: so } = await supabase
+        .from('sorts')
+        .select('*')
+        .in('personnage_id', persoIds)
+      fsorts = (so ?? []) as Record<string, unknown>[]
+    }
+
+    // Sorts : attache le nom du perso parent pour pouvoir réassocier à l'import.
+    const sortsWithParent = fsorts.map((s) => {
+      const cleaned = nettoyer(s)
+      cleaned._personnage_nom = persosMap.get(String(s.personnage_id)) ?? null
+      return cleaned
+    })
+
+    const env = construireEnveloppe('bibliotheque', {
+      scenarios: fs_data.map((x) => nettoyer(x as Record<string, unknown>)),
+      personnages: persosComplets.map((x) => nettoyer(x)),
+      ennemis: fe_data.map((x) => nettoyer(x as Record<string, unknown>)),
+      items: fi_data.map((x) => nettoyer(x as Record<string, unknown>)),
+      maps: fm_data.map((x) => nettoyer(x as Record<string, unknown>)),
+      sorts: sortsWithParent
+    })
+
+    const date = new Date().toISOString().slice(0, 10)
+    telechargerJSON(`bibliotheque-${date}.json`, env)
+  }
+
+  type LibPayload = {
+    scenarios?: Record<string, unknown>[]
+    personnages?: Record<string, unknown>[]
+    ennemis?: Record<string, unknown>[]
+    items?: Record<string, unknown>[]
+    maps?: Record<string, unknown>[]
+    sorts?: Record<string, unknown>[]
+  }
+
+  const importerToutLaBibliotheque = () => {
+    ouvrirSelecteurFichier(async (f) => {
+      setIoMessage('')
+      try {
+        const raw = await lireFichierJSON(f)
+        const env = validerEnveloppe<LibPayload>(raw, ['bibliotheque'])
+        if (!window.confirm(t('import_confirm'))) return
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        const uid = user.id
+        const payload = env.data
+        let total = 0
+
+        if (payload.scenarios?.length) {
+          const rows = payload.scenarios.map((x) => ({ ...nettoyer(x), mj_id: uid }))
+          const { error } = await supabase.from('scenarios').insert(rows)
+          if (error) throw error
+          total += rows.length
+        }
+
+        // Personnages : on insère et on récupère les nouveaux IDs pour les sorts.
+        const persoNomToId = new Map<string, string>()
+        if (payload.personnages?.length) {
+          const rows = payload.personnages.map((x) => ({ ...nettoyer(x), joueur_id: uid }))
+          const { data, error } = await supabase
+            .from('personnages')
+            .insert(rows)
+            .select('id, nom')
+          if (error) throw error
+          ;(data ?? []).forEach((d) => {
+            const nom = String((d as { nom?: unknown }).nom ?? '')
+            const id = String((d as { id?: unknown }).id ?? '')
+            if (nom && id && !persoNomToId.has(nom)) persoNomToId.set(nom, id)
+          })
+          total += rows.length
+        }
+
+        if (payload.ennemis?.length) {
+          const rows = payload.ennemis.map((x) => {
+            const clean = nettoyer(x)
+            const hp = typeof clean.hp_max === 'number' ? clean.hp_max : 10
+            return { ...clean, hp_actuel: hp, mj_id: uid }
+          })
+          const { error } = await supabase.from('ennemis').insert(rows)
+          if (error) throw error
+          total += rows.length
+        }
+
+        if (payload.items?.length) {
+          const rows = payload.items.map((x) => ({ ...nettoyer(x), mj_id: uid }))
+          const { error } = await supabase.from('items').insert(rows)
+          if (error) throw error
+          total += rows.length
+        }
+
+        if (payload.maps?.length) {
+          const rows = payload.maps.map((x) => ({ ...nettoyer(x), mj_id: uid }))
+          const { error } = await supabase.from('maps').insert(rows)
+          if (error) throw error
+          total += rows.length
+        }
+
+        if (payload.sorts?.length) {
+          // Cherche un perso de repli : soit premier importé, soit premier existant.
+          const { data: existants } = await supabase
+            .from('personnages')
+            .select('id, nom')
+            .eq('joueur_id', uid)
+            .limit(1)
+          const fallback = existants?.[0]?.id ? String(existants[0].id) : null
+          if (!fallback && persoNomToId.size === 0) {
+            throw new Error(t('import_need_char'))
+          }
+          const rows: Record<string, unknown>[] = []
+          for (const s of payload.sorts) {
+            const clean = { ...nettoyer(s) }
+            const parentNom = typeof clean._personnage_nom === 'string' ? clean._personnage_nom : null
+            delete clean._personnage_nom
+            const pid = (parentNom && persoNomToId.get(parentNom)) ?? fallback
+            if (!pid) continue
+            rows.push({ ...clean, personnage_id: pid })
+          }
+          if (rows.length > 0) {
+            const { error } = await supabase.from('sorts').insert(rows)
+            if (error) throw error
+            total += rows.length
+          }
+        }
+
+        setIoMessage(t('import_done', { n: total }))
+        fetchAll()
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        setIoMessage(tc('import_error', { message: msg }))
+      }
+    })
+  }
 
   const fallback = (nom: string, couleur: string) => (
     <div
@@ -217,42 +395,83 @@ export default function Bibliotheque() {
             onClick={() => router.push('/dashboard')}
             className="text-gray-400 hover:text-white"
           >
-            Retour
+            {tc('back')}
           </button>
-          <h1 className="text-2xl font-bold text-yellow-500">📚 Bibliothèque</h1>
+          <h1 className="text-2xl font-bold text-yellow-500">{t('title')}</h1>
         </div>
 
         <div className="bg-gray-800 p-4 rounded-lg mb-4">
-          <input
-            type="text"
-            value={recherche}
-            onChange={(e) => setRecherche(e.target.value)}
-            placeholder="🔎 Rechercher par nom, description, type..."
-            className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none"
-          />
+          <div className="relative">
+            <span
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg"
+              aria-hidden="true"
+            >
+              🔎
+            </span>
+            <input
+              type="text"
+              value={recherche}
+              onChange={(e) => setRecherche(e.target.value)}
+              placeholder={t('search_placeholder')}
+              className="w-full pl-10 pr-10 p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none focus:border-yellow-600"
+              aria-label={t('search_placeholder')}
+            />
+            {recherche && (
+              <button
+                type="button"
+                onClick={() => setRecherche('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full text-gray-400 hover:text-white hover:bg-gray-600"
+                aria-label={tc('close')}
+              >
+                ✕
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2 mb-4">
-          {ONGLETS.map((o) => {
-            const actif = onglet === o.id
+          <button
+            type="button"
+            onClick={exporterToutLaBibliotheque}
+            className="px-3 py-2 rounded-lg font-bold text-sm bg-gray-800 hover:bg-gray-700 text-gray-200 border border-yellow-600/40"
+          >
+            {t('export_all')}
+          </button>
+          <button
+            type="button"
+            onClick={importerToutLaBibliotheque}
+            className="px-3 py-2 rounded-lg font-bold text-sm bg-gray-800 hover:bg-gray-700 text-gray-200 border border-yellow-600/40"
+          >
+            {t('import_all')}
+          </button>
+        </div>
+        {ioMessage && (
+          <div className="mb-4 p-3 rounded bg-gray-800 border border-yellow-600/40 text-yellow-300 text-sm">
+            {ioMessage}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2 mb-4">
+          {ONGLETS.map((id) => {
+            const actif = onglet === id
             return (
               <button
-                key={o.id}
+                key={id}
                 type="button"
-                onClick={() => setOnglet(o.id)}
+                onClick={() => setOnglet(id)}
                 className={`px-4 py-2 rounded-lg font-bold text-sm transition ${
                   actif
                     ? 'bg-yellow-500 text-gray-900'
                     : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
                 }`}
               >
-                {o.emoji} {o.label}
+                {t(ONGLET_KEY[id])}
                 <span
                   className={`ml-2 text-xs ${
                     actif ? 'text-gray-800' : 'text-gray-500'
                   }`}
                 >
-                  ({compteurs[o.id]})
+                  ({compteurs[id]})
                 </span>
               </button>
             )
@@ -260,7 +479,7 @@ export default function Bibliotheque() {
         </div>
 
         {loading ? (
-          <p className="text-gray-400">Chargement...</p>
+          <p className="text-gray-400">{tc('loading')}</p>
         ) : (
           <div className="space-y-3">
             {onglet === 'scenarios' && (
