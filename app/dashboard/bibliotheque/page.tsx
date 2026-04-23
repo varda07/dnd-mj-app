@@ -76,7 +76,16 @@ type Sort = {
   personnage_id: string
 }
 
-type Onglet = 'scenarios' | 'personnages' | 'ennemis' | 'items' | 'maps' | 'sorts'
+type Pnj = {
+  id: string
+  nom: string
+  race: string | null
+  role: string | null
+  description: string | null
+  image_url: string | null
+}
+
+type Onglet = 'scenarios' | 'personnages' | 'ennemis' | 'items' | 'maps' | 'sorts' | 'pnj'
 
 const ONGLET_KEY: Record<Onglet, string> = {
   scenarios: 'tab_scenarios',
@@ -84,9 +93,10 @@ const ONGLET_KEY: Record<Onglet, string> = {
   ennemis: 'tab_enemies',
   items: 'tab_items',
   maps: 'tab_maps',
-  sorts: 'tab_spells'
+  sorts: 'tab_spells',
+  pnj: 'tab_pnj'
 }
-const ONGLETS: Onglet[] = ['scenarios', 'personnages', 'ennemis', 'items', 'maps', 'sorts']
+const ONGLETS: Onglet[] = ['scenarios', 'personnages', 'ennemis', 'items', 'maps', 'sorts', 'pnj']
 
 export default function Bibliotheque() {
   const router = useRouter()
@@ -102,6 +112,7 @@ export default function Bibliotheque() {
   const [items, setItems] = useState<Item[]>([])
   const [maps, setMaps] = useState<MapItem[]>([])
   const [sorts, setSorts] = useState<Sort[]>([])
+  const [pnj, setPnj] = useState<Pnj[]>([])
   const [ioMessage, setIoMessage] = useState('')
 
   const fetchAll = async () => {
@@ -112,7 +123,7 @@ export default function Bibliotheque() {
       return
     }
     const uid = user.id
-    const [s, p, e, i, m] = await Promise.all([
+    const [s, p, e, i, m, pn] = await Promise.all([
       supabase
         .from('scenarios')
         .select('id, nom, description, bg_image_url')
@@ -137,6 +148,11 @@ export default function Bibliotheque() {
         .from('maps')
         .select('id, nom, description, image_url')
         .eq('mj_id', uid)
+        .order('nom'),
+      supabase
+        .from('pnj')
+        .select('id, nom, race, role, description, image_url')
+        .eq('mj_id', uid)
         .order('nom')
     ])
     if (s.data) setScenarios(s.data)
@@ -144,6 +160,7 @@ export default function Bibliotheque() {
     if (e.data) setEnnemis(e.data)
     if (i.data) setItems(i.data)
     if (m.data) setMaps(m.data)
+    if (pn.data) setPnj(pn.data as Pnj[])
     const mesPersosIds = (p.data ?? []).map((pp) => pp.id)
     if (mesPersosIds.length > 0) {
       const { data: so } = await supabase
@@ -204,6 +221,10 @@ export default function Bibliotheque() {
       ),
     [sorts, personnages, q]
   )
+  const pnjFiltres = useMemo(
+    () => pnj.filter((p) => match(p.nom, p.race, p.role, p.description)),
+    [pnj, q]
+  )
 
   const compteurs: Record<Onglet, number> = {
     scenarios: scenariosFiltres.length,
@@ -211,7 +232,8 @@ export default function Bibliotheque() {
     ennemis: ennemisFiltres.length,
     items: itemsFiltres.length,
     maps: mapsFiltres.length,
-    sorts: sortsFiltres.length
+    sorts: sortsFiltres.length,
+    pnj: pnjFiltres.length
   }
 
   const vide = (
@@ -645,6 +667,33 @@ export default function Bibliotheque() {
                     {s.description && (
                       <p className="text-gray-500 text-xs italic mt-1 line-clamp-2">
                         {s.description}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+
+            {onglet === 'pnj' && (
+              pnjFiltres.length === 0 ? vide : pnjFiltres.map((p) => (
+                <div key={p.id} className="bg-gray-800 p-4 rounded-lg flex gap-4">
+                  {p.image_url ? (
+                    <img
+                      src={p.image_url}
+                      alt={p.nom}
+                      className="w-16 h-16 object-cover rounded bg-gray-900 flex-shrink-0 ring-2 ring-emerald-500/40"
+                    />
+                  ) : (
+                    fallback(p.nom, 'bg-emerald-600')
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-bold text-white">{p.nom}</h3>
+                    <p className="text-gray-400 text-sm">
+                      {[p.race, p.role].filter(Boolean).join(' · ') || '—'}
+                    </p>
+                    {p.description && (
+                      <p className="text-gray-500 text-xs italic mt-1 line-clamp-2">
+                        {p.description}
                       </p>
                     )}
                   </div>

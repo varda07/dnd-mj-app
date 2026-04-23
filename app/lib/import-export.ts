@@ -18,6 +18,7 @@ export type ExportType =
   | 'item'
   | 'map'
   | 'sort'
+  | 'pnj'
   | 'bibliotheque'
 
 export type Enveloppe<TData = unknown> = {

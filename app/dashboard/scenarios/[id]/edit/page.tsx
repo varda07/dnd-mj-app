@@ -19,7 +19,7 @@ type Chapitre = {
   parent_id: string | null
 }
 
-type ElementType = 'ennemi' | 'item' | 'map'
+type ElementType = 'ennemi' | 'item' | 'map' | 'pnj'
 
 type ScenarioLien = {
   id: string
@@ -39,13 +39,15 @@ type Elem = {
 const ICONE: Record<ElementType, string> = {
   ennemi: '👹',
   item: '🎒',
-  map: '🗺️'
+  map: '🗺️',
+  pnj: '🧑'
 }
 
 const LABEL: Record<ElementType, string> = {
   ennemi: 'Ennemis',
   item: 'Items',
-  map: 'Cartes'
+  map: 'Cartes',
+  pnj: 'PNJ'
 }
 
 const AUTO_SAVE_MS = 2000
@@ -91,6 +93,7 @@ export default function ScenarioEditPage() {
   const [ennemis, setEnnemis] = useState<Elem[]>([])
   const [items, setItems] = useState<Elem[]>([])
   const [maps, setMaps] = useState<Elem[]>([])
+  const [pnj, setPnj] = useState<Elem[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [picker, setPicker] = useState<
@@ -134,7 +137,7 @@ export default function ScenarioEditPage() {
       }
       setScenarioNom(scn.nom)
 
-      const [chapRes, lienRes, enn, itm, mps] = await Promise.all([
+      const [chapRes, lienRes, enn, itm, mps, pnjRes] = await Promise.all([
         supabase
           .from('chapitres')
           .select('*')
@@ -158,6 +161,11 @@ export default function ScenarioEditPage() {
         supabase
           .from('maps')
           .select('id, nom, image_url, description')
+          .eq('mj_id', user.id)
+          .order('nom'),
+        supabase
+          .from('pnj')
+          .select('id, nom, image_url, race, role')
           .eq('mj_id', user.id)
           .order('nom')
       ])
@@ -186,6 +194,14 @@ export default function ScenarioEditPage() {
           nom: m.nom,
           image_url: m.image_url,
           sous_titre: m.description ? String(m.description).slice(0, 80) : null
+        }))
+      )
+      setPnj(
+        (pnjRes.data ?? []).map((p) => ({
+          id: p.id,
+          nom: p.nom,
+          image_url: p.image_url,
+          sous_titre: [p.race, p.role].filter(Boolean).join(' · ') || null
         }))
       )
 
@@ -361,7 +377,13 @@ export default function ScenarioEditPage() {
   )
 
   const elemList = (type: ElementType): Elem[] =>
-    type === 'ennemi' ? ennemis : type === 'item' ? items : maps
+    type === 'ennemi'
+      ? ennemis
+      : type === 'item'
+      ? items
+      : type === 'map'
+      ? maps
+      : pnj
 
   const resolverElem = (type: ElementType, id: string): Elem | undefined =>
     elemList(type).find((e) => e.id === id)
@@ -588,6 +610,15 @@ export default function ScenarioEditPage() {
               />
 
               <LinkSections
+                labelScope="PNJ liés au chapitre"
+                elems={pnj}
+                liens={liensDuChapitre.filter((l) => l.element_type === 'pnj')}
+                resolveElem={(id) => resolverElem('pnj', id)}
+                icone={ICONE.pnj}
+                onAdd={() => ouvrirPicker('pnj', 'chapitre')}
+                onRemove={retirerLien}
+              />
+              <LinkSections
                 labelScope="Ennemis liés au chapitre"
                 elems={ennemis}
                 liens={liensDuChapitre.filter((l) => l.element_type === 'ennemi')}
@@ -626,7 +657,7 @@ export default function ScenarioEditPage() {
             </span>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-4">
-            {(['ennemi', 'item', 'map'] as ElementType[]).map((type) => {
+            {(['pnj', 'ennemi', 'item', 'map'] as ElementType[]).map((type) => {
               const lst = liensDuScenario.filter((l) => l.element_type === type)
               return (
                 <div key={type}>

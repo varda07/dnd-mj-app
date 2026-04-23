@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 
-type Onglet = 'scenarios' | 'personnages' | 'ennemis' | 'items' | 'maps' | 'sorts'
+type Onglet = 'scenarios' | 'personnages' | 'ennemis' | 'items' | 'maps' | 'sorts' | 'pnj'
 
 type ScenarioRow = {
   id: string
@@ -104,16 +104,37 @@ type SortRow = {
   nb_copies: number
 }
 
+type PnjRow = {
+  id: string
+  nom: string
+  race: string | null
+  role: string | null
+  description: string | null
+  personnalite: string | null
+  hp_max: number | null
+  force: number | null
+  dexterite: number | null
+  constitution: number | null
+  intelligence: number | null
+  sagesse: number | null
+  charisme: number | null
+  notes: string | null
+  image_url: string | null
+  auteur_username: string | null
+  nb_copies: number
+}
+
 type PersoMini = { id: string; nom: string }
 
-const ONGLETS_IDS: Onglet[] = ['scenarios', 'personnages', 'ennemis', 'items', 'maps', 'sorts']
+const ONGLETS_IDS: Onglet[] = ['scenarios', 'personnages', 'ennemis', 'items', 'maps', 'sorts', 'pnj']
 const ONGLETS_KEY: Record<Onglet, string> = {
   scenarios: 'tab_scenarios',
   personnages: 'tab_characters',
   ennemis: 'tab_enemies',
   items: 'tab_items',
   maps: 'tab_maps',
-  sorts: 'tab_spells'
+  sorts: 'tab_spells',
+  pnj: 'tab_pnj'
 }
 
 export default function Communaute() {
@@ -125,6 +146,7 @@ export default function Communaute() {
   const [items, setItems] = useState<ItemRow[]>([])
   const [maps, setMaps] = useState<MapRow[]>([])
   const [sorts, setSorts] = useState<SortRow[]>([])
+  const [pnj, setPnj] = useState<PnjRow[]>([])
   const [mesPersos, setMesPersos] = useState<PersoMini[]>([])
   const [sortCiblePersoId, setSortCiblePersoId] = useState('')
   const [chargement, setChargement] = useState(false)
@@ -145,13 +167,14 @@ export default function Communaute() {
       return
     }
 
-    const [scn, per, enn, itm, mps, srt, mesPer] = await Promise.all([
+    const [scn, per, enn, itm, mps, srt, pnjRes, mesPer] = await Promise.all([
       supabase.from('scenarios').select('*').eq('public', true).order('nb_copies', { ascending: false }),
       supabase.from('personnages').select('*').eq('public', true).order('nb_copies', { ascending: false }),
       supabase.from('ennemis').select('*').eq('public', true).order('nb_copies', { ascending: false }),
       supabase.from('items').select('*').eq('public', true).order('nb_copies', { ascending: false }),
       supabase.from('maps').select('*').eq('public', true).order('nb_copies', { ascending: false }),
       supabase.from('sorts').select('*').eq('public', true).order('nb_copies', { ascending: false }),
+      supabase.from('pnj').select('*').eq('public', true).order('nb_copies', { ascending: false }),
       supabase.from('personnages').select('id, nom').eq('joueur_id', user.id).order('nom')
     ])
 
@@ -161,6 +184,7 @@ export default function Communaute() {
     if (itm.data) setItems(itm.data as ItemRow[])
     if (mps.data) setMaps(mps.data as MapRow[])
     if (srt.data) setSorts(srt.data as SortRow[])
+    if (pnjRes.data) setPnj(pnjRes.data as PnjRow[])
     if (mesPer.data) {
       setMesPersos(mesPer.data)
       if (mesPer.data.length > 0 && !sortCiblePersoId) {
@@ -292,6 +316,43 @@ export default function Communaute() {
     }
     await incrementerCompteur('ennemis', e.id)
     setMessage(t('copied_to_enemies', { nom: e.nom }))
+    chargerTout()
+  }
+
+  const copierPnj = async (p: PnjRow) => {
+    marquerCopieEnCours(p.id, true)
+    setMessage('')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { error } = await supabase.from('pnj').insert({
+      mj_id: user.id,
+      nom: `${p.nom} (copie)`,
+      race: p.race,
+      role: p.role,
+      description: p.description ?? '',
+      personnalite: p.personnalite ?? '',
+      secrets: '', // ne jamais copier les secrets privés de l'auteur
+      hp_max: p.hp_max ?? 10,
+      hp_actuel: p.hp_max ?? 10,
+      force: p.force ?? 10,
+      dexterite: p.dexterite ?? 10,
+      constitution: p.constitution ?? 10,
+      intelligence: p.intelligence ?? 10,
+      sagesse: p.sagesse ?? 10,
+      charisme: p.charisme ?? 10,
+      notes: p.notes ?? '',
+      image_url: p.image_url ?? null,
+      public: false,
+      nb_copies: 0,
+      auteur_username: null
+    })
+    marquerCopieEnCours(p.id, false)
+    if (error) {
+      setMessage(msgErr(error))
+      return
+    }
+    await incrementerCompteur('pnj', p.id)
+    setMessage(t('copied_to_pnj', { nom: p.nom }))
     chargerTout()
   }
 
@@ -639,6 +700,45 @@ export default function Communaute() {
                     )}
                   </div>
                   {boutonCopier(s.id, () => copierSort(s))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!chargement && onglet === 'pnj' && (
+          <div className="space-y-3">
+            {pnj.length === 0 && (
+              <p className="text-gray-400 text-sm italic">{t('empty_pnj')}</p>
+            )}
+            {pnj.map((p) => (
+              <div key={p.id} className="bg-gray-800 p-4 rounded-lg">
+                <div className="flex items-start gap-3 flex-wrap">
+                  {p.image_url ? (
+                    <img
+                      src={p.image_url}
+                      alt={p.nom}
+                      className="w-20 h-20 rounded object-cover bg-gray-900 flex-shrink-0 ring-2 ring-emerald-500/40"
+                    />
+                  ) : (
+                    <div className="w-20 h-20 rounded bg-gray-700 flex items-center justify-center text-2xl flex-shrink-0">
+                      🧑
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-bold text-white break-words">{p.nom}</h3>
+                    <p className="text-gray-400 text-xs">
+                      {[p.race, p.role].filter(Boolean).join(' · ') || '—'}
+                    </p>
+                    {meta(p.auteur_username, p.nb_copies)}
+                    {p.description && (
+                      <p className="text-gray-500 text-xs italic mt-2 line-clamp-2">{p.description}</p>
+                    )}
+                    {p.personnalite && (
+                      <p className="text-gray-500 text-xs italic mt-1 line-clamp-2">💬 {p.personnalite}</p>
+                    )}
+                  </div>
+                  {boutonCopier(p.id, () => copierPnj(p))}
                 </div>
               </div>
             ))}

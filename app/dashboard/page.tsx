@@ -778,6 +778,10 @@ export default function Dashboard() {
                     <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">{t('forge_enemies_title')}</h3>
                     <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">{t('forge_enemies_desc')}</p>
                   </button>
+                  <button type="button" onClick={() => router.push('/dashboard/pnj')} className="bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
+                    <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">🧑 {t('forge_pnj_title')}</h3>
+                    <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">{t('forge_pnj_desc')}</p>
+                  </button>
                   <button type="button" onClick={() => router.push('/dashboard/items')} className="bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
                     <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">{t('forge_items_title')}</h3>
                     <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">{t('forge_items_desc')}</p>
