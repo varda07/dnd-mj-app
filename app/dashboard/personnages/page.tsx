@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useState, useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
