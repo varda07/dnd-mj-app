@@ -4,6 +4,8 @@ import {
   useState,
   useEffect,
   useRef,
+  useCallback,
+  memo,
   PointerEvent as ReactPointerEvent,
   MouseEvent as ReactMouseEvent
 } from 'react'
@@ -131,12 +133,52 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
     startY: number
   } | null>(null)
 
-  const clearLongPress = () => {
+  const pendingFromRef = useRef(pendingFrom)
+  pendingFromRef.current = pendingFrom
+  const linksRef = useRef(links)
+  linksRef.current = links
+
+  // rAF throttling for drag updates
+  const dragRafRef = useRef<number | null>(null)
+  const dragLatestRef = useRef<{ x: number; y: number } | null>(null)
+
+  // Debounced save for node position updates (1s)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map())
+
+  const flushPositionSaves = useCallback(async () => {
+    const pending = Array.from(pendingPositionsRef.current.entries())
+    pendingPositionsRef.current.clear()
+    for (const [id, pos] of pending) {
+      const { error } = await supabase
+        .from('mindmap_noeuds')
+        .update({ position_x: pos.x, position_y: pos.y })
+        .eq('id', id)
+      if (error) console.error('[mindmap] save position échec :', error)
+    }
+  }, [])
+
+  const schedulePositionSave = useCallback(() => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null
+      void flushPositionSaves()
+    }, 1000)
+  }, [flushPositionSaves])
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+      if (dragRafRef.current !== null) cancelAnimationFrame(dragRafRef.current)
+    }
+  }, [])
+
+  const clearLongPress = useCallback(() => {
     if (longPressRef.current) {
       clearTimeout(longPressRef.current.timer)
       longPressRef.current = null
     }
-  }
+  }, [])
 
   useEffect(() => {
     if (!scenarioId) {
@@ -230,17 +272,16 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
     if (data) setNodes((ns) => [...ns, data as MindNode])
   }
 
-  const connect = (from: string, to: string) => {
+  const connect = useCallback((from: string, to: string) => {
     if (from === to) return
     if (
-      links.some(
+      linksRef.current.some(
         (l) =>
           (l.noeud_from === from && l.noeud_to === to) ||
           (l.noeud_from === to && l.noeud_to === from)
       )
     )
       return
-    // Ouvre l'éditeur de lien — l'insert est fait dans `saveLink`.
     setLinkEditor({
       mode: 'create',
       from,
@@ -248,7 +289,7 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
       couleur: 'auto',
       annotation: ''
     })
-  }
+  }, [])
 
   const saveLink = async () => {
     if (!linkEditor) return
@@ -333,12 +374,12 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
     setEditingNode(null)
   }
 
-  const onNodePointerDown = (e: ReactPointerEvent<HTMLDivElement>, node: MindNode) => {
+  const onNodePointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>, node: MindNode) => {
     if (e.button === 2) return
     e.stopPropagation()
 
-    if (pendingFrom) {
-      if (pendingFrom !== node.id) connect(pendingFrom, node.id)
+    if (pendingFromRef.current) {
+      if (pendingFromRef.current !== node.id) connect(pendingFromRef.current, node.id)
       setPendingFrom(null)
       return
     }
@@ -378,9 +419,9 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
       }, 500)
       longPressRef.current = { timer, startX, startY }
     }
-  }
+  }, [connect])
 
-  const onNodeContextMenu = (e: ReactMouseEvent<HTMLDivElement>, node: MindNode) => {
+  const onNodeContextMenu = useCallback((e: ReactMouseEvent<HTMLDivElement>, node: MindNode) => {
     e.preventDefault()
     e.stopPropagation()
     const rect = canvasRef.current?.getBoundingClientRect()
@@ -391,9 +432,13 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
       y: e.clientY - rect.top,
       nodeId: node.id
     })
-  }
+  }, [])
 
-  const onLinkPointerDown = (e: ReactPointerEvent<SVGLineElement>, link: MindLink) => {
+  const onNodeDoubleClick = useCallback((node: MindNode) => {
+    setEditingNode(node)
+  }, [])
+
+  const onLinkPointerDown = useCallback((e: ReactPointerEvent<SVGLineElement>, link: MindLink) => {
     if (e.button === 2) return
     e.stopPropagation()
     if (e.pointerType !== 'touch') return
@@ -412,9 +457,9 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
       if (navigator.vibrate) navigator.vibrate(30)
     }, 500)
     longPressRef.current = { timer, startX, startY }
-  }
+  }, [])
 
-  const onLinkContextMenu = (e: ReactMouseEvent<SVGLineElement>, link: MindLink) => {
+  const onLinkContextMenu = useCallback((e: ReactMouseEvent<SVGLineElement>, link: MindLink) => {
     e.preventDefault()
     e.stopPropagation()
     const rect = canvasRef.current?.getBoundingClientRect()
@@ -425,7 +470,7 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
       y: e.clientY - rect.top,
       linkId: link.id
     })
-  }
+  }, [])
 
   const onCanvasPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button === 2) return
@@ -478,9 +523,18 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
       const x = Math.round(wx - drag.offsetX)
       const y = Math.round(wy - drag.offsetY)
       drag.moved = true
-      setNodes((ns) =>
-        ns.map((n) => (n.id === drag.id ? { ...n, position_x: x, position_y: y } : n))
-      )
+      dragLatestRef.current = { x, y }
+      if (dragRafRef.current === null) {
+        dragRafRef.current = requestAnimationFrame(() => {
+          dragRafRef.current = null
+          const latest = dragLatestRef.current
+          const cur = dragRef.current
+          if (!latest || !cur) return
+          setNodes((ns) =>
+            ns.map((n) => (n.id === cur.id ? { ...n, position_x: latest.x, position_y: latest.y } : n))
+          )
+        })
+      }
       return
     }
 
@@ -519,15 +573,20 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
 
     const drag = dragRef.current
     if (drag) {
+      if (dragRafRef.current !== null) {
+        cancelAnimationFrame(dragRafRef.current)
+        dragRafRef.current = null
+      }
+      const latest = dragLatestRef.current
+      dragLatestRef.current = null
       dragRef.current = null
-      if (drag.moved) {
-        const n = nodes.find((nn) => nn.id === drag.id)
-        if (n) {
-          await supabase
-            .from('mindmap_noeuds')
-            .update({ position_x: n.position_x, position_y: n.position_y })
-            .eq('id', drag.id)
-        }
+      if (drag.moved && latest) {
+        const id = drag.id
+        setNodes((ns) =>
+          ns.map((n) => (n.id === id ? { ...n, position_x: latest.x, position_y: latest.y } : n))
+        )
+        pendingPositionsRef.current.set(id, { x: latest.x, y: latest.y })
+        schedulePositionSave()
       }
     }
   }
@@ -647,159 +706,33 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
             height="1"
             style={{ position: 'absolute', overflow: 'visible', pointerEvents: 'none' }}
           >
-            <defs>
-              {links.map((l) => {
-                const a = nodes.find((n) => n.id === l.noeud_from)
-                const b = nodes.find((n) => n.id === l.noeud_to)
-                if (!a || !b) return null
-                const key = isColorKey(l.couleur) ? l.couleur : 'auto'
-                if (key !== 'auto' || a.type === b.type) return null
-                const c1 = TYPE_META[a.type].color
-                const c2 = TYPE_META[b.type].color
-                return (
-                  <linearGradient
-                    key={l.id}
-                    id={`mindmap-grad-${l.id}`}
-                    x1={a.position_x}
-                    y1={a.position_y}
-                    x2={b.position_x}
-                    y2={b.position_y}
-                    gradientUnits="userSpaceOnUse"
-                  >
-                    <stop offset="0%" stopColor={c1} />
-                    <stop offset="100%" stopColor={c2} />
-                  </linearGradient>
-                )
-              })}
-            </defs>
             {links.map((l) => {
               const a = nodes.find((n) => n.id === l.noeud_from)
               const b = nodes.find((n) => n.id === l.noeud_to)
               if (!a || !b) return null
-              const key = isColorKey(l.couleur) ? l.couleur : 'auto'
-              let stroke: string
-              if (key === 'auto') {
-                if (a.type === b.type) {
-                  stroke = TYPE_META[a.type].color
-                } else {
-                  stroke = `url(#mindmap-grad-${l.id})`
-                }
-              } else {
-                stroke = LINK_COLORS[key].hex
-              }
-              const mx = (a.position_x + b.position_x) / 2
-              const my = (a.position_y + b.position_y) / 2
-              const annotation = (l.annotation ?? '').trim()
-              // Largeur en "unités monde" : l'annotation va être rendue sans scale
-              // via vectorEffect sur le texte pas possible ; on garde simple et on
-              // laisse le scale l'agrandir — sinon le texte serait minuscule à
-              // faible zoom. Compromis acceptable pour un label court.
-              const annotationWidth = Math.min(160, annotation.length * 7 + 16)
               return (
-                <g key={l.id}>
-                  {/* Zone cliquable invisible plus large */}
-                  <line
-                    x1={a.position_x}
-                    y1={a.position_y}
-                    x2={b.position_x}
-                    y2={b.position_y}
-                    stroke="black"
-                    strokeOpacity={0}
-                    strokeWidth={16}
-                    vectorEffect="non-scaling-stroke"
-                    onPointerDown={(e) => onLinkPointerDown(e, l)}
-                    onContextMenu={(e) => onLinkContextMenu(e, l)}
-                    style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
-                  >
-                    <title>{annotation || 'Lien'}</title>
-                  </line>
-                  <line
-                    x1={a.position_x}
-                    y1={a.position_y}
-                    x2={b.position_x}
-                    y2={b.position_y}
-                    stroke={stroke}
-                    strokeWidth={2}
-                    strokeOpacity={0.85}
-                    vectorEffect="non-scaling-stroke"
-                    style={{ pointerEvents: 'none' }}
-                  />
-                  {annotation && (
-                    <g
-                      pointerEvents="none"
-                      transform={`translate(${mx}, ${my})`}
-                    >
-                      <rect
-                        x={-annotationWidth / 2}
-                        y={-9}
-                        width={annotationWidth}
-                        height={18}
-                        rx={4}
-                        ry={4}
-                        fill="rgba(10,11,13,0.85)"
-                        stroke="rgba(234,179,8,0.35)"
-                        strokeWidth={0.5}
-                      />
-                      <text
-                        x={0}
-                        y={0}
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                        fill="#e8e8ec"
-                        fontSize={11}
-                        fontFamily="system-ui, sans-serif"
-                      >
-                        {annotation.length > 24 ? annotation.slice(0, 23) + '…' : annotation}
-                      </text>
-                    </g>
-                  )}
-                </g>
+                <MindLinkView
+                  key={l.id}
+                  link={l}
+                  fromNode={a}
+                  toNode={b}
+                  onPointerDown={onLinkPointerDown}
+                  onContextMenu={onLinkContextMenu}
+                />
               )
             })}
           </svg>
 
-          {nodes.map((n) => {
-            const meta = TYPE_META[n.type]
-            const color = n.couleur ?? meta.color
-            const selected = pendingFrom === n.id
-            return (
-              <div
-                key={n.id}
-                onPointerDown={(e) => onNodePointerDown(e, n)}
-                onContextMenu={(e) => onNodeContextMenu(e, n)}
-                onDoubleClick={() => setEditingNode(n)}
-                className={`absolute shadow-lg cursor-grab active:cursor-grabbing ${
-                  selected ? 'ring-4 ring-yellow-300 animate-pulse' : ''
-                }`}
-                style={{
-                  left: n.position_x,
-                  top: n.position_y,
-                  transform: 'translate(-50%, -50%)',
-                  minWidth: 140,
-                  maxWidth: 220,
-                  padding: '10px 18px',
-                  borderRadius: 9999,
-                  backgroundColor: `${color}33`,
-                  border: '2px solid #eab308',
-                  backdropFilter: 'blur(2px)',
-                  touchAction: 'none'
-                }}
-              >
-                <div
-                  className="text-sm font-bold flex items-center justify-center gap-1 text-center leading-tight"
-                  style={{ color }}
-                >
-                  <span>{meta.icon}</span>
-                  <span className="truncate">{n.titre || meta.label}</span>
-                </div>
-                {n.contenu && (
-                  <div className="text-[11px] text-gray-300 text-center mt-1 line-clamp-2 break-words">
-                    {n.contenu}
-                  </div>
-                )}
-              </div>
-            )
-          })}
+          {nodes.map((n) => (
+            <MindNodeView
+              key={n.id}
+              node={n}
+              selected={pendingFrom === n.id}
+              onPointerDown={onNodePointerDown}
+              onContextMenu={onNodeContextMenu}
+              onDoubleClick={onNodeDoubleClick}
+            />
+          ))}
         </div>
 
         <div
@@ -1272,3 +1205,156 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
     </div>
   )
 }
+
+const MindNodeView = memo(function MindNodeView({
+  node,
+  selected,
+  onPointerDown,
+  onContextMenu,
+  onDoubleClick
+}: {
+  node: MindNode
+  selected: boolean
+  onPointerDown: (e: ReactPointerEvent<HTMLDivElement>, node: MindNode) => void
+  onContextMenu: (e: ReactMouseEvent<HTMLDivElement>, node: MindNode) => void
+  onDoubleClick: (node: MindNode) => void
+}) {
+  const meta = TYPE_META[node.type]
+  const color = node.couleur ?? meta.color
+  return (
+    <div
+      onPointerDown={(e) => onPointerDown(e, node)}
+      onContextMenu={(e) => onContextMenu(e, node)}
+      onDoubleClick={() => onDoubleClick(node)}
+      className={`absolute shadow-lg cursor-grab active:cursor-grabbing ${
+        selected ? 'ring-4 ring-yellow-300 animate-pulse' : ''
+      }`}
+      style={{
+        left: node.position_x,
+        top: node.position_y,
+        transform: 'translate(-50%, -50%)',
+        minWidth: 140,
+        maxWidth: 220,
+        padding: '10px 18px',
+        borderRadius: 9999,
+        backgroundColor: `${color}33`,
+        border: '2px solid #eab308',
+        backdropFilter: 'blur(2px)',
+        touchAction: 'none'
+      }}
+    >
+      <div
+        className="text-sm font-bold flex items-center justify-center gap-1 text-center leading-tight"
+        style={{ color }}
+      >
+        <span>{meta.icon}</span>
+        <span className="truncate">{node.titre || meta.label}</span>
+      </div>
+      {node.contenu && (
+        <div className="text-[11px] text-gray-300 text-center mt-1 line-clamp-2 break-words">
+          {node.contenu}
+        </div>
+      )}
+    </div>
+  )
+})
+
+const MindLinkView = memo(function MindLinkView({
+  link,
+  fromNode,
+  toNode,
+  onPointerDown,
+  onContextMenu
+}: {
+  link: MindLink
+  fromNode: MindNode
+  toNode: MindNode
+  onPointerDown: (e: ReactPointerEvent<SVGLineElement>, link: MindLink) => void
+  onContextMenu: (e: ReactMouseEvent<SVGLineElement>, link: MindLink) => void
+}) {
+  const a = fromNode
+  const b = toNode
+  const colorKey = isColorKey(link.couleur) ? link.couleur : 'auto'
+  const usesGradient = colorKey === 'auto' && a.type !== b.type
+  let stroke: string
+  if (colorKey === 'auto') {
+    stroke = a.type === b.type ? TYPE_META[a.type].color : `url(#mindmap-grad-${link.id})`
+  } else {
+    stroke = LINK_COLORS[colorKey].hex
+  }
+  const mx = (a.position_x + b.position_x) / 2
+  const my = (a.position_y + b.position_y) / 2
+  const annotation = (link.annotation ?? '').trim()
+  const annotationWidth = Math.min(160, annotation.length * 7 + 16)
+  return (
+    <g>
+      {usesGradient && (
+        <defs>
+          <linearGradient
+            id={`mindmap-grad-${link.id}`}
+            x1={a.position_x}
+            y1={a.position_y}
+            x2={b.position_x}
+            y2={b.position_y}
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop offset="0%" stopColor={TYPE_META[a.type].color} />
+            <stop offset="100%" stopColor={TYPE_META[b.type].color} />
+          </linearGradient>
+        </defs>
+      )}
+      <line
+        x1={a.position_x}
+        y1={a.position_y}
+        x2={b.position_x}
+        y2={b.position_y}
+        stroke="black"
+        strokeOpacity={0}
+        strokeWidth={16}
+        vectorEffect="non-scaling-stroke"
+        onPointerDown={(e) => onPointerDown(e, link)}
+        onContextMenu={(e) => onContextMenu(e, link)}
+        style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
+      >
+        <title>{annotation || 'Lien'}</title>
+      </line>
+      <line
+        x1={a.position_x}
+        y1={a.position_y}
+        x2={b.position_x}
+        y2={b.position_y}
+        stroke={stroke}
+        strokeWidth={2}
+        strokeOpacity={0.85}
+        vectorEffect="non-scaling-stroke"
+        style={{ pointerEvents: 'none' }}
+      />
+      {annotation && (
+        <g pointerEvents="none" transform={`translate(${mx}, ${my})`}>
+          <rect
+            x={-annotationWidth / 2}
+            y={-9}
+            width={annotationWidth}
+            height={18}
+            rx={4}
+            ry={4}
+            fill="rgba(10,11,13,0.85)"
+            stroke="rgba(234,179,8,0.35)"
+            strokeWidth={0.5}
+          />
+          <text
+            x={0}
+            y={0}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill="#e8e8ec"
+            fontSize={11}
+            fontFamily="system-ui, sans-serif"
+          >
+            {annotation.length > 24 ? annotation.slice(0, 23) + '…' : annotation}
+          </text>
+        </g>
+      )}
+    </g>
+  )
+})

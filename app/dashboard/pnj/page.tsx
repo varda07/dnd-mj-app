@@ -410,6 +410,7 @@ export default function PnjPage() {
                   <img
                     src={p.image_url}
                     alt={p.nom}
+                    loading="lazy"
                     className="w-20 h-20 object-cover rounded bg-gray-900 flex-shrink-0 ring-2 ring-emerald-500/40"
                   />
                 ) : (

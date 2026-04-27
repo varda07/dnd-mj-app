@@ -280,6 +280,7 @@ export default function Items() {
                   <img
                     src={item.image_url}
                     alt={item.nom}
+                    loading="lazy"
                     className="w-16 h-16 object-cover rounded bg-gray-900 flex-shrink-0"
                   />
                 )}

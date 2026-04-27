@@ -1,5 +1,282 @@
 @import "tailwindcss";
 
+@keyframes round-flash {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  35% {
+    transform: scale(1);
+  }
+  85% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+.animate-round-flash > * {
+  animation: round-flash 1.8s ease-out forwards;
+}
+
+/* ============================================================================
+   KO en combat — animations spectaculaires
+   Durée animation ≈ 2 s puis état permanent (vaincu / inconscient).
+   ============================================================================ */
+
+/* Flash plein écran au moment du KO (déjà utilisé par overlay fixed). */
+@keyframes ko-flash {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.animate-ko-flash { animation: ko-flash 0.6s ease-out forwards; }
+
+
+/* ---- ENNEMI : chute 90deg, fumée, flash blanc, badge bounce ---- */
+
+@keyframes ko-flash-white {
+  0% { opacity: 0; }
+  10% { opacity: 0.95; }
+  100% { opacity: 0; }
+}
+.ko-flash-white {
+  position: absolute;
+  inset: 0;
+  background: white;
+  z-index: 6;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  animation: ko-flash-white 0.45s ease-out forwards;
+}
+
+@keyframes ko-fall-ennemi {
+  0% {
+    transform: rotate(0) translateY(0);
+    filter: grayscale(0%);
+  }
+  18% {
+    transform: rotate(15deg) translateY(2%);
+    filter: grayscale(15%);
+  }
+  55% {
+    transform: rotate(70deg) translateY(10%);
+    filter: grayscale(60%);
+  }
+  85% {
+    transform: rotate(95deg) translateY(16%);
+    filter: grayscale(95%);
+  }
+  100% {
+    transform: rotate(90deg) translateY(15%);
+    filter: grayscale(100%);
+  }
+}
+.ko-fall-ennemi { animation: ko-fall-ennemi 1s cubic-bezier(0.55, 0.05, 0.45, 1) forwards; }
+
+/* Posture finale ennemi (après animation) */
+.ko-rest-ennemi {
+  transform: rotate(90deg) translateY(15%);
+  filter: grayscale(100%);
+  opacity: 0.55;
+  transition: transform 0.4s ease-out, filter 0.4s ease-out, opacity 0.4s ease-out;
+}
+
+/* Particules de fumée grise qui montent depuis l'ennemi */
+@keyframes ko-smoke-rise {
+  0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
+  20%  { opacity: 0.85; }
+  60%  { opacity: 0.55; }
+  100% { opacity: 0; transform: translate(var(--smoke-dx, 0), -120%) scale(1.7); }
+}
+.ko-smoke {
+  position: absolute;
+  bottom: 8%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(180,180,180,0.9) 0%, rgba(120,120,120,0.4) 60%, transparent 100%);
+  filter: blur(2px);
+  pointer-events: none;
+  z-index: 4;
+  animation: ko-smoke-rise 1.7s ease-out forwards;
+}
+
+/* Badge VAINCU avec bounce-in */
+@keyframes ko-badge-bounce {
+  0%   { opacity: 0; transform: scale(0) rotate(-25deg); }
+  55%  { opacity: 1; transform: scale(1.4) rotate(8deg); }
+  75%  { transform: scale(0.9) rotate(-3deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+.ko-badge-bounce { animation: ko-badge-bounce 0.75s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+
+/* ---- PJ : vacille puis chute en arrière, fissures, particules, aura ---- */
+
+/* Shake court de la carte au moment du KO */
+@keyframes ko-card-shake {
+  0%, 100% { transform: translateX(0); }
+  10% { transform: translateX(-7px) translateY(1px); }
+  20% { transform: translateX(7px) translateY(-1px); }
+  30% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  50% { transform: translateX(-4px); }
+  60% { transform: translateX(4px); }
+  75% { transform: translateX(-2px); }
+  90% { transform: translateX(1px); }
+}
+.ko-card-shake { animation: ko-card-shake 0.7s ease-in-out; }
+
+/* Image vacille puis tombe en arrière */
+@keyframes ko-vacille-perso {
+  0%   { transform: rotate(0); filter: brightness(1) saturate(1) hue-rotate(0); }
+  10%  { transform: rotate(-12deg); }
+  22%  { transform: rotate(11deg); }
+  34%  { transform: rotate(-9deg); }
+  46%  { transform: rotate(7deg); }
+  58%  { transform: rotate(-4deg); }
+  68%  { transform: rotate(0); filter: brightness(0.85) saturate(1.4) hue-rotate(-15deg); }
+  82%  { transform: rotate(-18deg) translateY(4%); }
+  92%  { transform: rotate(-26deg) translateY(8%); }
+  100% { transform: rotate(-30deg) translateY(12%) scale(0.92); filter: brightness(0.5) sepia(0.35) saturate(2) hue-rotate(-30deg); }
+}
+.ko-vacille-perso { animation: ko-vacille-perso 1.7s cubic-bezier(0.4, 0, 0.6, 1) forwards; }
+
+/* Posture finale PJ (après animation) */
+.ko-rest-perso {
+  transform: rotate(-30deg) translateY(12%) scale(0.92);
+  filter: brightness(0.5) sepia(0.35) saturate(2) hue-rotate(-30deg);
+  transition: transform 0.4s ease-out, filter 0.4s ease-out;
+}
+
+/* Aura rouge sang permanente pulsante autour de la carte PJ */
+@keyframes ko-aura-perso {
+  0%, 100% {
+    box-shadow:
+      0 0 12px 2px rgba(220, 38, 38, 0.45),
+      inset 0 0 16px 2px rgba(127, 29, 29, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 28px 8px rgba(220, 38, 38, 0.85),
+      inset 0 0 28px 4px rgba(127, 29, 29, 0.55);
+  }
+}
+.ko-aura-perso { animation: ko-aura-perso 2.2s ease-in-out infinite; }
+
+/* Fissure / craquelure animée sur la bordure de la carte (pseudo-éléments) */
+.ko-crack-perso { position: relative; }
+.ko-crack-perso::before,
+.ko-crack-perso::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 0.5rem;
+  pointer-events: none;
+  z-index: 5;
+}
+@keyframes ko-crack-draw-1 {
+  0% { opacity: 0; clip-path: polygon(0 0, 0 0, 0 0, 0 0); }
+  20% { opacity: 1; }
+  100% {
+    opacity: 1;
+    clip-path: polygon(
+      0% 30%, 4% 28%, 6% 35%, 9% 32%, 11% 40%, 14% 38%, 16% 47%, 18% 45%,
+      20% 100%, 0 100%
+    );
+  }
+}
+@keyframes ko-crack-draw-2 {
+  0% { opacity: 0; clip-path: polygon(100% 0, 100% 0, 100% 0, 100% 0); }
+  20% { opacity: 1; }
+  100% {
+    opacity: 1;
+    clip-path: polygon(
+      100% 25%, 96% 28%, 94% 22%, 91% 27%, 89% 19%, 86% 24%, 84% 16%, 82% 21%,
+      80% 0, 100% 0
+    );
+  }
+}
+.ko-crack-perso::before {
+  background: linear-gradient(135deg, transparent 40%, rgba(220, 38, 38, 0.85) 50%, transparent 60%);
+  border: 1px solid rgba(220, 38, 38, 0.7);
+  animation: ko-crack-draw-1 1.2s ease-out forwards;
+  filter: drop-shadow(0 0 4px rgba(220, 38, 38, 0.6));
+}
+.ko-crack-perso::after {
+  background: linear-gradient(225deg, transparent 40%, rgba(220, 38, 38, 0.85) 50%, transparent 60%);
+  border: 1px solid rgba(220, 38, 38, 0.7);
+  animation: ko-crack-draw-2 1.2s ease-out 0.2s forwards;
+  filter: drop-shadow(0 0 4px rgba(220, 38, 38, 0.6));
+}
+
+/* Fissure SVG dans la zone image (zigzag dessiné en stroke-dasharray) */
+.ko-crack-svg path {
+  stroke: #dc2626;
+  stroke-width: 1.4;
+  fill: none;
+  filter: drop-shadow(0 0 3px rgba(220, 38, 38, 0.8));
+  stroke-dasharray: 220;
+  stroke-dashoffset: 220;
+  animation: ko-crack-stroke 1.3s ease-out 0.1s forwards;
+}
+@keyframes ko-crack-stroke {
+  0% { stroke-dashoffset: 220; opacity: 0; }
+  15% { opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0.95; }
+}
+
+/* Particules rouges qui s'éparpillent depuis le centre */
+@keyframes ko-red-particle {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+  15%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% {
+    opacity: 0;
+    transform:
+      translate(calc(-50% + var(--p-dx, 0px)), calc(-50% + var(--p-dy, 0px)))
+      scale(0.4);
+  }
+}
+.ko-red-particle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ef4444 0%, #991b1b 70%, transparent 100%);
+  pointer-events: none;
+  z-index: 5;
+  animation: ko-red-particle 1.5s ease-out forwards;
+  filter: drop-shadow(0 0 3px rgba(220, 38, 38, 0.9));
+}
+
+/* Badge INCONSCIENT qui pop dramatiquement puis pulse */
+@keyframes ko-badge-pop-perso {
+  0%   { opacity: 0; transform: scale(0) rotate(-180deg); }
+  60%  { opacity: 1; transform: scale(1.5) rotate(0); }
+  80%  { transform: scale(0.85); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes ko-badge-pulse {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.08); filter: brightness(1.25); }
+}
+.ko-badge-pop-perso {
+  animation:
+    ko-badge-pop-perso 1s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
+    ko-badge-pulse 1.6s ease-in-out 1s infinite;
+}
+.ko-badge-pulse { animation: ko-badge-pulse 1.6s ease-in-out infinite; }
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

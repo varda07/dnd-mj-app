@@ -513,6 +513,7 @@ export default function Bibliotheque() {
                     <img
                       src={s.bg_image_url}
                       alt={s.nom}
+                      loading="lazy"
                       className="w-16 h-16 object-cover rounded bg-gray-900 flex-shrink-0"
                     />
                   ) : (
@@ -537,6 +538,7 @@ export default function Bibliotheque() {
                     <img
                       src={p.image_url}
                       alt={p.nom}
+                      loading="lazy"
                       className="w-16 h-16 object-cover rounded-full bg-gray-900 flex-shrink-0 ring-2 ring-blue-400"
                     />
                   ) : (
@@ -566,6 +568,7 @@ export default function Bibliotheque() {
                     <img
                       src={e.image_url}
                       alt={e.nom}
+                      loading="lazy"
                       className="w-16 h-16 object-cover rounded bg-gray-900 flex-shrink-0 ring-2 ring-red-400"
                     />
                   ) : (
@@ -594,6 +597,7 @@ export default function Bibliotheque() {
                     <img
                       src={i.image_url}
                       alt={i.nom}
+                      loading="lazy"
                       className="w-16 h-16 object-cover rounded bg-gray-900 flex-shrink-0"
                     />
                   ) : (
@@ -623,6 +627,7 @@ export default function Bibliotheque() {
                     <img
                       src={m.image_url}
                       alt={m.nom}
+                      loading="lazy"
                       className="w-16 h-16 object-cover rounded bg-gray-900 flex-shrink-0"
                     />
                   ) : (
@@ -681,6 +686,7 @@ export default function Bibliotheque() {
                     <img
                       src={p.image_url}
                       alt={p.nom}
+                      loading="lazy"
                       className="w-16 h-16 object-cover rounded bg-gray-900 flex-shrink-0 ring-2 ring-emerald-500/40"
                     />
                   ) : (

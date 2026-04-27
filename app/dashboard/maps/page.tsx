@@ -252,7 +252,7 @@ export default function Maps() {
                 </div>
               </div>
               {map.image_url && (
-                <img src={map.image_url} alt={map.nom} className="w-full max-h-96 object-contain rounded mb-2 bg-gray-900" />
+                <img src={map.image_url} alt={map.nom} loading="lazy" className="w-full max-h-96 object-contain rounded mb-2 bg-gray-900" />
               )}
               {map.description && <p className="text-gray-500 text-sm italic">{map.description}</p>}
             </div>

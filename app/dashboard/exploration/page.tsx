@@ -6,6 +6,8 @@ import {
   useState,
   useEffect,
   useRef,
+  useCallback,
+  memo,
   PointerEvent as ReactPointerEvent
 } from 'react'
 import { useRouter } from 'next/navigation'
@@ -131,9 +133,14 @@ export default function ExplorationPage() {
 
   const scenario = scenarios.find((s) => s.id === scenarioId)
   const isMJ = !!scenario && scenario.mj_id === userId
+  const isMJRef = useRef(isMJ)
+  isMJRef.current = isMJ
 
   const MIN_SCALE = 0.2
   const MAX_SCALE = 5
+
+  const dragSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const dragSavePatchRef = useRef<Partial<ExplorationRow>>({})
 
   useEffect(() => {
     const el = outerRef.current
@@ -302,14 +309,26 @@ export default function ExplorationPage() {
     setPersonnages(pj ?? [])
   }
 
-  const saveExploration = async (patch: Partial<ExplorationRow>) => {
-    if (!exploration || !isMJ) return
+  const saveExploration = useCallback(async (patch: Partial<ExplorationRow>) => {
+    const cur = explorationRef.current
+    if (!cur || !isMJRef.current) return
     const { error } = await supabase
       .from('explorations')
       .update(patch)
-      .eq('id', exploration.id)
+      .eq('id', cur.id)
     if (error) console.error('[exploration] save échec :', error)
-  }
+  }, [])
+
+  const scheduleDragSave = useCallback((patch: Partial<ExplorationRow>) => {
+    Object.assign(dragSavePatchRef.current, patch)
+    if (dragSaveTimerRef.current) clearTimeout(dragSaveTimerRef.current)
+    dragSaveTimerRef.current = setTimeout(() => {
+      const p = dragSavePatchRef.current
+      dragSavePatchRef.current = {}
+      dragSaveTimerRef.current = null
+      saveExploration(p)
+    }, 500)
+  }, [saveExploration])
 
   const updateLocal = (patch: Partial<ExplorationRow>) => {
     setExploration((prev) => {
@@ -323,7 +342,7 @@ export default function ExplorationPage() {
     explorationRef.current = exploration
   }, [exploration])
 
-  const startMarkerDrag = (
+  const startMarkerDrag = useCallback((
     kind: 'positions_pj' | 'items_caches' | 'ennemis_caches',
     key: string,
     clientX: number,
@@ -331,7 +350,7 @@ export default function ExplorationPage() {
     element: HTMLElement,
     pointerId: number
   ) => {
-    if (!isMJ) return
+    if (!isMJRef.current) return
     const cur = explorationRef.current
     if (!cur) return
     const placed = (cur[kind] as Placed[]).find((p) => p.key === key)
@@ -358,9 +377,9 @@ export default function ExplorationPage() {
       pointerId,
       element
     }
-  }
+  }, [])
 
-  const advanceMarkerDrag = (clientX: number, clientY: number) => {
+  const advanceMarkerDrag = useCallback((clientX: number, clientY: number) => {
     const mDrag = markerDragRef.current
     if (!mDrag) return false
     const wrap = wrapperRef.current
@@ -381,9 +400,9 @@ export default function ExplorationPage() {
       return next
     })
     return true
-  }
+  }, [])
 
-  const endMarkerDrag = async () => {
+  const endMarkerDrag = useCallback(async () => {
     const mDrag = markerDragRef.current
     if (!mDrag) return false
     markerDragRef.current = null
@@ -392,10 +411,40 @@ export default function ExplorationPage() {
     } catch {}
     if (mDrag.moved && explorationRef.current) {
       const arr = explorationRef.current[mDrag.kind] as Placed[]
-      await saveExploration({ [mDrag.kind]: arr } as Partial<ExplorationRow>)
+      scheduleDragSave({ [mDrag.kind]: arr } as Partial<ExplorationRow>)
     }
     return true
-  }
+  }, [scheduleDragSave])
+
+  const handleMarkerLongPressStart = useCallback((
+    kind: 'positions_pj' | 'items_caches' | 'ennemis_caches',
+    markerKey: string,
+    cx: number,
+    cy: number,
+    startX: number,
+    startY: number
+  ) => {
+    if (longPressRef.current) {
+      clearTimeout(longPressRef.current.timer)
+      longPressRef.current = null
+    }
+    const timer = setTimeout(() => {
+      setContextMenu({ x: cx, y: cy, kind, key: markerKey })
+      longPressRef.current = null
+      markerDragRef.current = null
+      if (navigator.vibrate) navigator.vibrate(30)
+    }, 500)
+    longPressRef.current = { timer, startX, startY }
+  }, [])
+
+  const handleMarkerRequestMenu = useCallback((
+    kind: 'positions_pj' | 'items_caches' | 'ennemis_caches',
+    markerKey: string,
+    cx: number,
+    cy: number
+  ) => {
+    setContextMenu({ x: cx, y: cy, kind, key: markerKey })
+  }, [])
 
   // ----- Fog render -----
   useEffect(() => {
@@ -918,6 +967,7 @@ export default function ExplorationPage() {
                   height: imgSize.h || 600,
                   transformOrigin: '0 0',
                   transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
+                  willChange: 'transform',
                   cursor:
                     mode === 'brush' || mode === 'erase'
                       ? 'crosshair'
@@ -929,6 +979,7 @@ export default function ExplorationPage() {
                 <img
                   src={exploration.map_image_url}
                   alt="Carte"
+                  loading="lazy"
                   className="block pointer-events-none"
                   style={{ width: '100%', height: '100%' }}
                   onLoad={(e) => {
@@ -952,6 +1003,8 @@ export default function ExplorationPage() {
               return (
                 <PlacedMarker
                   key={p.key}
+                  kind="positions_pj"
+                  markerKey={p.key}
                   type="pj"
                   x={p.x}
                   y={p.y}
@@ -961,34 +1014,11 @@ export default function ExplorationPage() {
                   label={labelFor(p.ref_id)}
                   image={imageFor(p.ref_id)}
                   interactive={isMJ}
-                  onDragStart={
-                    isMJ
-                      ? (clientX, clientY, el, pointerId) =>
-                          startMarkerDrag('positions_pj', p.key, clientX, clientY, el, pointerId)
-                      : undefined
-                  }
-                  onDragMove={isMJ ? (cx, cy) => advanceMarkerDrag(cx, cy) : undefined}
-                  onDragEnd={isMJ ? () => { void endMarkerDrag() } : undefined}
-                  onRequestMenu={
-                    isMJ
-                      ? (cx, cy) =>
-                          setContextMenu({ x: cx, y: cy, kind: 'positions_pj', key: p.key })
-                      : undefined
-                  }
-                  onLongPressStart={
-                    isMJ
-                      ? (cx, cy, startX, startY) => {
-                          clearLongPress()
-                          const timer = setTimeout(() => {
-                            setContextMenu({ x: cx, y: cy, kind: 'positions_pj', key: p.key })
-                            longPressRef.current = null
-                            markerDragRef.current = null
-                            if (navigator.vibrate) navigator.vibrate(30)
-                          }, 500)
-                          longPressRef.current = { timer, startX, startY }
-                        }
-                      : undefined
-                  }
+                  onDragStart={isMJ ? startMarkerDrag : undefined}
+                  onDragMove={isMJ ? advanceMarkerDrag : undefined}
+                  onDragEnd={isMJ ? endMarkerDrag : undefined}
+                  onRequestMenu={isMJ ? handleMarkerRequestMenu : undefined}
+                  onLongPressStart={isMJ ? handleMarkerLongPressStart : undefined}
                 />
               )
             })}
@@ -997,6 +1027,8 @@ export default function ExplorationPage() {
               (exploration.items_caches ?? []).map((p) => (
                 <PlacedMarker
                   key={p.key}
+                  kind="items_caches"
+                  markerKey={p.key}
                   type="item"
                   x={p.x}
                   y={p.y}
@@ -1006,24 +1038,11 @@ export default function ExplorationPage() {
                   label={labelFor(p.ref_id)}
                   image={imageFor(p.ref_id)}
                   interactive
-                  onDragStart={(clientX, clientY, el, pointerId) =>
-                    startMarkerDrag('items_caches', p.key, clientX, clientY, el, pointerId)
-                  }
-                  onDragMove={(cx, cy) => advanceMarkerDrag(cx, cy)}
-                  onDragEnd={() => { void endMarkerDrag() }}
-                  onRequestMenu={(cx, cy) =>
-                    setContextMenu({ x: cx, y: cy, kind: 'items_caches', key: p.key })
-                  }
-                  onLongPressStart={(cx, cy, startX, startY) => {
-                    clearLongPress()
-                    const timer = setTimeout(() => {
-                      setContextMenu({ x: cx, y: cy, kind: 'items_caches', key: p.key })
-                      longPressRef.current = null
-                      markerDragRef.current = null
-                      if (navigator.vibrate) navigator.vibrate(30)
-                    }, 500)
-                    longPressRef.current = { timer, startX, startY }
-                  }}
+                  onDragStart={startMarkerDrag}
+                  onDragMove={advanceMarkerDrag}
+                  onDragEnd={endMarkerDrag}
+                  onRequestMenu={handleMarkerRequestMenu}
+                  onLongPressStart={handleMarkerLongPressStart}
                 />
               ))}
 
@@ -1031,6 +1050,8 @@ export default function ExplorationPage() {
               (exploration.ennemis_caches ?? []).map((p) => (
                 <PlacedMarker
                   key={p.key}
+                  kind="ennemis_caches"
+                  markerKey={p.key}
                   type="ennemi"
                   x={p.x}
                   y={p.y}
@@ -1040,24 +1061,11 @@ export default function ExplorationPage() {
                   label={labelFor(p.ref_id)}
                   image={imageFor(p.ref_id)}
                   interactive
-                  onDragStart={(clientX, clientY, el, pointerId) =>
-                    startMarkerDrag('ennemis_caches', p.key, clientX, clientY, el, pointerId)
-                  }
-                  onDragMove={(cx, cy) => advanceMarkerDrag(cx, cy)}
-                  onDragEnd={() => { void endMarkerDrag() }}
-                  onRequestMenu={(cx, cy) =>
-                    setContextMenu({ x: cx, y: cy, kind: 'ennemis_caches', key: p.key })
-                  }
-                  onLongPressStart={(cx, cy, startX, startY) => {
-                    clearLongPress()
-                    const timer = setTimeout(() => {
-                      setContextMenu({ x: cx, y: cy, kind: 'ennemis_caches', key: p.key })
-                      longPressRef.current = null
-                      markerDragRef.current = null
-                      if (navigator.vibrate) navigator.vibrate(30)
-                    }, 500)
-                    longPressRef.current = { timer, startX, startY }
-                  }}
+                  onDragStart={startMarkerDrag}
+                  onDragMove={advanceMarkerDrag}
+                  onDragEnd={endMarkerDrag}
+                  onRequestMenu={handleMarkerRequestMenu}
+                  onLongPressStart={handleMarkerLongPressStart}
                 />
               ))}
 
@@ -1168,7 +1176,11 @@ const MARKER_STYLE: Record<
 
 const BASE_MARKER_SIZE = 44
 
-function PlacedMarker({
+type MarkerKind = 'positions_pj' | 'items_caches' | 'ennemis_caches'
+
+const PlacedMarker = memo(function PlacedMarker({
+  kind,
+  markerKey,
   type,
   x,
   y,
@@ -1184,6 +1196,8 @@ function PlacedMarker({
   onRequestMenu,
   onLongPressStart
 }: {
+  kind: MarkerKind
+  markerKey: string
   type: 'pj' | 'ennemi' | 'item'
   x: number
   y: number
@@ -1193,11 +1207,11 @@ function PlacedMarker({
   label: string
   image: string | null
   interactive: boolean
-  onDragStart?: (clientX: number, clientY: number, element: HTMLElement, pointerId: number) => void
+  onDragStart?: (kind: MarkerKind, markerKey: string, clientX: number, clientY: number, element: HTMLElement, pointerId: number) => void
   onDragMove?: (clientX: number, clientY: number) => void
-  onDragEnd?: () => void
-  onRequestMenu?: (x: number, y: number) => void
-  onLongPressStart?: (x: number, y: number, startX: number, startY: number) => void
+  onDragEnd?: () => void | Promise<unknown>
+  onRequestMenu?: (kind: MarkerKind, markerKey: string, x: number, y: number) => void
+  onLongPressStart?: (kind: MarkerKind, markerKey: string, x: number, y: number, startX: number, startY: number) => void
 }) {
   const [imgFailed, setImgFailed] = useState(false)
   const style = MARKER_STYLE[type]
@@ -1207,7 +1221,7 @@ function PlacedMarker({
   const screenX = viewX + x * viewScale
   const screenY = viewY + y * viewScale
   const rawSize = BASE_MARKER_SIZE / viewScale
-  const size = Math.min(80, Math.max(20, rawSize))
+  const size = Math.min(50, Math.max(20, rawSize))
   const scaleRatio = size / BASE_MARKER_SIZE
   const borderPx = Math.max(1, 3 * scaleRatio)
   const fontPx = 12 * scaleRatio
@@ -1235,21 +1249,21 @@ function PlacedMarker({
           const r = wrap?.getBoundingClientRect()
           const cx = r ? e.clientX - r.left : e.clientX
           const cy = r ? e.clientY - r.top : e.clientY
-          onRequestMenu(cx, cy)
+          onRequestMenu(kind, markerKey, cx, cy)
         }}
         onPointerDown={(e) => {
           if (!interactive) return
           e.stopPropagation()
           if (e.button === 2) return
           if (onDragStart) {
-            onDragStart(e.clientX, e.clientY, e.currentTarget as HTMLElement, e.pointerId)
+            onDragStart(kind, markerKey, e.clientX, e.clientY, e.currentTarget as HTMLElement, e.pointerId)
           }
           if (e.pointerType === 'touch' && onLongPressStart) {
             const wrap = (e.currentTarget.closest('[data-outer-wrap]') as HTMLElement) || null
             const r = wrap?.getBoundingClientRect()
             const cx = r ? e.clientX - r.left : e.clientX
             const cy = r ? e.clientY - r.top : e.clientY
-            onLongPressStart(cx, cy, e.clientX, e.clientY)
+            onLongPressStart(kind, markerKey, cx, cy, e.clientX, e.clientY)
           }
         }}
         onPointerMove={(e) => {
@@ -1293,6 +1307,7 @@ function PlacedMarker({
             src={image!}
             alt={label}
             draggable={false}
+            loading="lazy"
             onError={() => setImgFailed(true)}
             style={{
               width: '100%',
@@ -1326,4 +1341,4 @@ function PlacedMarker({
       )}
     </div>
   )
-}
+})

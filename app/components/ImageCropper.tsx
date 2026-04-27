@@ -126,6 +126,7 @@ export default function ImageCropper({
               <img
                 src={currentImageUrl}
                 alt="actuelle"
+                loading="lazy"
                 className="max-h-32 rounded bg-gray-900 object-contain"
               />
             </div>
@@ -150,6 +151,7 @@ export default function ImageCropper({
                 src={src}
                 onLoad={handleImageLoad}
                 alt="à cadrer"
+                loading="lazy"
                 className="max-h-[60vh] object-contain"
               />
             </ReactCrop>
@@ -182,6 +184,7 @@ export default function ImageCropper({
           <img
             src={croppedPreview}
             alt="preview"
+            loading="lazy"
             className="max-h-48 rounded bg-gray-900 object-contain"
           />
           <button

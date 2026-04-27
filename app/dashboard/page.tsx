@@ -741,6 +741,7 @@ export default function Dashboard() {
                               <img
                                 src={p.image_url}
                                 alt={p.nom}
+                                loading="lazy"
                                 className="w-12 h-12 rounded-full object-cover ring-2 ring-blue-400 flex-shrink-0 bg-gray-900"
                               />
                             ) : (

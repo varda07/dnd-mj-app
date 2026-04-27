@@ -339,6 +339,7 @@ export default function Ennemis() {
                   <img
                     src={ennemi.image_url}
                     alt={ennemi.nom}
+                    loading="lazy"
                     className="w-24 h-24 object-cover rounded bg-gray-900 flex-shrink-0"
                   />
                 )}

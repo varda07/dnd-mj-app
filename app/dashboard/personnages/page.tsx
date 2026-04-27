@@ -1293,6 +1293,7 @@ export default function Personnages() {
                   <img
                     src={perso.image_url}
                     alt={perso.nom}
+                    loading="lazy"
                     className="w-12 h-12 object-cover rounded-full bg-gray-900 flex-shrink-0 ring-2 ring-yellow-500"
                   />
                 )}

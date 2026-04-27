@@ -536,6 +536,7 @@ export default function Communaute() {
                     <img
                       src={p.image_url}
                       alt={p.nom}
+                      loading="lazy"
                       className="w-14 h-14 rounded-full object-cover ring-2 ring-yellow-500 bg-gray-900 flex-shrink-0"
                     />
                   ) : (
@@ -569,6 +570,7 @@ export default function Communaute() {
                     <img
                       src={e.image_url}
                       alt={e.nom}
+                      loading="lazy"
                       className="w-20 h-20 rounded object-cover bg-gray-900 flex-shrink-0"
                     />
                   )}
@@ -601,6 +603,7 @@ export default function Communaute() {
                     <img
                       src={i.image_url}
                       alt={i.nom}
+                      loading="lazy"
                       className="w-16 h-16 rounded object-cover bg-gray-900 flex-shrink-0"
                     />
                   )}
@@ -639,6 +642,7 @@ export default function Communaute() {
                   <img
                     src={m.image_url}
                     alt={m.nom}
+                    loading="lazy"
                     className="w-full max-h-80 object-contain rounded bg-gray-900"
                   />
                 )}
@@ -718,6 +722,7 @@ export default function Communaute() {
                     <img
                       src={p.image_url}
                       alt={p.nom}
+                      loading="lazy"
                       className="w-20 h-20 rounded object-cover bg-gray-900 flex-shrink-0 ring-2 ring-emerald-500/40"
                     />
                   ) : (

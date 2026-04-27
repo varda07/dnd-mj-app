@@ -412,6 +412,7 @@ export default function GlobalSearch() {
                           <img
                             src={r.image_url}
                             alt=""
+                            loading="lazy"
                             className="w-9 h-9 rounded object-cover bg-gray-900 flex-shrink-0"
                           />
                         ) : (

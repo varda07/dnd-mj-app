@@ -655,6 +655,7 @@ export default function FichePersonnage() {
               <img
                 src={perso.image_url}
                 alt={perso.nom}
+                loading="lazy"
                 className="w-28 h-28 md:w-36 md:h-36 rounded-full object-cover ring-4 ring-yellow-600 shadow-lg flex-shrink-0 bg-stone-900"
               />
             ) : (
