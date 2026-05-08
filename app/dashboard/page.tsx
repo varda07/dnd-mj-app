@@ -787,13 +787,9 @@ export default function Dashboard() {
                     <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">{t('forge_items_title')}</h3>
                     <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">{t('forge_items_desc')}</p>
                   </button>
-                  <button type="button" onClick={() => router.push('/dashboard/maps')} className="bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
+                  <button type="button" onClick={() => router.push('/dashboard/maps')} className="col-span-2 bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
                     <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">{t('forge_maps_title')}</h3>
                     <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">{t('forge_maps_desc')}</p>
-                  </button>
-                  <button type="button" onClick={() => router.push('/dashboard/communaute')} className="col-span-2 bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left border border-yellow-600/30">
-                    <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">{t('forge_community_title')}</h3>
-                    <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">{t('forge_community_desc')}</p>
                   </button>
                 </div>
                 <div className="bg-gray-800 p-4 rounded-lg">

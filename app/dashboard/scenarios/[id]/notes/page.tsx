@@ -146,7 +146,7 @@ export default function NotesSessionPage() {
         <div className="max-w-3xl mx-auto">
           <button
             type="button"
-            onClick={() => router.push('/dashboard/scenarios')}
+            onClick={() => router.back()}
             className="text-gray-400 hover:text-white mb-4"
           >
             ← Retour
@@ -165,7 +165,7 @@ export default function NotesSessionPage() {
         <div className="flex items-center gap-4 mb-4">
           <button
             type="button"
-            onClick={() => router.push('/dashboard/scenarios')}
+            onClick={() => router.back()}
             className="text-gray-400 hover:text-white"
           >
             ← Retour

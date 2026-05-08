@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import ImageCropper from '@/app/components/ImageCropper'
@@ -39,6 +40,7 @@ type Ennemi = {
 type ScenarioOption = { id: string; nom: string }
 
 export default function Ennemis() {
+  const router = useRouter()
   const [ennemis, setEnnemis] = useState<Ennemi[]>([])
   const [nom, setNom] = useState('')
   const [hp, setHp] = useState('10')
@@ -245,7 +247,7 @@ export default function Ennemis() {
     <main className="min-h-screen bg-gray-900 text-white p-6">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center gap-4 mb-6">
-          <button type="button" onClick={() => window.location.href = '/dashboard'} className="text-gray-400 hover:text-white">
+          <button type="button" onClick={() => router.back()} className="text-gray-400 hover:text-white">
             {tc('back')}
           </button>
           <h1 className="text-2xl font-bold text-yellow-500">{t('title')}</h1>

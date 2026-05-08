@@ -528,7 +528,7 @@ export default function FichePersonnage() {
         <div className="max-w-4xl mx-auto">
           <button
             type="button"
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.back()}
             className="text-gray-400 hover:text-white mb-4"
           >
             Retour
@@ -561,7 +561,7 @@ export default function FichePersonnage() {
         <div className="flex items-center gap-4 mb-4 flex-wrap">
           <button
             type="button"
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.back()}
             className="text-gray-400 hover:text-white"
           >
             Retour

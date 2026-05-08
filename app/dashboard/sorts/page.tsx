@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import {
@@ -217,6 +218,7 @@ function SpellOrnament({ position }: { position: 'tl' | 'tr' | 'bl' | 'br' }) {
 }
 
 export default function Sorts() {
+  const router = useRouter()
   const [sorts, setSorts] = useState<Sort[]>([])
   const [nom, setNom] = useState('')
   const [niveau, setNiveau] = useState('0')
@@ -393,7 +395,7 @@ export default function Sorts() {
     <main className="min-h-screen bg-gray-900 text-white p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center gap-4 mb-6">
-          <button type="button" onClick={() => window.location.href = '/dashboard'} className="text-gray-400 hover:text-white text-sm">
+          <button type="button" onClick={() => router.back()} className="text-gray-400 hover:text-white text-sm">
             ← {tc('back')}
           </button>
           <h1 className="text-xl md:text-2xl font-bold text-yellow-500 tracking-wider">{ts('title')}</h1>

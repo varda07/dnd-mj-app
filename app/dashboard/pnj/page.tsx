@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import ImageCropper from '@/app/components/ImageCropper'
@@ -26,6 +27,7 @@ type Pnj = {
   secrets: string | null
   hp_max: number
   hp_actuel: number
+  armure: number
   force: number
   dexterite: number
   constitution: number
@@ -40,6 +42,7 @@ type Pnj = {
 }
 
 export default function PnjPage() {
+  const router = useRouter()
   const [pnjs, setPnjs] = useState<Pnj[]>([])
   const [nom, setNom] = useState('')
   const [race, setRace] = useState('')
@@ -48,6 +51,7 @@ export default function PnjPage() {
   const [personnalite, setPersonnalite] = useState('')
   const [secrets, setSecrets] = useState('')
   const [hp, setHp] = useState('10')
+  const [armure, setArmure] = useState('10')
   const [force, setForce] = useState('10')
   const [dexterite, setDexterite] = useState('10')
   const [constitution, setConstitution] = useState('10')
@@ -76,6 +80,7 @@ export default function PnjPage() {
     setPersonnalite('')
     setSecrets('')
     setHp('10')
+    setArmure('10')
     setForce('10')
     setDexterite('10')
     setConstitution('10')
@@ -98,6 +103,7 @@ export default function PnjPage() {
     setPersonnalite(p.personnalite ?? '')
     setSecrets(p.secrets ?? '')
     setHp(String(p.hp_max))
+    setArmure(String(p.armure ?? 10))
     setForce(String(p.force))
     setDexterite(String(p.dexterite))
     setConstitution(String(p.constitution))
@@ -152,6 +158,7 @@ export default function PnjPage() {
       personnalite,
       secrets,
       hp_max: parseInt(hp) || 10,
+      armure: parseInt(armure) || 10,
       force: parseInt(force) || 10,
       dexterite: parseInt(dexterite) || 10,
       constitution: parseInt(constitution) || 10,
@@ -246,7 +253,7 @@ export default function PnjPage() {
     <main className="min-h-screen bg-gray-900 text-white p-6">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center gap-4 mb-6">
-          <button type="button" onClick={() => window.location.href = '/dashboard'} className="text-gray-400 hover:text-white">
+          <button type="button" onClick={() => router.back()} className="text-gray-400 hover:text-white">
             {tc('back')}
           </button>
           <h1 className="text-2xl font-bold text-yellow-500">{t('title')}</h1>
@@ -324,6 +331,15 @@ export default function PnjPage() {
                   type="number"
                   value={hp}
                   onChange={(e) => setHp(e.target.value)}
+                  className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-gray-400 text-sm">🛡️ Classe d&apos;armure</label>
+                <input
+                  type="number"
+                  value={armure}
+                  onChange={(e) => setArmure(e.target.value)}
                   className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none"
                 />
               </div>
@@ -458,6 +474,7 @@ export default function PnjPage() {
                   )}
                   <div className="grid grid-cols-3 gap-1 text-[11px] text-gray-500 mt-2">
                     <span>❤️ {p.hp_actuel}/{p.hp_max}</span>
+                    <span>🛡️ CA {p.armure ?? 10}</span>
                     <span>💪 {p.force}</span>
                     <span>🏃 {p.dexterite}</span>
                     <span>🫀 {p.constitution}</span>

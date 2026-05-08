@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import ImageCropper from '@/app/components/ImageCropper'
@@ -27,6 +28,7 @@ type Map = {
 }
 
 export default function Maps() {
+  const router = useRouter()
   const [maps, setMaps] = useState<Map[]>([])
   const [nom, setNom] = useState('')
   const [description, setDescription] = useState('')
@@ -179,11 +181,19 @@ export default function Maps() {
   return (
     <main className="min-h-screen bg-gray-900 text-white p-6">
       <div className="max-w-4xl mx-auto">
-        <div className="flex items-center gap-4 mb-6">
-          <button type="button" onClick={() => window.location.href = '/dashboard'} className="text-gray-400 hover:text-white">
+        <div className="flex items-center gap-4 mb-6 flex-wrap">
+          <button type="button" onClick={() => router.back()} className="text-gray-400 hover:text-white">
             {tc('back')}
           </button>
           <h1 className="text-2xl font-bold text-yellow-500">{t('title')}</h1>
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard/maps/editor')}
+            className="ml-auto px-4 py-2 rounded font-bold bg-[#C9A84C]/15 text-[#e6c878] border border-[#C9A84C] hover:bg-[#C9A84C]/25 text-sm transition"
+            title="Créer une carte avec l'éditeur de tuiles"
+          >
+            🎨 Créer une map
+          </button>
         </div>
         <div className="bg-gray-800 p-6 rounded-lg mb-6">
           <h2 className="text-lg font-bold text-yellow-500 mb-4">{editingId ? t('edit_title') : t('create_title')}</h2>

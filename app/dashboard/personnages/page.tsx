@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react'
+import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import ImageCropper from '@/app/components/ImageCropper'
@@ -106,6 +107,7 @@ function Help({ text }: { text: string }) {
 }
 
 export default function Personnages() {
+  const router = useRouter()
   const [personnages, setPersonnages] = useState<Personnage[]>([])
   const [nom, setNom] = useState('')
   const [race, setRace] = useState(RACE_NOMS[0])
@@ -165,6 +167,23 @@ export default function Personnages() {
     fetchScenarios()
     fetchSortsTemplates()
   }, [])
+
+  // Recalcul automatique des HP quand classe ou Constitution changent à la
+  // création (pas en édition, pour ne pas écraser un PV manuellement saisi).
+  // L'utilisateur peut toujours surcharger la valeur ensuite : on n'incluant
+  // pas hpMax dans les deps, son édition manuelle ne déclenche pas de
+  // reset.
+  useEffect(() => {
+    if (editingId) return
+    const c = findClasse(classe)
+    if (!c) return
+    const con = parseInt(constitution)
+    if (Number.isNaN(con)) return
+    const hp = c.hpNiveau1Base + modificateur(con)
+    setHpMax(String(hp))
+    setHpActuel(String(hp))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classe, constitution, editingId])
 
   const fetchSortsTemplates = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -724,7 +743,7 @@ export default function Personnages() {
       )}
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center gap-4 mb-6 flex-wrap">
-          <button type="button" onClick={() => window.location.href = '/dashboard'} className="text-gray-400 hover:text-white">
+          <button type="button" onClick={() => router.back()} className="text-gray-400 hover:text-white">
             {tc('back')}
           </button>
           <h1 className="text-2xl font-bold text-yellow-500">{t('title')}</h1>
@@ -876,6 +895,19 @@ export default function Personnages() {
                 <input type="number" value={hpActuel} onChange={(e) => setHpActuel(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
               </div>
             </div>
+            {classeObj && !editingId && (() => {
+              const conMod = modificateur(conNum)
+              const signe = conMod >= 0 ? '+' : '−'
+              return (
+                <p className="text-[11px] text-gray-500 italic -mt-1">
+                  {classeObj.hpNiveau1Base} ({deVie}) {signe} {Math.abs(conMod)} (Con) ={' '}
+                  <span className="text-yellow-500 font-bold">
+                    {classeObj.hpNiveau1Base + conMod} HP
+                  </span>
+                  <span className="ml-2 text-gray-600">— modifiable manuellement</span>
+                </p>
+              )
+            })()}
 
             <div className="flex items-center justify-between pt-2">
               <p className="text-gray-400 text-sm font-bold flex items-center">

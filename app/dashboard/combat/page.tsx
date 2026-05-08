@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { Suspense, useState, useEffect, useRef, useCallback } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import {
@@ -15,6 +15,8 @@ import {
 
 type Scenario = { id: string; nom: string; bg_image_url: string | null; mj_id: string }
 
+type Arme = { nom: string; bonus?: string; degats?: string }
+
 type BaseParticipant = {
   id: string
   nom: string
@@ -23,9 +25,32 @@ type BaseParticipant = {
   dexterite: number
   image_url?: string | null
   conditions: ConditionKey[]
+  // Champs étendus pour la fiche dépliable. Optionnels pour rester compatibles
+  // avec d'anciennes lignes / les ennemis qui n'ont pas toutes les colonnes.
+  classe?: string | null
+  niveau?: number | null
+  ca?: number | null
+  armure?: number | null
+  vitesse?: number | null
+  force?: number | null
+  constitution?: number | null
+  armes?: Arme[]
 }
 
 type Participant = BaseParticipant & { kind: 'perso' | 'ennemi' }
+
+type SortDispo = {
+  id: string // personnage_sorts.id
+  personnage_id: string
+  sort_id: string
+  disponible: boolean
+  nom: string
+  niveau: number
+  ecole?: string | null
+}
+
+type LayoutMode = 'horizontal' | 'vertical'
+const LAYOUT_STORAGE_KEY = 'combat-layout-mode'
 
 type Item = {
   id: string
@@ -87,6 +112,7 @@ export default function Combat() {
 }
 
 function CombatInner() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [scenarioId, setScenarioId] = useState('')
@@ -115,6 +141,9 @@ function CombatInner() {
   const [etatsCombat, setEtatsCombat] = useState<Record<string, EtatCombat>>({})
   const [koAnimating, setKoAnimating] = useState<Set<string>>(new Set())
   const [koFlash, setKoFlash] = useState<'perso' | 'ennemi' | null>(null)
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>('horizontal')
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [persoSorts, setPersoSorts] = useState<Record<string, SortDispo[]>>({})
   const prevHpRef = useRef<Record<string, number>>({})
   const koTimerRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const tCombat = useTranslations('combat')
@@ -131,6 +160,33 @@ function CombatInner() {
 
   useEffect(() => {
     fetchScenarios()
+  }, [])
+
+  // Layout mode : hydratation depuis localStorage au montage uniquement.
+  // On ne lit pas la valeur sync à l'init du useState pour éviter un mismatch
+  // SSR/CSR (force-dynamic empêche le SSR mais on reste prudents).
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const stored = window.localStorage.getItem(LAYOUT_STORAGE_KEY)
+    if (stored === 'horizontal' || stored === 'vertical') {
+      setLayoutMode(stored)
+    }
+  }, [])
+
+  const changerLayoutMode = useCallback((mode: LayoutMode) => {
+    setLayoutMode(mode)
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(LAYOUT_STORAGE_KEY, mode)
+    }
+  }, [])
+
+  const toggleExpand = useCallback((pieceId: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(pieceId)) next.delete(pieceId)
+      else next.add(pieceId)
+      return next
+    })
   }, [])
 
   useEffect(() => {
@@ -256,16 +312,19 @@ function CombatInner() {
 
   const fetchCombatData = async () => {
     const scenario = scenarios.find((s) => s.id === scenarioId)
-    setBgImageUrl(scenario?.bg_image_url ?? '')
+    // Si un `map_url` est passé via l'URL (ex. depuis le mode Exploration),
+    // il prend la priorité sur le bg_image_url stocké sur le scénario.
+    const mapUrlOverride = searchParams.get('map_url')
+    setBgImageUrl(mapUrlOverride || scenario?.bg_image_url || '')
 
     const [{ data: p }, { data: e }, { data: it }, { data: cb }] = await Promise.all([
       supabase
         .from('personnages')
-        .select('id, nom, hp_max, hp_actuel, dexterite, image_url, conditions')
+        .select('id, nom, hp_max, hp_actuel, dexterite, image_url, conditions, classe, niveau, ca, vitesse, force, constitution, armes')
         .eq('scenario_id', scenarioId),
       supabase
         .from('ennemis')
-        .select('id, nom, hp_max, hp_actuel, dexterite, image_url, conditions')
+        .select('id, nom, hp_max, hp_actuel, dexterite, image_url, conditions, force, constitution')
         .eq('scenario_id', scenarioId),
       supabase.from('items').select('*').eq('scenario_id', scenarioId),
       supabase.from('combats').select('*').eq('scenario_id', scenarioId).maybeSingle()
@@ -283,6 +342,43 @@ function CombatInner() {
     setPersonnages(persos)
     setEnnemis(enns)
     setItems(it ?? [])
+
+    // Sorts attribués aux PJ du scénario : on charge en batch puis on indexe
+    // par personnage_id pour affichage dans la carte dépliée.
+    const persoIds = persos.map((pe) => pe.id)
+    if (persoIds.length > 0) {
+      const { data: ps } = await supabase
+        .from('personnage_sorts')
+        .select('id, personnage_id, sort_id, disponible, sorts!inner(id, nom, niveau, ecole)')
+        .in('personnage_id', persoIds)
+      type SortRow = {
+        id: string
+        personnage_id: string
+        sort_id: string
+        disponible: boolean
+        sorts: { id: string; nom: string; niveau: number; ecole: string | null } | null
+      }
+      const map: Record<string, SortDispo[]> = {}
+      ;((ps as unknown as SortRow[]) ?? []).forEach((row) => {
+        if (!row.sorts) return
+        const list = map[row.personnage_id] ?? (map[row.personnage_id] = [])
+        list.push({
+          id: row.id,
+          personnage_id: row.personnage_id,
+          sort_id: row.sort_id,
+          disponible: row.disponible,
+          nom: row.sorts.nom,
+          niveau: row.sorts.niveau,
+          ecole: row.sorts.ecole
+        })
+      })
+      Object.values(map).forEach((arr) =>
+        arr.sort((a, b) => a.niveau - b.niveau || a.nom.localeCompare(b.nom))
+      )
+      setPersoSorts(map)
+    } else {
+      setPersoSorts({})
+    }
 
     const allIds = new Set<string>()
     persos.forEach((pe) => allIds.add(`perso-${pe.id}`))
@@ -489,17 +585,89 @@ function CombatInner() {
     return participantsEnCombat.find((p) => pieceIdOf(p) === found[0])
   }
 
-  const onCellClick = (x: number, y: number) => {
-    const p = pieceAt(x, y)
-    if (p) {
-      const pid = pieceIdOf(p)
-      setSelectedPieceId((prev) => (prev === pid ? null : pid))
-      return
+  // Drag & drop d'une miniature sur la grille (PC + mobile via pointer events).
+  // L'ancien flow "click puis click sur cellule cible" est supprimé.
+  // Note : on conserve la pièce montée dans le DOM pendant le drag (juste
+  // opacité réduite) sinon le démontage casse setPointerCapture et les
+  // pointermove/up suivants ne sont jamais reçus.
+  const gridRef = useRef<HTMLDivElement>(null)
+  type PieceDragState = {
+    pieceId: string
+    clientX: number
+    clientY: number
+    dropX: number | null
+    dropY: number | null
+  }
+  const [pieceDrag, setPieceDrag] = useState<PieceDragState | null>(null)
+  const pieceDragRef = useRef<PieceDragState | null>(null)
+  pieceDragRef.current = pieceDrag
+
+  const computeDropCell = (clientX: number, clientY: number) => {
+    const rect = gridRef.current?.getBoundingClientRect()
+    if (!rect) return { dropX: null as number | null, dropY: null as number | null }
+    const px = clientX - rect.left
+    const py = clientY - rect.top
+    const cx = Math.floor(px / CELL_SIZE)
+    const cy = Math.floor(py / CELL_SIZE)
+    const inside = cx >= 0 && cx < GRID_COLS && cy >= 0 && cy < GRID_ROWS
+    return { dropX: inside ? cx : null, dropY: inside ? cy : null }
+  }
+
+  const onPiecePointerDown = (pieceId: string) =>
+    (e: React.PointerEvent<HTMLElement>) => {
+      if (e.button === 2) return
+      e.stopPropagation()
+      try {
+        ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+      } catch {
+        /* ignore */
+      }
+      const { dropX, dropY } = computeDropCell(e.clientX, e.clientY)
+      const next: PieceDragState = {
+        pieceId,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        dropX,
+        dropY
+      }
+      pieceDragRef.current = next
+      setPieceDrag(next)
+      setSelectedPieceId(pieceId)
     }
-    if (selectedPieceId) {
-      setPositions((prev) => ({ ...prev, [selectedPieceId]: { x, y } }))
-      setSelectedPieceId(null)
+
+  const onPiecePointerMove = (e: React.PointerEvent<HTMLElement>) => {
+    const cur = pieceDragRef.current
+    if (!cur) return
+    e.stopPropagation()
+    const { dropX, dropY } = computeDropCell(e.clientX, e.clientY)
+    const next: PieceDragState = {
+      pieceId: cur.pieceId,
+      clientX: e.clientX,
+      clientY: e.clientY,
+      dropX,
+      dropY
     }
+    pieceDragRef.current = next
+    setPieceDrag(next)
+  }
+
+  const onPiecePointerUp = (e: React.PointerEvent<HTMLElement>) => {
+    const cur = pieceDragRef.current
+    if (!cur) return
+    e.stopPropagation()
+    try {
+      ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+    } catch {
+      /* ignore */
+    }
+    const { pieceId, dropX, dropY } = cur
+    pieceDragRef.current = null
+    setPieceDrag(null)
+    setSelectedPieceId(null)
+    if (dropX == null || dropY == null) return
+    const occupant = pieceAt(dropX, dropY)
+    if (occupant && pieceIdOf(occupant) !== pieceId) return
+    setPositions((prev) => ({ ...prev, [pieceId]: { x: dropX, y: dropY } }))
   }
 
   const basculerCondition = async (p: Participant, cle: ConditionKey) => {
@@ -616,6 +784,27 @@ function CombatInner() {
         await basculerCondition(p, 'inconscient')
       }
     }
+  }
+
+  const toggleSortDispo = async (entry: SortDispo) => {
+    const next = !entry.disponible
+    const { error } = await supabase
+      .from('personnage_sorts')
+      .update({ disponible: next })
+      .eq('id', entry.id)
+    if (error) {
+      console.error('[combat] toggle sort dispo :', error)
+      return
+    }
+    setPersoSorts((prev) => {
+      const list = prev[entry.personnage_id] ?? []
+      return {
+        ...prev,
+        [entry.personnage_id]: list.map((s) =>
+          s.id === entry.id ? { ...s, disponible: next } : s
+        )
+      }
+    })
   }
 
   const ajouterDeathSave = useCallback((pieceId: string, type: 'success' | 'failure') => {
@@ -758,7 +947,7 @@ function CombatInner() {
         <div className="flex items-center gap-4 mb-6">
           <button
             type="button"
-            onClick={() => (window.location.href = '/dashboard')}
+            onClick={() => router.back()}
             className="text-gray-400 hover:text-white"
           >
             {tc('back')}
@@ -923,8 +1112,7 @@ function CombatInner() {
         )}
 
         {combatDemarre && (
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4">
-            <div className="space-y-4">
+          <div className="space-y-4">
               <div className="bg-gray-800 p-4 rounded-lg">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-3 flex-wrap">
@@ -1279,6 +1467,26 @@ function CombatInner() {
                 )}
               </div>
 
+              {/* Panneau Participants — switch H/V + cartes dépliables */}
+              <ParticipantsPanel
+                participants={participantsEnCombat}
+                tourActuelId={tourActuelId}
+                etatsCombat={etatsCombat}
+                koAnimating={koAnimating}
+                expandedIds={expandedIds}
+                onToggleExpand={toggleExpand}
+                modifierHp={modifierHp}
+                basculerCondition={basculerCondition}
+                menuConditionsPour={menuConditionsPour}
+                setMenuConditionsPour={setMenuConditionsPour}
+                tCond={tCond}
+                tCombat={tCombat}
+                layoutMode={layoutMode}
+                changerLayoutMode={changerLayoutMode}
+                persoSorts={persoSorts}
+                onToggleSortDispo={toggleSortDispo}
+              />
+
               <div className="bg-gray-800 p-4 rounded-lg">
                 <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                   <h2 className="text-lg font-bold text-yellow-500">{tCombat('grid_title')}</h2>
@@ -1311,40 +1519,45 @@ function CombatInner() {
                   )}
                 </div>
 
-                {selectedPieceId && (
+                {pieceDrag && (
                   <p className="text-yellow-400 text-sm mb-2">
-                    {tCombat('move_hint')}
+                    Relâche sur une case libre pour placer la miniature.
                   </p>
                 )}
                 <div className="overflow-auto">
                   <div
-                    className="inline-grid border border-gray-700 rounded"
+                    ref={gridRef}
+                    className="inline-grid border border-gray-700 rounded relative"
                     style={{
                       gridTemplateColumns: `repeat(${GRID_COLS}, ${CELL_SIZE}px)`,
                       gridTemplateRows: `repeat(${GRID_ROWS}, ${CELL_SIZE}px)`,
                       backgroundColor: bgImageUrl ? undefined : '#111827',
                       backgroundImage: bgImageUrl ? `url(${bgImageUrl})` : undefined,
                       backgroundSize: 'cover',
-                      backgroundPosition: 'center'
+                      backgroundPosition: 'center',
+                      touchAction: 'none'
                     }}
                   >
                     {Array.from({ length: GRID_COLS * GRID_ROWS }).map((_, i) => {
                       const x = i % GRID_COLS
                       const y = Math.floor(i / GRID_COLS)
                       const p = pieceAt(x, y)
-                      const selected = p && selectedPieceId === pieceIdOf(p)
-                      const isTurn = p && tourActuelId === pieceIdOf(p)
-                      const canDrop = selectedPieceId && !p
+                      const pid = p ? pieceIdOf(p) : null
+                      const isDragged = pid != null && pieceDrag?.pieceId === pid
+                      const isTurn = p && tourActuelId === pid
+                      const isDropTarget =
+                        pieceDrag &&
+                        pieceDrag.dropX === x &&
+                        pieceDrag.dropY === y &&
+                        (!p || pid === pieceDrag.pieceId)
                       return (
-                        <button
+                        <div
                           key={i}
-                          type="button"
-                          onClick={() => onCellClick(x, y)}
                           className={`flex items-center justify-center transition ${
                             bgImageUrl
-                              ? 'border border-white/20 hover:border-white/40'
+                              ? 'border border-white/20'
                               : 'border border-gray-700/60'
-                          } ${canDrop ? 'hover:bg-yellow-500/20' : ''}`}
+                          } ${isDropTarget ? 'bg-yellow-500/30 ring-2 ring-yellow-400' : ''}`}
                           style={{ width: CELL_SIZE, height: CELL_SIZE }}
                         >
                           {p && (
@@ -1353,33 +1566,90 @@ function CombatInner() {
                                 src={p.image_url}
                                 alt={p.nom}
                                 title={`${p.nom} (${p.hp_actuel}/${p.hp_max})`}
+                                draggable={false}
                                 loading="lazy"
+                                onPointerDown={onPiecePointerDown(pid!)}
+                                onPointerMove={onPiecePointerMove}
+                                onPointerUp={onPiecePointerUp}
+                                onPointerCancel={onPiecePointerUp}
                                 className={`w-7 h-7 ${
                                   p.kind === 'perso' ? 'rounded-full' : 'rounded'
-                                } object-cover shadow-md ring-2 ${
+                                } object-cover shadow-md ring-2 cursor-grab active:cursor-grabbing select-none ${
                                   p.kind === 'perso' ? 'ring-blue-400' : 'ring-red-400'
-                                } ${selected ? '!ring-yellow-300 scale-110' : ''} ${
+                                } ${
                                   isTurn ? '!ring-yellow-400 animate-pulse' : ''
                                 }`}
+                                style={{ touchAction: 'none', opacity: isDragged ? 0.25 : 1 }}
                               />
                             ) : (
                               <div
-                                className={`w-7 h-7 flex items-center justify-center font-bold text-xs text-white shadow-md ${
+                                onPointerDown={onPiecePointerDown(pid!)}
+                                onPointerMove={onPiecePointerMove}
+                                onPointerUp={onPiecePointerUp}
+                                onPointerCancel={onPiecePointerUp}
+                                className={`w-7 h-7 flex items-center justify-center font-bold text-xs text-white shadow-md cursor-grab active:cursor-grabbing select-none ${
                                   p.kind === 'perso'
                                     ? 'rounded-full bg-blue-500'
                                     : 'rounded bg-red-500'
-                                } ${selected ? 'ring-2 ring-yellow-300 scale-110' : ''} ${
+                                } ${
                                   isTurn ? 'ring-2 ring-yellow-400 animate-pulse' : ''
                                 }`}
                                 title={`${p.nom} (${p.hp_actuel}/${p.hp_max})`}
+                                style={{ touchAction: 'none', opacity: isDragged ? 0.25 : 1 }}
                               >
                                 {p.nom.slice(0, 2).toUpperCase() || '?'}
                               </div>
                             )
                           )}
-                        </button>
+                        </div>
                       )
                     })}
+
+                    {/* Ghost flottant à la position du pointeur pendant le drag */}
+                    {pieceDrag && (() => {
+                      const dragged = participantsEnCombat.find(
+                        (pp) => pieceIdOf(pp) === pieceDrag.pieceId
+                      )
+                      if (!dragged) return null
+                      const rect = gridRef.current?.getBoundingClientRect()
+                      const ghostLeft = rect ? pieceDrag.clientX - rect.left - 14 : 0
+                      const ghostTop = rect ? pieceDrag.clientY - rect.top - 14 : 0
+                      return (
+                        <div
+                          className="pointer-events-none absolute z-30"
+                          style={{
+                            left: ghostLeft,
+                            top: ghostTop,
+                            opacity: 0.85
+                          }}
+                        >
+                          {dragged.image_url ? (
+                            <img
+                              src={dragged.image_url}
+                              alt=""
+                              draggable={false}
+                              className={`w-7 h-7 ${
+                                dragged.kind === 'perso' ? 'rounded-full' : 'rounded'
+                              } object-cover shadow-2xl ring-2 ${
+                                dragged.kind === 'perso'
+                                  ? 'ring-blue-300'
+                                  : 'ring-red-300'
+                              }`}
+                            />
+                          ) : (
+                            <div
+                              className={`w-7 h-7 flex items-center justify-center font-bold text-xs text-white shadow-2xl ring-2 ring-yellow-300 ${
+                                dragged.kind === 'perso'
+                                  ? 'rounded-full bg-blue-500'
+                                  : 'rounded bg-red-500'
+                              }`}
+                            >
+                              {dragged.nom.slice(0, 2).toUpperCase() || '?'}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
                 </div>
                 <div className="flex gap-4 text-xs text-gray-400 mt-3">
@@ -1488,193 +1758,19 @@ function CombatInner() {
               </div>
             </div>
 
-            <div className="bg-gray-800 p-4 rounded-lg lg:sticky lg:top-4 lg:self-start max-h-[85vh] overflow-y-auto">
-              <h2 className="text-lg font-bold text-yellow-500 mb-3">{tCombat('hp_title')}</h2>
-              {participantsEnCombat.length === 0 ? (
-                <p className="text-gray-400 text-sm">{tCombat('no_participants')}</p>
-              ) : (
-                <div className="space-y-2">
-                  {participantsEnCombat.map((p) => {
-                    const pct = p.hp_max > 0 ? (p.hp_actuel / p.hp_max) * 100 : 0
-                    const barColor =
-                      pct <= 25 ? 'bg-red-500' : pct <= 50 ? 'bg-orange-500' : 'bg-green-500'
-                    const isTurn = tourActuelId === pieceIdOf(p)
-                    return (
-                      <div
-                        key={pieceIdOf(p)}
-                        className={`p-3 rounded border ${
-                          isTurn ? 'border-yellow-400 bg-gray-700/50' : 'border-gray-700 bg-gray-900/50'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span
-                            className={`w-3 h-3 rounded-full ${
-                              p.kind === 'perso' ? 'bg-blue-500' : 'bg-red-500'
-                            }`}
-                          />
-                          <span className="text-white font-bold truncate">{p.nom}</span>
-                        </div>
-                        <div className="h-2 bg-gray-700 rounded overflow-hidden mb-2">
-                          <div
-                            className={`h-full transition-all ${barColor}`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-gray-300 text-sm">
-                            ❤️ {p.hp_actuel}/{p.hp_max}
-                          </span>
-                          <div className="flex gap-1">
-                            <button
-                              type="button"
-                              onClick={() => modifierHp(p, -5)}
-                              className="w-7 h-7 bg-red-700 rounded text-white text-xs font-bold hover:bg-red-600"
-                              title="-5 PV"
-                            >
-                              -5
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => modifierHp(p, -1)}
-                              className="w-7 h-7 bg-red-600 rounded text-white font-bold hover:bg-red-500"
-                              title="-1 PV"
-                            >
-                              -
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => modifierHp(p, 1)}
-                              className="w-7 h-7 bg-green-600 rounded text-white font-bold hover:bg-green-500"
-                              title="+1 PV"
-                            >
-                              +
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => modifierHp(p, 5)}
-                              className="w-7 h-7 bg-green-700 rounded text-white text-xs font-bold hover:bg-green-600"
-                              title="+5 PV"
-                            >
-                              +5
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="mt-2 pt-2 border-t border-gray-700/60">
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <span className="text-[10px] uppercase tracking-[0.15em] text-gray-500">
-                              {tCombat('conditions_count', { n: p.conditions.length })}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setMenuConditionsPour((prev) =>
-                                  prev === pieceIdOf(p) ? null : pieceIdOf(p)
-                                )
-                              }
-                              className="px-2 py-0.5 rounded bg-purple-700 hover:bg-purple-600 text-white text-[11px] font-bold"
-                              title={tCombat('add_condition_tooltip')}
-                            >
-                              {tCombat('add_condition')}
-                            </button>
-                          </div>
-
-                          {p.conditions.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mb-1">
-                              {p.conditions.map((cle) => {
-                                const c = CONDITIONS_MAP[cle]
-                                if (!c) return null
-                                const nomTr = tCond(cle)
-                                return (
-                                  <button
-                                    key={cle}
-                                    type="button"
-                                    onClick={() => basculerCondition(p, cle)}
-                                    className="group relative inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-900/60 border border-purple-500/60 hover:bg-red-900/60 hover:border-red-500/60 text-purple-100 text-[11px] transition"
-                                    title={`${nomTr} — ${c.description} (${tCombat('click_to_remove')})`}
-                                  >
-                                    <span>{c.icone}</span>
-                                    <span>{nomTr}</span>
-                                    <span className="opacity-0 group-hover:opacity-100 transition text-red-200 ml-0.5">
-                                      ✕
-                                    </span>
-                                    <span
-                                      className="pointer-events-none absolute left-0 top-full mt-1 z-20 hidden group-hover:block w-64 p-2 rounded bg-gray-900 border border-purple-600/60 text-[11px] text-gray-200 shadow-xl"
-                                      style={{ letterSpacing: 'normal', textTransform: 'none', fontWeight: 400 }}
-                                    >
-                                      <span className="block font-bold text-purple-200 mb-1">
-                                        {c.icone} {nomTr}
-                                      </span>
-                                      <span className="block text-gray-300 mb-1">{c.description}</span>
-                                      {c.effets.length > 0 && (
-                                        <span className="block text-gray-400 text-[10px]">
-                                          {c.effets.map((eff, i) => (
-                                            <span key={i} className="block">• {eff}</span>
-                                          ))}
-                                        </span>
-                                      )}
-                                    </span>
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          )}
-
-                          {menuConditionsPour === pieceIdOf(p) && (
-                            <div className="mt-1 p-2 rounded bg-gray-900/90 border border-purple-600/40 max-h-56 overflow-y-auto">
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-[10px] uppercase tracking-[0.15em] text-purple-300">
-                                  {tCombat('choose_condition')}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => setMenuConditionsPour(null)}
-                                  className="text-gray-400 hover:text-white text-xs"
-                                  aria-label="Fermer"
-                                >
-                                  ✕
-                                </button>
-                              </div>
-                              <div className="grid grid-cols-1 gap-0.5">
-                                {CONDITIONS.map((c) => {
-                                  const active = p.conditions.includes(c.key)
-                                  return (
-                                    <button
-                                      key={c.key}
-                                      type="button"
-                                      onClick={() => basculerCondition(p, c.key)}
-                                      title={c.description}
-                                      className={`flex items-center gap-2 px-2 py-1 rounded text-[11px] text-left transition ${
-                                        active
-                                          ? 'bg-purple-700/60 text-white'
-                                          : 'hover:bg-gray-800 text-gray-300'
-                                      }`}
-                                    >
-                                      <span className="text-base leading-none">{c.icone}</span>
-                                      <span className="flex-1">{tCond(c.key)}</span>
-                                      {active && <span className="text-green-300">✓</span>}
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
         )}
       </div>
 
       {koFlash && (
         <div
-          className={`fixed inset-0 z-30 pointer-events-none animate-ko-flash ${
-            koFlash === 'perso' ? 'bg-red-600/40' : 'bg-red-500/30'
-          }`}
+          className="fixed inset-0 z-30 pointer-events-none animate-ko-flash"
+          style={{
+            boxShadow:
+              koFlash === 'perso'
+                ? 'inset 0 0 120px 30px rgba(220,38,38,0.45)'
+                : 'inset 0 0 80px 20px rgba(220,38,38,0.25)',
+            background: 'transparent'
+          }}
         />
       )}
 
@@ -1716,5 +1812,567 @@ function CombatInner() {
         </div>
       )}
     </main>
+  )
+}
+
+// ============================================================================
+// ParticipantsPanel — switch H/V + cartes dépliables (Minimal Eclipsed Forge)
+// ============================================================================
+
+type ParticipantsPanelProps = {
+  participants: Participant[]
+  tourActuelId: string | null
+  etatsCombat: Record<string, EtatCombat>
+  koAnimating: Set<string>
+  expandedIds: Set<string>
+  onToggleExpand: (pieceId: string) => void
+  modifierHp: (p: Participant, delta: number) => Promise<void>
+  basculerCondition: (p: Participant, c: ConditionKey) => Promise<void>
+  menuConditionsPour: string | null
+  setMenuConditionsPour: React.Dispatch<React.SetStateAction<string | null>>
+  tCond: (key: string) => string
+  tCombat: (key: string, params?: Record<string, number | string>) => string
+  layoutMode: LayoutMode
+  changerLayoutMode: (mode: LayoutMode) => void
+  persoSorts: Record<string, SortDispo[]>
+  onToggleSortDispo: (entry: SortDispo) => Promise<void>
+}
+
+function ParticipantsPanel(props: ParticipantsPanelProps) {
+  const {
+    participants,
+    tourActuelId,
+    etatsCombat,
+    koAnimating,
+    expandedIds,
+    onToggleExpand,
+    modifierHp,
+    basculerCondition,
+    menuConditionsPour,
+    setMenuConditionsPour,
+    tCond,
+    tCombat,
+    layoutMode,
+    changerLayoutMode,
+    persoSorts,
+    onToggleSortDispo
+  } = props
+
+  const compagnons = participants.filter((p) => p.kind === 'perso')
+  const ennemis = participants.filter((p) => p.kind === 'ennemi')
+
+  const renderCards = (list: Participant[], emptyMsg: string) => {
+    if (list.length === 0) {
+      return (
+        <p className="text-gray-600 text-xs italic px-3 py-3">{emptyMsg}</p>
+      )
+    }
+    return list.map((p) => {
+      const pid = `${p.kind}-${p.id}`
+      return (
+        <ParticipantCard
+          key={pid}
+          p={p}
+          pieceId={pid}
+          isTurn={tourActuelId === pid}
+          isAnimatingKO={koAnimating.has(pid)}
+          expanded={expandedIds.has(pid)}
+          etat={etatsCombat[pid]}
+          onToggle={() => onToggleExpand(pid)}
+          modifierHp={modifierHp}
+          basculerCondition={basculerCondition}
+          menuConditionsPour={menuConditionsPour}
+          setMenuConditionsPour={setMenuConditionsPour}
+          tCond={tCond}
+          tCombat={tCombat}
+          layoutMode={layoutMode}
+          sorts={persoSorts[p.id] ?? []}
+          onToggleSortDispo={onToggleSortDispo}
+        />
+      )
+    })
+  }
+
+  return (
+    <div className="bg-[#0d0e12] rounded-lg p-4 border border-[rgba(201,168,76,0.18)]">
+      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+        <h2 className="text-[11px] uppercase tracking-[0.32em] text-[#c9a84c] font-bold">
+          ⚔ Participants
+        </h2>
+        <LayoutSwitch mode={layoutMode} onChange={changerLayoutMode} />
+      </div>
+
+      {layoutMode === 'horizontal' ? (
+        <div className="space-y-4">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.3em] text-blue-400/70 mb-2">
+              Compagnons ({compagnons.length})
+            </p>
+            <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 items-start">
+              {renderCards(compagnons, 'Aucun compagnon')}
+            </div>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.3em] text-red-400/70 mb-2">
+              Ennemis ({ennemis.length})
+            </p>
+            <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 items-start">
+              {renderCards(ennemis, 'Aucun ennemi')}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.3em] text-blue-400/70 mb-2">
+              Compagnons ({compagnons.length})
+            </p>
+            <div className="space-y-3">{renderCards(compagnons, 'Aucun compagnon')}</div>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.3em] text-red-400/70 mb-2">
+              Ennemis ({ennemis.length})
+            </p>
+            <div className="space-y-3">{renderCards(ennemis, 'Aucun ennemi')}</div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LayoutSwitch({
+  mode,
+  onChange
+}: {
+  mode: LayoutMode
+  onChange: (m: LayoutMode) => void
+}) {
+  return (
+    <div className="inline-flex rounded-md border border-[rgba(201,168,76,0.25)] bg-[#12141a] p-0.5 text-[11px] uppercase tracking-[0.18em]">
+      {(['horizontal', 'vertical'] as LayoutMode[]).map((m) => {
+        const actif = mode === m
+        return (
+          <button
+            key={m}
+            type="button"
+            onClick={() => onChange(m)}
+            className={`px-3 py-1 rounded transition ${
+              actif
+                ? 'bg-[#c9a84c]/15 text-[#e6c878]'
+                : 'text-gray-500 hover:text-gray-200'
+            }`}
+          >
+            {m === 'horizontal' ? '▭ Horizontal' : '▯ Vertical'}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+type ParticipantCardProps = {
+  p: Participant
+  pieceId: string
+  isTurn: boolean
+  isAnimatingKO: boolean
+  expanded: boolean
+  etat: EtatCombat | undefined
+  onToggle: () => void
+  modifierHp: (p: Participant, delta: number) => Promise<void>
+  basculerCondition: (p: Participant, c: ConditionKey) => Promise<void>
+  menuConditionsPour: string | null
+  setMenuConditionsPour: React.Dispatch<React.SetStateAction<string | null>>
+  tCond: (key: string) => string
+  tCombat: (key: string, params?: Record<string, number | string>) => string
+  layoutMode: LayoutMode
+  sorts: SortDispo[]
+  onToggleSortDispo: (entry: SortDispo) => Promise<void>
+}
+
+function ParticipantCard(props: ParticipantCardProps) {
+  const {
+    p,
+    pieceId,
+    isTurn,
+    isAnimatingKO,
+    expanded,
+    etat,
+    onToggle,
+    modifierHp,
+    basculerCondition,
+    menuConditionsPour,
+    setMenuConditionsPour,
+    tCond,
+    layoutMode,
+    sorts,
+    onToggleSortDispo
+  } = props
+
+  const isPerso = p.kind === 'perso'
+  const pct = p.hp_max > 0 ? (p.hp_actuel / p.hp_max) * 100 : 0
+  const barColor =
+    pct <= 25 ? 'bg-red-500' : pct <= 50 ? 'bg-orange-500' : 'bg-green-500'
+  const ca = isPerso ? p.ca ?? null : p.armure ?? null
+  const conditionMenuOuvert = menuConditionsPour === pieceId
+
+  // Tokens de bordure Minimal Eclipsed Forge
+  const baseBorder = isPerso
+    ? 'border-[rgba(201,168,76,0.2)]'
+    : 'border-[rgba(220,38,38,0.25)]'
+  const hoverBorder = isPerso
+    ? 'hover:border-[rgba(201,168,76,0.45)]'
+    : 'hover:border-[rgba(220,38,38,0.5)]'
+  const expandedBorder = 'border-[rgba(201,168,76,0.6)]'
+
+  const widthClass =
+    layoutMode === 'horizontal' ? 'w-[260px] flex-shrink-0' : 'w-full'
+
+  const initMod =
+    p.dexterite != null ? Math.floor((p.dexterite - 10) / 2) : null
+  const initStr =
+    initMod == null ? '—' : initMod >= 0 ? `+${initMod}` : `${initMod}`
+
+  // Classes d'animation KO appliquées sur la carte / le portrait. Les
+  // keyframes sont définies dans globals.css.
+  const cardKoClass = [
+    isAnimatingKO && isPerso ? 'ko-card-shake' : '',
+    isPerso && etat?.status === 'inconscient' ? 'ko-aura-perso' : ''
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  let imageEffectClass = ''
+  if (isAnimatingKO) {
+    imageEffectClass = isPerso ? 'ko-vacille-perso' : 'ko-fall-ennemi'
+  } else if (etat?.status === 'inconscient') {
+    imageEffectClass = 'ko-rest-perso'
+  } else if (etat?.status === 'mort') {
+    imageEffectClass = 'ko-rest-perso brightness-[0.4] saturate-50'
+  } else if (etat?.status === 'vaincu') {
+    imageEffectClass = 'ko-rest-ennemi'
+  } else if (etat?.status === 'stabilise') {
+    imageEffectClass = 'brightness-75'
+  }
+
+  return (
+    <div
+      data-piece-id={pieceId}
+      data-ko-status={etat?.status ?? 'none'}
+      data-ko-animating={isAnimatingKO ? 'true' : 'false'}
+      className={`relative rounded-lg bg-[#12141a] border transition-colors duration-200 ${widthClass} ${cardKoClass} ${
+        isTurn
+          ? 'mef-turn-active border-[rgba(201,168,76,0.85)]'
+          : expanded
+          ? expandedBorder
+          : `${baseBorder} ${hoverBorder}`
+      }`}
+    >
+      {/* En-tête compact — toujours visible, cliquable */}
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full text-left p-3 flex gap-3 items-center"
+        aria-expanded={expanded}
+      >
+        <div className="relative flex-shrink-0">
+          {p.image_url ? (
+            <img
+              src={p.image_url}
+              alt={p.nom}
+              loading="lazy"
+              className={`w-12 h-12 object-cover ${
+                isPerso ? 'rounded-full' : 'rounded'
+              } ring-1 ${
+                isPerso
+                  ? 'ring-[rgba(201,168,76,0.3)]'
+                  : 'ring-[rgba(220,38,38,0.4)]'
+              } ${imageEffectClass}`}
+              style={{ transformOrigin: 'center bottom' }}
+            />
+          ) : (
+            <div
+              className={`w-12 h-12 flex items-center justify-center font-bold text-white text-sm ${
+                isPerso
+                  ? 'rounded-full bg-[#1f2533]'
+                  : 'rounded bg-[#2a1717]'
+              } ${imageEffectClass}`}
+              style={{ transformOrigin: 'center bottom' }}
+            >
+              {p.nom.slice(0, 2).toUpperCase()}
+            </div>
+          )}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="font-semibold text-gray-100 truncate">{p.nom}</p>
+            {etat && (
+              <span className="text-[9px] tracking-widest text-red-300 font-bold uppercase">
+                {etat.status}
+              </span>
+            )}
+          </div>
+          <p className="text-[11px] text-gray-500 truncate">
+            {isPerso
+              ? `${p.classe ?? '—'}${p.niveau ? ` · Niv ${p.niveau}` : ''} · CA ${ca ?? '—'}`
+              : `Ennemi · CA ${ca ?? '—'}`}
+          </p>
+          <div className="mt-1.5 h-1.5 rounded-full bg-black/40 overflow-hidden">
+            <div
+              className={`h-full ${barColor} transition-all`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <p className="text-[10px] text-gray-500 mt-0.5">
+            ❤ {p.hp_actuel}/{p.hp_max}
+          </p>
+        </div>
+
+        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+          {isTurn && (
+            <span className="text-[9px] uppercase tracking-[0.25em] text-[#e6c878] font-bold whitespace-nowrap">
+              ← TOUR
+            </span>
+          )}
+          <span
+            className={`text-[#c9a84c]/70 text-sm transition-transform duration-300 ${
+              expanded ? 'rotate-180' : 'rotate-0'
+            }`}
+            aria-hidden="true"
+          >
+            ▾
+          </span>
+        </div>
+      </button>
+
+      {/* Panneau déplié — animation grid-template-rows pour transition smooth */}
+      <div
+        className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+          expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        }`}
+      >
+        <div className="overflow-hidden">
+          <div className="px-3 pb-3 pt-3 space-y-3 border-t border-[rgba(201,168,76,0.12)]">
+            {/* Stats grid 3x2 */}
+            <div className="grid grid-cols-3 gap-1.5">
+              {[
+                { label: 'CA', value: ca },
+                { label: 'VIT', value: isPerso ? p.vitesse ?? null : null },
+                { label: 'INIT', value: initStr },
+                { label: 'FOR', value: p.force ?? null },
+                { label: 'DEX', value: p.dexterite ?? null },
+                { label: 'CON', value: p.constitution ?? null }
+              ].map((s) => (
+                <div
+                  key={s.label}
+                  className="rounded border border-[rgba(201,168,76,0.18)] bg-black/30 px-2 py-1.5 text-center"
+                >
+                  <p className="text-[9px] tracking-[0.2em] text-[#c9a84c]/70 uppercase">
+                    {s.label}
+                  </p>
+                  <p className="text-sm font-bold text-gray-100">
+                    {s.value == null ? '—' : s.value}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* Armes — PJ uniquement */}
+            {isPerso && (
+              <CardSection title="⚔ ARMES">
+                {p.armes && p.armes.length > 0 ? (
+                  <ul className="space-y-1">
+                    {p.armes.map((a, i) => (
+                      <li
+                        key={i}
+                        className="flex items-center justify-between gap-2 text-xs"
+                      >
+                        <span className="text-gray-200 truncate">{a.nom}</span>
+                        <span className="text-[#c9a84c] font-mono text-[11px]">
+                          {a.degats || '—'}
+                          {a.bonus ? ` · ${a.bonus}` : ''}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-[11px] text-gray-600 italic">Aucune arme.</p>
+                )}
+              </CardSection>
+            )}
+
+            {/* Sorts — PJ uniquement */}
+            {isPerso && (
+              <CardSection title="✦ SORTS">
+                {sorts.length === 0 ? (
+                  <p className="text-[11px] text-gray-600 italic">
+                    Aucun sort attribué.
+                  </p>
+                ) : (
+                  <ul className="space-y-1">
+                    {sorts.map((s) => (
+                      <li
+                        key={s.id}
+                        className="flex items-center gap-2 text-xs"
+                      >
+                        <span className="w-5 h-5 rounded-full bg-black/50 border border-[rgba(201,168,76,0.3)] flex items-center justify-center text-[10px] font-bold text-[#c9a84c] flex-shrink-0">
+                          {s.niveau === 0 ? 'C' : s.niveau}
+                        </span>
+                        <span className="flex-1 truncate text-gray-200">
+                          {s.nom}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => onToggleSortDispo(s)}
+                          className={`text-[9px] tracking-[0.2em] font-bold px-2 py-0.5 rounded border transition ${
+                            s.disponible
+                              ? 'border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10'
+                              : 'border-gray-700 text-gray-500 hover:text-gray-300'
+                          }`}
+                        >
+                          {s.disponible ? 'DISPO' : 'UTILISÉ'}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardSection>
+            )}
+
+            {/* Conditions — libellé utilisateur "États" */}
+            <CardSection title="⚠ ÉTATS">
+              {p.conditions.length === 0 ? (
+                <p className="text-[11px] text-gray-600 italic">Aucune.</p>
+              ) : (
+                <div className="flex flex-wrap gap-1">
+                  {p.conditions.map((cle) => {
+                    const c = CONDITIONS_MAP[cle]
+                    if (!c) return null
+                    const nomTr = tCond(cle)
+                    return (
+                      <button
+                        key={cle}
+                        type="button"
+                        onClick={() => basculerCondition(p, cle)}
+                        title={`${nomTr} — ${c.description}`}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-purple-500/40 bg-purple-900/30 text-purple-100 text-[11px] hover:bg-red-900/40 hover:border-red-500/60 transition"
+                      >
+                        <span>{c.icone}</span>
+                        <span>{nomTr}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
+              {conditionMenuOuvert && (
+                <div className="mt-2 p-2 rounded bg-black/40 border border-[rgba(201,168,76,0.2)] max-h-56 overflow-y-auto">
+                  <div className="grid grid-cols-1 gap-0.5">
+                    {CONDITIONS.map((c) => {
+                      const active = p.conditions.includes(c.key)
+                      return (
+                        <button
+                          key={c.key}
+                          type="button"
+                          onClick={() => basculerCondition(p, c.key)}
+                          title={c.description}
+                          className={`flex items-center gap-2 px-2 py-1 rounded text-[11px] text-left transition ${
+                            active
+                              ? 'bg-purple-700/40 text-white'
+                              : 'hover:bg-white/[0.05] text-gray-300'
+                          }`}
+                        >
+                          <span className="text-base leading-none">{c.icone}</span>
+                          <span className="flex-1">{tCond(c.key)}</span>
+                          {active && <span className="text-emerald-300">✓</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </CardSection>
+
+            {/* Boutons d'action */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-1">
+              <CardActionButton
+                label="−1 HP"
+                tone="damage"
+                onClick={() => modifierHp(p, -1)}
+              />
+              <CardActionButton
+                label="+1 HP"
+                tone="heal"
+                onClick={() => modifierHp(p, 1)}
+              />
+              <CardActionButton
+                label="+ ÉTAT"
+                tone="neutral"
+                onClick={() =>
+                  setMenuConditionsPour((prev) =>
+                    prev === pieceId ? null : pieceId
+                  )
+                }
+              />
+              {isPerso ? (
+                <CardActionButton
+                  label="FICHE"
+                  tone="neutral"
+                  onClick={() =>
+                    (window.location.href = `/dashboard/personnages/${p.id}`)
+                  }
+                />
+              ) : (
+                <span aria-hidden="true" />
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CardSection({
+  title,
+  children
+}: {
+  title: string
+  children: React.ReactNode
+}) {
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-[0.25em] text-[#c9a84c]/80 font-bold mb-1.5">
+        {title}
+      </p>
+      {children}
+    </div>
+  )
+}
+
+function CardActionButton({
+  label,
+  onClick,
+  tone
+}: {
+  label: string
+  onClick: () => void
+  tone: 'damage' | 'heal' | 'neutral'
+}) {
+  const colorClass =
+    tone === 'damage'
+      ? 'border-red-700/50 text-red-300 hover:bg-red-700/30 hover:border-red-500'
+      : tone === 'heal'
+      ? 'border-emerald-700/50 text-emerald-300 hover:bg-emerald-700/30 hover:border-emerald-500'
+      : 'border-[rgba(201,168,76,0.35)] text-[#e6c878] hover:bg-[rgba(201,168,76,0.15)] hover:border-[rgba(201,168,76,0.7)]'
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-2 py-1.5 rounded border bg-transparent text-[10px] tracking-[0.18em] font-bold uppercase transition ${colorClass}`}
+    >
+      {label}
+    </button>
   )
 }

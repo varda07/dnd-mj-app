@@ -12,7 +12,32 @@ import {
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
-type NodeType = 'lieu' | 'pnj' | 'evenement' | 'indice'
+type NodeType = 'lieu' | 'pnj' | 'evenement' | 'indice' | 'custom'
+
+// Palette pour les types personnalisés (clé stockée en base, hex pour rendu)
+type CustomColorKey = 'or' | 'rouge' | 'vert' | 'bleu' | 'violet' | 'orange' | 'gris'
+
+const CUSTOM_COLOR_HEX: Record<CustomColorKey, string> = {
+  or: '#eab308',
+  rouge: '#ef4444',
+  vert: '#22c55e',
+  bleu: '#3b82f6',
+  violet: '#a855f7',
+  orange: '#f97316',
+  gris: '#6b7280'
+}
+
+const isCustomColorKey = (v: string | null | undefined): v is CustomColorKey =>
+  v === 'or' || v === 'rouge' || v === 'vert' || v === 'bleu' ||
+  v === 'violet' || v === 'orange' || v === 'gris'
+
+type CustomType = {
+  id: string
+  scenario_id: string
+  nom: string
+  couleur: CustomColorKey
+  icone: string
+}
 
 type NoteEntry = {
   id: string
@@ -23,18 +48,19 @@ type NoteEntry = {
 
 type MindNode = {
   id: string
-  scenario_id: string
+  mindmap_id: string
   type: NodeType
   titre: string
   contenu: string
   position_x: number
   position_y: number
   couleur: string | null
+  custom_type_id: string | null
 }
 
 type MindLink = {
   id: string
-  scenario_id: string
+  mindmap_id: string
   noeud_from: string
   noeud_to: string
   label: string | null
@@ -42,14 +68,40 @@ type MindLink = {
   annotation: string | null
 }
 
+type Mindmap = {
+  id: string
+  scenario_id: string
+  nom: string
+}
+
 type ScenarioLite = { id: string; nom: string }
 
-const TYPE_META: Record<NodeType, { label: string; icon: string; color: string }> = {
+// Métadonnées des types prédéfinis. Le type 'custom' n'apparaît pas ici car
+// son label/icône/couleur sont dynamiques et résolus via TYPE_META_RESOLVED.
+const BUILTIN_TYPE_META: Record<Exclude<NodeType, 'custom'>, { label: string; icon: string; color: string }> = {
   lieu: { label: 'Lieu', icon: '📍', color: '#3b82f6' },
   pnj: { label: 'PNJ', icon: '👤', color: '#a855f7' },
   evenement: { label: 'Événement', icon: '⚡', color: '#f97316' },
   indice: { label: 'Indice', icon: '🔍', color: '#22c55e' }
 }
+
+const CUSTOM_FALLBACK_META = { label: 'Personnalisé', icon: '✨', color: '#6b7280' }
+
+// Résout les métadonnées d'un noeud (gère builtins + types custom).
+function resolveNodeMeta(
+  node: { type: NodeType; custom_type_id: string | null },
+  customTypes: CustomType[]
+): { label: string; icon: string; color: string } {
+  if (node.type !== 'custom') return BUILTIN_TYPE_META[node.type]
+  const ct = customTypes.find((t) => t.id === node.custom_type_id)
+  if (!ct) return CUSTOM_FALLBACK_META
+  return { label: ct.nom, icon: ct.icone, color: CUSTOM_COLOR_HEX[ct.couleur] }
+}
+
+// Helpers existants (utilisés par les autres parties du composant) — pour
+// compatibilité, on conserve TYPE_META qui pointe vers les builtins. Les
+// chemins qui rendent un noeud passent désormais par resolveNodeMeta.
+const TYPE_META = BUILTIN_TYPE_META
 
 // Palette des couleurs de liens. La clé est stockée en base ('or', 'rouge', …)
 // et la valeur hex est utilisée pour le rendu SVG.
@@ -81,6 +133,10 @@ const MAX_SCALE = 5
 export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
   const router = useRouter()
   const [scenarioId, setScenarioId] = useState<string>(scenarios[0]?.id ?? '')
+  const [mindmaps, setMindmaps] = useState<Mindmap[]>([])
+  const [mindmapId, setMindmapId] = useState<string>('')
+  const [customTypes, setCustomTypes] = useState<CustomType[]>([])
+  const [customCreatorOpen, setCustomCreatorOpen] = useState(false)
   const [nodes, setNodes] = useState<MindNode[]>([])
   const [links, setLinks] = useState<MindLink[]>([])
   const [pendingFrom, setPendingFrom] = useState<string | null>(null)
@@ -180,17 +236,80 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
     }
   }, [])
 
+  // Charge les types de noeud personnalisés du scénario sélectionné.
   useEffect(() => {
     if (!scenarioId) {
+      setCustomTypes([])
+      return
+    }
+    const load = async () => {
+      const { data } = await supabase
+        .from('mindmap_types_custom')
+        .select('id, scenario_id, nom, couleur, icone')
+        .eq('scenario_id', scenarioId)
+        .order('created_at', { ascending: true })
+      const list: CustomType[] = ((data ?? []) as Array<{
+        id: string
+        scenario_id: string
+        nom: string
+        couleur: string
+        icone: string
+      }>).map((row) => ({
+        id: row.id,
+        scenario_id: row.scenario_id,
+        nom: row.nom,
+        couleur: isCustomColorKey(row.couleur) ? row.couleur : 'gris',
+        icone: row.icone || '✨'
+      }))
+      setCustomTypes(list)
+    }
+    load()
+  }, [scenarioId])
+
+  // Charge la liste des cartes mentales du scénario sélectionné. S'il n'en
+  // existe aucune, on en crée une par défaut pour ne jamais afficher l'écran
+  // vide.
+  useEffect(() => {
+    if (!scenarioId) {
+      setMindmaps([])
+      setMindmapId('')
       setNodes([])
       setLinks([])
       setNotes([])
       return
     }
+    const loadMindmaps = async () => {
+      const { data } = await supabase
+        .from('mindmaps')
+        .select('id, scenario_id, nom')
+        .eq('scenario_id', scenarioId)
+        .order('created_at', { ascending: true })
+      let list = (data as Mindmap[]) ?? []
+      if (list.length === 0) {
+        const { data: created } = await supabase
+          .from('mindmaps')
+          .insert({ scenario_id: scenarioId, nom: 'Carte principale' })
+          .select('id, scenario_id, nom')
+          .single()
+        if (created) list = [created as Mindmap]
+      }
+      setMindmaps(list)
+      setMindmapId(list[0]?.id ?? '')
+    }
+    loadMindmaps()
+  }, [scenarioId])
+
+  // Charge les noeuds et liens de la carte mentale sélectionnée.
+  useEffect(() => {
+    if (!mindmapId) {
+      setNodes([])
+      setLinks([])
+      return
+    }
     const load = async () => {
       const [n, l] = await Promise.all([
-        supabase.from('mindmap_noeuds').select('*').eq('scenario_id', scenarioId),
-        supabase.from('mindmap_liens').select('*').eq('scenario_id', scenarioId)
+        supabase.from('mindmap_noeuds').select('*').eq('mindmap_id', mindmapId),
+        supabase.from('mindmap_liens').select('*').eq('mindmap_id', mindmapId)
       ])
       setNodes((n.data as MindNode[]) ?? [])
       setLinks((l.data as MindLink[]) ?? [])
@@ -198,7 +317,7 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
       setView({ x: 0, y: 0, scale: 1 })
     }
     load()
-  }, [scenarioId])
+  }, [mindmapId])
 
   const fetchNotes = async () => {
     if (!scenarioId) {
@@ -242,8 +361,63 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
 
-  const addNode = async (type: NodeType) => {
+  const creerMindmap = async () => {
     if (!scenarioId) return
+    const nom = window.prompt('Nom de la nouvelle carte mentale ?', 'Nouvelle carte')
+    if (!nom || !nom.trim()) return
+    const { data, error } = await supabase
+      .from('mindmaps')
+      .insert({ scenario_id: scenarioId, nom: nom.trim() })
+      .select('id, scenario_id, nom')
+      .single()
+    if (error) {
+      console.error('[mindmap] insert mindmap échec :', error)
+      return
+    }
+    if (data) {
+      setMindmaps((prev) => [...prev, data as Mindmap])
+      setMindmapId((data as Mindmap).id)
+    }
+  }
+
+  const renommerMindmap = async (id: string) => {
+    const courant = mindmaps.find((m) => m.id === id)
+    if (!courant) return
+    const nom = window.prompt('Nouveau nom de la carte ?', courant.nom)
+    if (!nom || !nom.trim() || nom.trim() === courant.nom) return
+    const { error } = await supabase
+      .from('mindmaps')
+      .update({ nom: nom.trim() })
+      .eq('id', id)
+    if (error) {
+      console.error('[mindmap] rename échec :', error)
+      return
+    }
+    setMindmaps((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, nom: nom.trim() } : m))
+    )
+  }
+
+  const supprimerMindmap = async (id: string) => {
+    if (mindmaps.length <= 1) {
+      alert('Impossible de supprimer la dernière carte mentale du scénario.')
+      return
+    }
+    const courant = mindmaps.find((m) => m.id === id)
+    if (!courant) return
+    if (!confirm(`Supprimer la carte « ${courant.nom} » et tous ses noeuds/liens ?`)) return
+    const { error } = await supabase.from('mindmaps').delete().eq('id', id)
+    if (error) {
+      console.error('[mindmap] delete mindmap échec :', error)
+      return
+    }
+    const restantes = mindmaps.filter((m) => m.id !== id)
+    setMindmaps(restantes)
+    if (mindmapId === id) setMindmapId(restantes[0]?.id ?? '')
+  }
+
+  const addNode = async (type: Exclude<NodeType, 'custom'>) => {
+    if (!mindmapId) return
     const rect = canvasRef.current?.getBoundingClientRect()
     const w = rect?.width ?? 800
     const h = rect?.height ?? 600
@@ -251,14 +425,16 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
     const cx = (w / 2 - v.x) / v.scale
     const cy = (h / 2 - v.y) / v.scale
     const jitter = () => Math.round((Math.random() - 0.5) * 120)
+    const meta = BUILTIN_TYPE_META[type]
     const payload = {
-      scenario_id: scenarioId,
+      mindmap_id: mindmapId,
       type,
-      titre: TYPE_META[type].label,
+      titre: meta.label,
       contenu: '',
       position_x: Math.round(cx + jitter()),
       position_y: Math.round(cy + jitter()),
-      couleur: TYPE_META[type].color
+      couleur: meta.color,
+      custom_type_id: null
     }
     const { data, error } = await supabase
       .from('mindmap_noeuds')
@@ -270,6 +446,87 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
       return
     }
     if (data) setNodes((ns) => [...ns, data as MindNode])
+  }
+
+  // Ajoute un noeud d'un type personnalisé (référence à mindmap_types_custom).
+  const addCustomNode = async (customTypeId: string) => {
+    if (!mindmapId) return
+    const ct = customTypes.find((t) => t.id === customTypeId)
+    if (!ct) return
+    const rect = canvasRef.current?.getBoundingClientRect()
+    const w = rect?.width ?? 800
+    const h = rect?.height ?? 600
+    const v = viewRef.current
+    const cx = (w / 2 - v.x) / v.scale
+    const cy = (h / 2 - v.y) / v.scale
+    const jitter = () => Math.round((Math.random() - 0.5) * 120)
+    const payload = {
+      mindmap_id: mindmapId,
+      type: 'custom' as const,
+      titre: ct.nom,
+      contenu: '',
+      position_x: Math.round(cx + jitter()),
+      position_y: Math.round(cy + jitter()),
+      couleur: CUSTOM_COLOR_HEX[ct.couleur],
+      custom_type_id: ct.id
+    }
+    const { data, error } = await supabase
+      .from('mindmap_noeuds')
+      .insert(payload)
+      .select()
+      .single()
+    if (error) {
+      console.error('[mindmap] insert noeud custom échec :', error)
+      return
+    }
+    if (data) setNodes((ns) => [...ns, data as MindNode])
+  }
+
+  // Crée un nouveau type personnalisé pour le scénario courant.
+  const creerCustomType = async (
+    nom: string,
+    couleur: CustomColorKey,
+    icone: string
+  ) => {
+    if (!scenarioId) return null
+    const trimmed = nom.trim()
+    if (!trimmed) return null
+    const { data, error } = await supabase
+      .from('mindmap_types_custom')
+      .insert({
+        scenario_id: scenarioId,
+        nom: trimmed,
+        couleur,
+        icone: icone.trim() || '✨'
+      })
+      .select('id, scenario_id, nom, couleur, icone')
+      .single()
+    if (error || !data) {
+      console.error('[mindmap] insert custom type échec :', error)
+      return null
+    }
+    const created: CustomType = {
+      id: data.id,
+      scenario_id: data.scenario_id,
+      nom: data.nom,
+      couleur: isCustomColorKey(data.couleur) ? data.couleur : 'gris',
+      icone: data.icone || '✨'
+    }
+    setCustomTypes((prev) => [...prev, created])
+    return created
+  }
+
+  const supprimerCustomType = async (id: string) => {
+    if (!confirm('Supprimer ce type personnalisé ? Les noeuds existants conserveront leur libellé mais perdront le lien avec le type.')) return
+    const { error } = await supabase
+      .from('mindmap_types_custom')
+      .delete()
+      .eq('id', id)
+    if (error) {
+      console.error('[mindmap] delete custom type échec :', error)
+      return
+    }
+    setCustomTypes((prev) => prev.filter((t) => t.id !== id))
   }
 
   const connect = useCallback((from: string, to: string) => {
@@ -296,10 +553,11 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
     const couleur = linkEditor.couleur
     const annotation = linkEditor.annotation.slice(0, ANNOTATION_MAX)
     if (linkEditor.mode === 'create') {
+      if (!mindmapId) return
       const { data, error } = await supabase
         .from('mindmap_liens')
         .insert({
-          scenario_id: scenarioId,
+          mindmap_id: mindmapId,
           noeud_from: linkEditor.from,
           noeud_to: linkEditor.to,
           couleur,
@@ -625,19 +883,54 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
           )}
         </select>
         <div className="flex flex-wrap gap-1">
-          {(Object.keys(TYPE_META) as NodeType[]).map((t) => (
+          {(Object.keys(BUILTIN_TYPE_META) as Array<Exclude<NodeType, 'custom'>>).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => addNode(t)}
               disabled={!scenarioId}
               className="px-3 py-2 rounded-full text-sm font-bold text-white disabled:opacity-40"
-              style={{ backgroundColor: TYPE_META[t].color }}
-              title={`Ajouter ${TYPE_META[t].label}`}
+              style={{ backgroundColor: BUILTIN_TYPE_META[t].color }}
+              title={`Ajouter ${BUILTIN_TYPE_META[t].label}`}
             >
-              {TYPE_META[t].icon} {TYPE_META[t].label}
+              {BUILTIN_TYPE_META[t].icon} {BUILTIN_TYPE_META[t].label}
             </button>
           ))}
+          {customTypes.map((ct) => (
+            <span
+              key={ct.id}
+              className="group inline-flex items-stretch rounded-full overflow-hidden disabled:opacity-40"
+            >
+              <button
+                type="button"
+                onClick={() => addCustomNode(ct.id)}
+                disabled={!scenarioId}
+                className="px-3 py-2 text-sm font-bold text-white"
+                style={{ backgroundColor: CUSTOM_COLOR_HEX[ct.couleur] }}
+                title={`Ajouter ${ct.nom}`}
+              >
+                {ct.icone} {ct.nom}
+              </button>
+              <button
+                type="button"
+                onClick={() => supprimerCustomType(ct.id)}
+                className="px-2 text-white/70 hover:text-red-200 hover:bg-black/30"
+                title="Supprimer ce type personnalisé"
+                style={{ backgroundColor: CUSTOM_COLOR_HEX[ct.couleur] }}
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+          <button
+            type="button"
+            onClick={() => setCustomCreatorOpen(true)}
+            disabled={!scenarioId}
+            className="px-3 py-2 rounded-full text-sm font-bold text-yellow-300 bg-gray-800 border border-yellow-600/50 hover:bg-gray-700 disabled:opacity-40"
+            title="Créer un type personnalisé"
+          >
+            ✨ Personnalisé
+          </button>
         </div>
         <button
           type="button"
@@ -657,6 +950,59 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
           molette/pinch = zoom · glisser le fond = déplacer
         </p>
       </div>
+
+      {scenarioId && (
+        <div className="px-3 py-2 border-b border-gray-700 bg-gray-900/40 flex flex-wrap items-center gap-1">
+          <span className="text-[11px] uppercase tracking-[0.18em] text-gray-500 mr-1">
+            Cartes mentales
+          </span>
+          {mindmaps.map((m) => {
+            const actif = m.id === mindmapId
+            return (
+              <div
+                key={m.id}
+                className={`group flex items-center gap-1 rounded-full pl-3 pr-1 py-1 text-sm border transition ${
+                  actif
+                    ? 'bg-yellow-500/15 border-yellow-500 text-yellow-200'
+                    : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => setMindmapId(m.id)}
+                  className="font-medium"
+                >
+                  {m.nom}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => renommerMindmap(m.id)}
+                  className="opacity-60 hover:opacity-100 hover:text-yellow-300 px-1"
+                  title="Renommer"
+                >
+                  ✏️
+                </button>
+                <button
+                  type="button"
+                  onClick={() => supprimerMindmap(m.id)}
+                  className="opacity-60 hover:opacity-100 hover:text-red-400 px-1"
+                  title="Supprimer"
+                >
+                  🗑️
+                </button>
+              </div>
+            )
+          })}
+          <button
+            type="button"
+            onClick={creerMindmap}
+            className="px-3 py-1 rounded-full text-sm font-bold bg-gray-700 hover:bg-gray-600 text-yellow-400 border border-gray-600"
+            title="Nouvelle carte mentale"
+          >
+            ➕ Nouvelle carte mentale
+          </button>
+        </div>
+      )}
 
       {pendingFrom && (
         <div className="bg-yellow-500/15 border-b-2 border-yellow-500 px-3 py-2 text-sm text-yellow-400 flex items-center justify-between gap-2">
@@ -716,6 +1062,7 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
                   link={l}
                   fromNode={a}
                   toNode={b}
+                  customTypes={customTypes}
                   onPointerDown={onLinkPointerDown}
                   onContextMenu={onLinkContextMenu}
                 />
@@ -727,6 +1074,7 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
             <MindNodeView
               key={n.id}
               node={n}
+              customTypes={customTypes}
               selected={pendingFrom === n.id}
               onPointerDown={onNodePointerDown}
               onContextMenu={onNodeContextMenu}
@@ -922,7 +1270,7 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
                   {related.map((l) => {
                     const otherId = l.noeud_from === linksBrowser ? l.noeud_to : l.noeud_from
                     const other = nodes.find((n) => n.id === otherId)
-                    const meta = other ? TYPE_META[other.type] : null
+                    const meta = other ? resolveNodeMeta(other, customTypes) : null
                     return (
                       <li
                         key={l.id}
@@ -1030,11 +1378,13 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
         const toId = linkEditor.mode === 'create' ? linkEditor.to : linkEditor.link.noeud_to
         const a = nodes.find((n) => n.id === fromId)
         const b = nodes.find((n) => n.id === toId)
+        const metaA = a ? resolveNodeMeta(a, customTypes) : null
+        const metaB = b ? resolveNodeMeta(b, customTypes) : null
         const autoHint =
-          a && b
-            ? a.type === b.type
-              ? TYPE_META[a.type].label
-              : `${TYPE_META[a.type].label} ↔ ${TYPE_META[b.type].label}`
+          metaA && metaB
+            ? metaA.label === metaB.label
+              ? metaA.label
+              : `${metaA.label} ↔ ${metaB.label}`
             : ''
         return (
           <div
@@ -1048,20 +1398,20 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
               <h3 className="text-yellow-500 font-bold">
                 {linkEditor.mode === 'create' ? '🔗 Nouveau lien' : '🎨 Modifier le lien'}
               </h3>
-              {a && b && (
+              {a && b && metaA && metaB && (
                 <p className="text-gray-300 text-sm flex items-center gap-2 flex-wrap">
                   <span
                     className="px-2 py-0.5 rounded-full text-xs font-bold"
-                    style={{ backgroundColor: `${TYPE_META[a.type].color}33`, color: TYPE_META[a.type].color }}
+                    style={{ backgroundColor: `${metaA.color}33`, color: metaA.color }}
                   >
-                    {TYPE_META[a.type].icon} {a.titre || TYPE_META[a.type].label}
+                    {metaA.icon} {a.titre || metaA.label}
                   </span>
                   <span className="text-gray-500">↔</span>
                   <span
                     className="px-2 py-0.5 rounded-full text-xs font-bold"
-                    style={{ backgroundColor: `${TYPE_META[b.type].color}33`, color: TYPE_META[b.type].color }}
+                    style={{ backgroundColor: `${metaB.color}33`, color: metaB.color }}
                   >
-                    {TYPE_META[b.type].icon} {b.titre || TYPE_META[b.type].label}
+                    {metaB.icon} {b.titre || metaB.label}
                   </span>
                 </p>
               )}
@@ -1168,7 +1518,10 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-yellow-500 font-bold">
-              {TYPE_META[editingNode.type].icon} Éditer {TYPE_META[editingNode.type].label}
+              {(() => {
+                const m = resolveNodeMeta(editingNode, customTypes)
+                return `${m.icon} Éditer ${m.label}`
+              })()}
             </h3>
             <input
               type="text"
@@ -1202,24 +1555,163 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
           </div>
         </div>
       )}
+
+      {customCreatorOpen && (
+        <CustomTypeCreator
+          onCancel={() => setCustomCreatorOpen(false)}
+          onCreate={async (nom, couleur, icone) => {
+            const created = await creerCustomType(nom, couleur, icone)
+            if (created) {
+              setCustomCreatorOpen(false)
+              // Place tout de suite un noeud du nouveau type au centre.
+              await addCustomNode(created.id)
+            }
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
+// CustomTypeCreator — modale de création d'un type personnalisé
+// ============================================================================
+
+function CustomTypeCreator({
+  onCancel,
+  onCreate
+}: {
+  onCancel: () => void
+  onCreate: (
+    nom: string,
+    couleur: CustomColorKey,
+    icone: string
+  ) => Promise<void>
+}) {
+  const [nom, setNom] = useState('')
+  const [couleur, setCouleur] = useState<CustomColorKey>('or')
+  const [icone, setIcone] = useState('✨')
+  const [submitting, setSubmitting] = useState(false)
+
+  const submit = async () => {
+    if (!nom.trim() || submitting) return
+    setSubmitting(true)
+    try {
+      await onCreate(nom, couleur, icone)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 z-[80] flex items-center justify-center p-4"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-gray-800 border-2 border-yellow-600 rounded-lg shadow-2xl w-full max-w-md p-4 space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-yellow-500 font-bold flex items-center gap-2">
+          ✨ Nouveau type personnalisé
+        </h3>
+
+        <div>
+          <label className="text-[11px] uppercase tracking-[0.18em] text-gray-400 block mb-1">
+            Nom du type
+          </label>
+          <input
+            type="text"
+            value={nom}
+            onChange={(e) => setNom(e.target.value)}
+            placeholder="Quête, Trésor, Faction…"
+            maxLength={40}
+            autoFocus
+            className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="text-[11px] uppercase tracking-[0.18em] text-gray-400 block mb-2">
+            Couleur
+          </label>
+          <div className="grid grid-cols-7 gap-2">
+            {(Object.keys(CUSTOM_COLOR_HEX) as CustomColorKey[]).map((key) => {
+              const actif = couleur === key
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setCouleur(key)}
+                  className={`w-10 h-10 rounded-full border-2 transition ${
+                    actif
+                      ? 'border-yellow-400 scale-110'
+                      : 'border-gray-700 hover:border-gray-500'
+                  }`}
+                  style={{ backgroundColor: CUSTOM_COLOR_HEX[key] }}
+                  title={key}
+                  aria-label={key}
+                />
+              )
+            })}
+          </div>
+        </div>
+
+        <div>
+          <label className="text-[11px] uppercase tracking-[0.18em] text-gray-400 block mb-1">
+            Icône (emoji)
+          </label>
+          <input
+            type="text"
+            value={icone}
+            onChange={(e) => setIcone(e.target.value)}
+            maxLength={4}
+            placeholder="✨"
+            className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm text-center text-2xl"
+          />
+          <p className="text-[10px] text-gray-500 mt-1 italic">
+            Tape n&apos;importe quel emoji ou caractère court (max 4 chars).
+          </p>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!nom.trim() || submitting}
+            className="flex-1 p-2 bg-yellow-500 text-gray-900 font-bold rounded hover:bg-yellow-400 disabled:opacity-50"
+          >
+            {submitting ? 'Création…' : 'Créer le type'}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 p-2 bg-gray-700 text-white rounded hover:bg-gray-600"
+          >
+            Annuler
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
 
 const MindNodeView = memo(function MindNodeView({
   node,
+  customTypes,
   selected,
   onPointerDown,
   onContextMenu,
   onDoubleClick
 }: {
   node: MindNode
+  customTypes: CustomType[]
   selected: boolean
   onPointerDown: (e: ReactPointerEvent<HTMLDivElement>, node: MindNode) => void
   onContextMenu: (e: ReactMouseEvent<HTMLDivElement>, node: MindNode) => void
   onDoubleClick: (node: MindNode) => void
 }) {
-  const meta = TYPE_META[node.type]
+  const meta = resolveNodeMeta(node, customTypes)
   const color = node.couleur ?? meta.color
   return (
     <div
@@ -1263,22 +1755,29 @@ const MindLinkView = memo(function MindLinkView({
   link,
   fromNode,
   toNode,
+  customTypes,
   onPointerDown,
   onContextMenu
 }: {
   link: MindLink
   fromNode: MindNode
   toNode: MindNode
+  customTypes: CustomType[]
   onPointerDown: (e: ReactPointerEvent<SVGLineElement>, link: MindLink) => void
   onContextMenu: (e: ReactMouseEvent<SVGLineElement>, link: MindLink) => void
 }) {
   const a = fromNode
   const b = toNode
+  const metaA = resolveNodeMeta(a, customTypes)
+  const metaB = resolveNodeMeta(b, customTypes)
   const colorKey = isColorKey(link.couleur) ? link.couleur : 'auto'
-  const usesGradient = colorKey === 'auto' && a.type !== b.type
+  // Pour le gradient on compare les couleurs résolues plutôt que les types
+  // bruts (deux types custom différents = gradient).
+  const sameColor = metaA.color === metaB.color
+  const usesGradient = colorKey === 'auto' && !sameColor
   let stroke: string
   if (colorKey === 'auto') {
-    stroke = a.type === b.type ? TYPE_META[a.type].color : `url(#mindmap-grad-${link.id})`
+    stroke = sameColor ? metaA.color : `url(#mindmap-grad-${link.id})`
   } else {
     stroke = LINK_COLORS[colorKey].hex
   }
@@ -1298,8 +1797,8 @@ const MindLinkView = memo(function MindLinkView({
             y2={b.position_y}
             gradientUnits="userSpaceOnUse"
           >
-            <stop offset="0%" stopColor={TYPE_META[a.type].color} />
-            <stop offset="100%" stopColor={TYPE_META[b.type].color} />
+            <stop offset="0%" stopColor={metaA.color} />
+            <stop offset="100%" stopColor={metaB.color} />
           </linearGradient>
         </defs>
       )}

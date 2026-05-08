@@ -416,7 +416,7 @@ export default function Bibliotheque() {
         <div className="flex items-center gap-4 mb-6">
           <button
             type="button"
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.back()}
             className="text-gray-400 hover:text-white"
           >
             {tc('back')}

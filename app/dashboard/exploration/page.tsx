@@ -146,6 +146,12 @@ export default function ExplorationPage() {
     const el = outerRef.current
     if (!el) return
     const onWheel = (e: WheelEvent) => {
+      // Sécurité mobile : si un toucher est actif sur la carte, on ignore tout
+      // event "wheel" (certains navigateurs mobiles synthétisent un wheel à
+      // partir d'un trackpad-pinch ou d'un single-touch, ce qui pourrait
+      // déclencher un zoom à 1 doigt). Le zoom mobile passe UNIQUEMENT par le
+      // pinch 2-doigts géré dans handlePointerMove.
+      if (pointersRef.current.size > 0) return
       e.preventDefault()
       const rect = el.getBoundingClientRect()
       const px = e.clientX - rect.left
@@ -735,7 +741,7 @@ export default function ExplorationPage() {
         <div className="flex items-center gap-4 mb-4">
           <button
             type="button"
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.back()}
             className="text-gray-400 hover:text-white"
           >
             ← Retour
@@ -915,9 +921,13 @@ export default function ExplorationPage() {
                   </label>
                   <button
                     type="button"
-                    onClick={() =>
-                      router.push(`/dashboard/combat?scenario_id=${scenarioId}`)
-                    }
+                    onClick={() => {
+                      const params = new URLSearchParams()
+                      params.set('scenario_id', scenarioId)
+                      const mapUrl = exploration?.map_image_url
+                      if (mapUrl) params.set('map_url', mapUrl)
+                      router.push(`/dashboard/combat?${params.toString()}`)
+                    }}
                     className="w-full p-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded text-sm"
                   >
                     ⚔️ Lancer Combat

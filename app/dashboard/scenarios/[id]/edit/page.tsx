@@ -285,6 +285,58 @@ export default function ScenarioEditPage() {
     }
   }
 
+  // Crée un chapitre frère à une position précise (insertion entre deux
+  // rangs). Décale les ordres des frères situés après la position cible.
+  const creerChapitreAt = async (
+    parentId: string | null,
+    insertIndex: number
+  ) => {
+    if (!scenarioId) return
+    const freres = chapitres
+      .filter((c) => (c.parent_id ?? null) === parentId)
+      .sort((a, b) => a.ordre - b.ordre)
+    const { data, error } = await supabase
+      .from('chapitres')
+      .insert({
+        scenario_id: scenarioId,
+        titre: 'Sans titre',
+        contenu: '',
+        parent_id: parentId,
+        ordre: insertIndex
+      })
+      .select()
+      .single()
+    if (error || !data) {
+      console.error('[scenario edit] create chapitre at :', error)
+      return
+    }
+    const newCh = data as Chapitre
+    const updates = freres
+      .map((c, i) => ({ id: c.id, newOrdre: i >= insertIndex ? c.ordre + 1 : c.ordre, oldOrdre: c.ordre }))
+      .filter((u) => u.oldOrdre !== u.newOrdre)
+    await Promise.all(
+      updates.map((u) =>
+        supabase.from('chapitres').update({ ordre: u.newOrdre }).eq('id', u.id)
+      )
+    )
+    setChapitres((prev) => {
+      const updated = prev.map((c) => {
+        const u = updates.find((uu) => uu.id === c.id)
+        return u ? { ...c, ordre: u.newOrdre } : c
+      })
+      return [...updated, newCh]
+    })
+    if (parentId) {
+      setCollapsed((prev) => {
+        const next = new Set(prev)
+        next.delete(parentId)
+        return next
+      })
+    }
+    ignoreNextAutoSave.current = true
+    setSelectedId(newCh.id)
+  }
+
   const supprimerChapitre = async (id: string) => {
     if (!window.confirm('Supprimer ce chapitre et tous ses sous-chapitres ?')) return
     const { error } = await supabase.from('chapitres').delete().eq('id', id)
@@ -462,7 +514,7 @@ export default function ScenarioEditPage() {
       <main className="min-h-screen bg-[#1a1a1a] text-gray-200 p-6">
         <button
           type="button"
-          onClick={() => router.push('/dashboard/scenarios')}
+          onClick={() => router.back()}
           className="text-gray-400 hover:text-white mb-4"
         >
           ← Retour
@@ -480,31 +532,38 @@ export default function ScenarioEditPage() {
       : '💾 Enregistrement…'
 
   return (
-    <main className="min-h-screen bg-[#1a1a1a] text-gray-200 flex flex-col">
-      {/* Barre supérieure */}
-      <header className="flex items-center gap-3 px-4 py-3 border-b border-gray-800 bg-[#1e1e1e]">
+    <main
+      className="min-h-screen bg-[#191919] text-gray-100 flex flex-col"
+      style={{
+        fontFamily:
+          'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontFeatureSettings: '"cv11", "ss01", "ss03"'
+      }}
+    >
+      {/* Barre supérieure — minimaliste, peu de bordures */}
+      <header className="flex items-center gap-3 px-5 py-3 bg-[#191919]/95 backdrop-blur sticky top-0 z-20">
         <button
           type="button"
-          onClick={() => router.push('/dashboard/scenarios')}
-          className="text-gray-400 hover:text-white text-sm"
+          onClick={() => router.back()}
+          className="text-gray-500 hover:text-gray-200 text-sm transition"
         >
           ← Scénarios
         </button>
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
-          className="md:hidden ml-auto px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 text-gray-200 text-sm"
+          className="md:hidden ml-auto px-2 py-1 rounded text-gray-300 hover:bg-white/5 text-sm transition"
           aria-label="Ouvrir la liste des chapitres"
         >
           ☰ Chapitres
         </button>
-        <h1 className="hidden md:block text-lg font-semibold text-gray-100 ml-2 truncate flex-1">
-          📖 {scenarioNom}
+        <h1 className="hidden md:block text-sm font-medium text-gray-300 ml-2 truncate flex-1">
+          {scenarioNom}
         </h1>
         <span
-          className={`hidden md:inline text-xs ${
+          className={`hidden md:inline text-xs transition ${
             saveState === 'saved'
-              ? 'text-green-400'
+              ? 'text-gray-500'
               : saveState === 'saving'
               ? 'text-yellow-400'
               : 'text-gray-400'
@@ -517,12 +576,12 @@ export default function ScenarioEditPage() {
       <div className="flex-1 flex min-h-0">
         {/* Sidebar — chapitres (drawer sur mobile) */}
         <aside
-          className={`fixed inset-y-0 left-0 z-40 w-72 bg-[#1e1e1e] border-r border-gray-800 transform transition-transform md:static md:translate-x-0 md:w-72 flex flex-col ${
+          className={`fixed inset-y-0 left-0 z-40 w-72 bg-[#1c1c1c] transform transition-transform md:static md:translate-x-0 md:w-72 flex flex-col ${
             drawerOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
-          <div className="px-3 py-2 border-b border-gray-800 flex items-center justify-between">
-            <span className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
+          <div className="px-4 pt-3 pb-2 flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-medium">
               Chapitres
             </span>
             <button
@@ -534,9 +593,9 @@ export default function ScenarioEditPage() {
               ✕
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto p-2">
+          <div className="flex-1 overflow-y-auto px-2 py-1">
             {tree.length === 0 ? (
-              <p className="text-gray-500 text-xs italic px-2 py-4 text-center">
+              <p className="text-gray-500 text-xs italic px-3 py-6 text-center">
                 Aucun chapitre pour l&apos;instant.
               </p>
             ) : (
@@ -550,6 +609,7 @@ export default function ScenarioEditPage() {
                 }}
                 onToggleCollapse={toggleCollapsed}
                 onAddChild={(pid) => creerChapitre(pid)}
+                onInsertSibling={creerChapitreAt}
                 onDelete={supprimerChapitre}
                 dragId={dragId}
                 onDragStart={onDragStart}
@@ -558,13 +618,13 @@ export default function ScenarioEditPage() {
               />
             )}
           </div>
-          <div className="p-2 border-t border-gray-800">
+          <div className="px-3 py-3">
             <button
               type="button"
               onClick={() => creerChapitre(null)}
-              className="w-full px-3 py-2 rounded bg-yellow-600 hover:bg-yellow-500 text-gray-900 text-sm font-bold"
+              className="w-full px-3 py-2 rounded text-gray-400 hover:text-gray-100 hover:bg-white/[0.04] text-sm text-left transition"
             >
-              ➕ Nouveau chapitre
+              <span className="opacity-70">+</span> Nouveau chapitre
             </button>
           </div>
         </aside>
@@ -587,26 +647,28 @@ export default function ScenarioEditPage() {
                 <button
                   type="button"
                   onClick={() => creerChapitre(null)}
-                  className="px-4 py-2 rounded bg-yellow-600 hover:bg-yellow-500 text-gray-900 font-bold"
+                  className="px-4 py-2 rounded text-gray-200 hover:bg-white/[0.06] transition"
                 >
-                  ➕ Nouveau chapitre
+                  + Nouveau chapitre
                 </button>
               </div>
             </div>
           ) : (
-            <div className="max-w-3xl mx-auto p-6 md:p-10 space-y-6">
-              <input
-                type="text"
-                value={selected.titre}
-                onChange={(e) => patchChapitre(selected.id, { titre: e.target.value })}
-                placeholder="Titre du chapitre"
-                className="w-full bg-transparent text-3xl md:text-4xl font-bold text-gray-100 border-none outline-none placeholder-gray-600 focus:ring-0"
+            <div className="max-w-3xl mx-auto px-6 md:px-16 pt-16 md:pt-24 pb-32 space-y-8">
+              <ChapterHeader
+                key={selected.id}
+                titre={selected.titre}
+                onTitreChange={(v) => patchChapitre(selected.id, { titre: v })}
               />
               <textarea
                 value={selected.contenu}
                 onChange={(e) => patchChapitre(selected.id, { contenu: e.target.value })}
-                placeholder="Raconte l'histoire, décris les lieux, note les règles maison…"
-                className="w-full min-h-[40vh] bg-transparent text-base text-gray-200 leading-relaxed border border-gray-800 rounded p-4 outline-none focus:border-gray-600 resize-y"
+                placeholder="Raconte l'histoire, décris les lieux, note les règles maison…  Tape ici."
+                className="w-full min-h-[55vh] bg-transparent text-[16px] text-gray-200 leading-[1.7] border-none outline-none placeholder-gray-600 focus:ring-0 resize-y"
+                style={{
+                  fontFamily:
+                    'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }}
               />
 
               <LinkSections
@@ -650,9 +712,9 @@ export default function ScenarioEditPage() {
         </section>
 
         {/* Droite — éléments du scénario global */}
-        <aside className="hidden lg:flex w-80 border-l border-gray-800 bg-[#1e1e1e] flex-col">
-          <div className="px-3 py-2 border-b border-gray-800">
-            <span className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
+        <aside className="hidden lg:flex w-80 bg-[#1c1c1c] flex-col">
+          <div className="px-4 pt-3 pb-2">
+            <span className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-medium">
               Scénario global
             </span>
           </div>
@@ -831,6 +893,7 @@ function ChapterTree(props: {
   onSelect: (id: string) => void
   onToggleCollapse: (id: string) => void
   onAddChild: (parentId: string) => void
+  onInsertSibling: (parentId: string | null, insertIndex: number) => void
   onDelete: (id: string) => void
   dragId: string | null
   onDragStart: (e: React.DragEvent, id: string) => void
@@ -838,22 +901,70 @@ function ChapterTree(props: {
   onDrop: (e: React.DragEvent, id: string) => void
 }) {
   return (
-    <ul className="space-y-0.5">
-      {props.nodes.map((n) => (
-        <ChapterRow key={n.id} node={n} depth={0} {...props} />
+    <ul className="relative">
+      <Inserter
+        onClick={() => props.onInsertSibling(null, 0)}
+        depth={0}
+        first
+      />
+      {props.nodes.map((n, i) => (
+        <li key={n.id}>
+          <ChapterRow node={n} depth={0} parentId={null} {...props} />
+          <Inserter
+            onClick={() => props.onInsertSibling(null, i + 1)}
+            depth={0}
+          />
+        </li>
       ))}
     </ul>
+  )
+}
+
+// Petit séparateur entre deux chapitres frères qui révèle un bouton « + »
+// au survol, façon Notion.
+function Inserter({
+  onClick,
+  depth,
+  first
+}: {
+  onClick: () => void
+  depth: number
+  first?: boolean
+}) {
+  return (
+    <div
+      className={`group/inserter relative h-1 hover:h-6 transition-[height] duration-150 ${
+        first ? 'mt-0' : ''
+      }`}
+      style={{ paddingLeft: 4 + depth * 14 }}
+    >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          onClick()
+        }}
+        className="absolute left-2 right-2 top-1/2 -translate-y-1/2 flex items-center gap-2 rounded px-2 py-1 opacity-0 group-hover/inserter:opacity-100 text-[11px] text-gray-500 hover:text-gray-200 hover:bg-white/[0.04] transition"
+        title="Insérer un chapitre ici"
+      >
+        <span className="flex-1 h-px bg-white/[0.08]" />
+        <span className="font-medium">+ Ajouter</span>
+        <span className="flex-1 h-px bg-white/[0.08]" />
+      </button>
+    </div>
   )
 }
 
 type ChapterRowProps = {
   node: ChapNode
   depth: number
+  parentId: string | null
   selectedId: string | null
   collapsed: Set<string>
   onSelect: (id: string) => void
   onToggleCollapse: (id: string) => void
   onAddChild: (parentId: string) => void
+  onInsertSibling: (parentId: string | null, insertIndex: number) => void
   onDelete: (id: string) => void
   dragId: string | null
   onDragStart: (e: React.DragEvent, id: string) => void
@@ -862,27 +973,34 @@ type ChapterRowProps = {
 }
 
 function ChapterRow(props: ChapterRowProps) {
-  const { node, depth, ...rest } = props
+  const { node, depth } = props
   const hasChildren = node.children.length > 0
   const isCollapsed = props.collapsed.has(node.id)
   const isSelected = props.selectedId === node.id
   const isDragged = props.dragId === node.id
 
   return (
-    <li>
+    <>
       <div
         draggable
         onDragStart={(e) => props.onDragStart(e, node.id)}
         onDragOver={props.onDragOver}
         onDrop={(e) => props.onDrop(e, node.id)}
-        className={`group flex items-center gap-1 rounded px-1 py-1 cursor-pointer text-sm transition ${
+        className={`group flex items-center gap-1 rounded px-1.5 py-1 cursor-pointer text-sm transition ${
           isSelected
-            ? 'bg-yellow-600/15 text-yellow-100'
-            : 'hover:bg-gray-800/60 text-gray-200'
+            ? 'bg-white/[0.07] text-gray-100'
+            : 'text-gray-300 hover:bg-white/[0.03]'
         } ${isDragged ? 'opacity-40' : ''}`}
         style={{ paddingLeft: 4 + depth * 14 }}
         onClick={() => props.onSelect(node.id)}
       >
+        <span
+          className="w-4 h-4 flex items-center justify-center text-gray-600 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 select-none transition"
+          title="Glisser pour réorganiser"
+          aria-hidden="true"
+        >
+          ⠿
+        </span>
         {hasChildren ? (
           <button
             type="button"
@@ -890,7 +1008,7 @@ function ChapterRow(props: ChapterRowProps) {
               e.stopPropagation()
               props.onToggleCollapse(node.id)
             }}
-            className="w-4 h-4 flex items-center justify-center text-gray-500 hover:text-gray-200"
+            className="w-4 h-4 flex items-center justify-center text-gray-500 hover:text-gray-200 transition"
             aria-label={isCollapsed ? 'Déplier' : 'Replier'}
           >
             {isCollapsed ? '▸' : '▾'}
@@ -905,10 +1023,10 @@ function ChapterRow(props: ChapterRowProps) {
             e.stopPropagation()
             props.onAddChild(node.id)
           }}
-          className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center text-gray-400 hover:text-yellow-400 text-xs"
+          className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gray-100 text-sm transition"
           title="Ajouter un sous-chapitre"
         >
-          ➕
+          +
         </button>
         <button
           type="button"
@@ -916,20 +1034,135 @@ function ChapterRow(props: ChapterRowProps) {
             e.stopPropagation()
             props.onDelete(node.id)
           }}
-          className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center text-gray-400 hover:text-red-400 text-xs"
+          className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center text-gray-500 hover:text-red-400 text-xs transition"
           title="Supprimer"
         >
           ✕
         </button>
       </div>
       {hasChildren && !isCollapsed && (
-        <ul className="space-y-0.5">
-          {node.children.map((c) => (
-            <ChapterRow key={c.id} node={c} depth={depth + 1} {...rest} />
+        <ul>
+          <Inserter
+            onClick={() => props.onInsertSibling(node.id, 0)}
+            depth={depth + 1}
+            first
+          />
+          {node.children.map((c, i) => (
+            <li key={c.id}>
+              <ChapterRow
+                node={c}
+                depth={depth + 1}
+                parentId={node.id}
+                selectedId={props.selectedId}
+                collapsed={props.collapsed}
+                onSelect={props.onSelect}
+                onToggleCollapse={props.onToggleCollapse}
+                onAddChild={props.onAddChild}
+                onInsertSibling={props.onInsertSibling}
+                onDelete={props.onDelete}
+                dragId={props.dragId}
+                onDragStart={props.onDragStart}
+                onDragOver={props.onDragOver}
+                onDrop={props.onDrop}
+              />
+              <Inserter
+                onClick={() => props.onInsertSibling(node.id, i + 1)}
+                depth={depth + 1}
+              />
+            </li>
           ))}
         </ul>
       )}
-    </li>
+    </>
+  )
+}
+
+// ----------------------------------------------------------------------------
+// ChapterHeader — titre éditable + emoji optionnel (Notion-style)
+// ----------------------------------------------------------------------------
+
+const EMOJIS_RAPIDES = ['📖', '📜', '⚔️', '🏰', '🌲', '🗡️', '🔮', '🎭', '🌟', '🔥', '❄️', '🦴', '🐉', '👑', '🗝️', '💀']
+
+// Détecte si une chaîne commence par un emoji et le sépare du reste du texte.
+function splitEmoji(titre: string): { emoji: string | null; rest: string } {
+  if (!titre) return { emoji: null, rest: '' }
+  const match = titre.match(
+    /^(\p{Extended_Pictographic}(?:\u{FE0F})?(?:\u{200D}\p{Extended_Pictographic}(?:\u{FE0F})?)*)\s*/u
+  )
+  if (match) {
+    return { emoji: match[1], rest: titre.slice(match[0].length) }
+  }
+  return { emoji: null, rest: titre }
+}
+
+function ChapterHeader({
+  titre,
+  onTitreChange
+}: {
+  titre: string
+  onTitreChange: (v: string) => void
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const { emoji, rest } = splitEmoji(titre)
+
+  const setEmoji = (next: string | null) => {
+    onTitreChange(next ? `${next} ${rest}`.trimEnd() : rest)
+    setPickerOpen(false)
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setPickerOpen((v) => !v)}
+          className="text-4xl md:text-5xl leading-none hover:bg-white/[0.04] rounded px-1 -mx-1 transition"
+          title={emoji ? 'Changer ou retirer l’emoji' : 'Ajouter un emoji'}
+        >
+          {emoji ?? <span className="text-gray-700">📄</span>}
+        </button>
+        {pickerOpen && (
+          <>
+            <div
+              className="fixed inset-0 z-30"
+              onClick={() => setPickerOpen(false)}
+            />
+            <div className="absolute z-40 mt-2 left-0 bg-[#202020] rounded-lg shadow-2xl p-2 grid grid-cols-8 gap-1 w-72">
+              {EMOJIS_RAPIDES.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => setEmoji(e)}
+                  className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/[0.08] text-xl transition"
+                >
+                  {e}
+                </button>
+              ))}
+              {emoji && (
+                <button
+                  type="button"
+                  onClick={() => setEmoji(null)}
+                  className="col-span-8 mt-1 px-2 py-1 rounded text-xs text-gray-400 hover:text-gray-100 hover:bg-white/[0.05] transition"
+                >
+                  Retirer l&apos;emoji
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+      <input
+        type="text"
+        value={rest}
+        onChange={(e) => onTitreChange(emoji ? `${emoji} ${e.target.value}` : e.target.value)}
+        placeholder="Sans titre"
+        className="w-full bg-transparent text-4xl md:text-5xl font-bold text-gray-50 border-none outline-none placeholder-gray-700 focus:ring-0 leading-tight tracking-tight"
+        style={{
+          fontFamily:
+            'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        }}
+      />
+    </div>
   )
 }
 
