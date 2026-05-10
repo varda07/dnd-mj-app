@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
@@ -16,6 +16,13 @@ import {
   telechargerJSON,
   validerEnveloppe
 } from '@/app/lib/import-export'
+import {
+  PNJ_TEMPLATES,
+  CATEGORIES_PNJ,
+  templateVersPnj,
+  type CategoriePnj,
+  type PnjTemplate
+} from '@/app/data/pnj_templates'
 
 type Pnj = {
   id: string
@@ -65,6 +72,7 @@ export default function PnjPage() {
   const [file, setFile] = useState<File | null>(null)
   const [imageActuelle, setImageActuelle] = useState('')
   const [cropperKey, setCropperKey] = useState(0)
+  const [importerOuvert, setImporterOuvert] = useState(false)
   const t = useTranslations('pnj')
   const tc = useTranslations('common')
 
@@ -410,13 +418,22 @@ export default function PnjPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <h2 className="text-lg font-bold text-yellow-500">{t('my_pnj')}</h2>
-            <button
-              type="button"
-              onClick={importerPnj}
-              className="px-3 py-1.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs font-bold"
-            >
-              {tc('import_json')}
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setImporterOuvert(true)}
+                className="px-3 py-1.5 rounded bg-yellow-600 hover:bg-yellow-500 text-gray-900 text-xs font-bold"
+              >
+                {t('import_templates')}
+              </button>
+              <button
+                type="button"
+                onClick={importerPnj}
+                className="px-3 py-1.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs font-bold"
+              >
+                {tc('import_json')}
+              </button>
+            </div>
           </div>
           {pnjs.length === 0 && <p className="text-gray-400">{t('empty')}</p>}
           {pnjs.map((p) => (
@@ -500,6 +517,238 @@ export default function PnjPage() {
           ))}
         </div>
       </div>
+      {importerOuvert && (
+        <PnjTemplateImporter
+          onClose={() => setImporterOuvert(false)}
+          existingNames={new Set(pnjs.map((p) => p.nom))}
+          onImported={(n) => {
+            setMessage(t('imported_count', { n }))
+            fetchPnjs()
+          }}
+        />
+      )}
     </main>
+  )
+}
+
+// ----------------------------------------------------------------------------
+// PnjTemplateImporter : modale qui liste les templates de PNJ par catégorie
+// et insère des copies dans la table pnj.
+// ----------------------------------------------------------------------------
+function PnjTemplateImporter({
+  onClose,
+  existingNames,
+  onImported
+}: {
+  onClose: () => void
+  existingNames: Set<string>
+  onImported: (n: number) => void
+}) {
+  const t = useTranslations('pnj')
+  const tc = useTranslations('common')
+  const [filtreCat, setFiltreCat] = useState<CategoriePnj | 'all'>('all')
+  const [recherche, setRecherche] = useState('')
+  const [selection, setSelection] = useState<Set<string>>(new Set())
+  const [enImport, setEnImport] = useState(false)
+  const [erreur, setErreur] = useState<string | null>(null)
+
+  const filtres = useMemo(() => {
+    const q = recherche.trim().toLowerCase()
+    return PNJ_TEMPLATES.filter((tp) => {
+      if (filtreCat !== 'all' && tp.categorie !== filtreCat) return false
+      if (q && !`${tp.nom} ${tp.nomEn} ${tp.description}`.toLowerCase().includes(q)) return false
+      return true
+    })
+  }, [filtreCat, recherche])
+
+  const togglerSel = (nom: string) => {
+    setSelection((prev) => {
+      const next = new Set(prev)
+      if (next.has(nom)) next.delete(nom)
+      else next.add(nom)
+      return next
+    })
+  }
+
+  const toutSelectionner = () => {
+    setSelection(new Set(filtres.map((tp) => tp.nom)))
+  }
+
+  const importer = async () => {
+    setErreur(null)
+    if (selection.size === 0) return
+    setEnImport(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      setErreur('Non connecté.')
+      setEnImport(false)
+      return
+    }
+    const choisis = PNJ_TEMPLATES.filter((tp) => selection.has(tp.nom))
+    const rows = choisis.map((tp: PnjTemplate) => templateVersPnj(tp, user.id))
+    const { error } = await supabase.from('pnj').insert(rows)
+    setEnImport(false)
+    if (error) {
+      console.error('[pnj] import templates :', error)
+      setErreur(error.message)
+      return
+    }
+    onImported(rows.length)
+    onClose()
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[150] bg-black/75 flex items-center justify-center p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-3xl max-h-[85vh] flex flex-col rounded-xl shadow-2xl"
+        style={{
+          background: '#12141a',
+          border: '1px solid rgba(201,168,76,0.4)'
+        }}
+      >
+        <div
+          className="px-4 py-3 flex items-center justify-between border-b"
+          style={{ borderColor: 'rgba(201,168,76,0.2)' }}
+        >
+          <h3 className="text-[13px] tracking-[0.18em] uppercase text-[#C9A84C] font-bold">
+            📚 {t('import_templates')}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-400 hover:text-white text-xl leading-none w-7 h-7"
+            aria-label={tc('close')}
+          >
+            ×
+          </button>
+        </div>
+
+        <div
+          className="px-4 py-3 grid grid-cols-2 md:grid-cols-2 gap-2 border-b"
+          style={{ borderColor: 'rgba(201,168,76,0.15)' }}
+        >
+          <input
+            type="text"
+            value={recherche}
+            onChange={(e) => setRecherche(e.target.value)}
+            placeholder={tc('loading')}
+            className="px-2.5 py-1.5 rounded bg-black/40 border border-[rgba(201,168,76,0.2)] text-white text-xs outline-none focus:border-[#C9A84C]"
+          />
+          <select
+            value={filtreCat}
+            onChange={(e) => setFiltreCat(e.target.value as CategoriePnj | 'all')}
+            className="px-2.5 py-1.5 rounded bg-black/40 border border-[rgba(201,168,76,0.2)] text-white text-xs outline-none"
+          >
+            <option value="all">{t('all_categories')}</option>
+            {CATEGORIES_PNJ.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-3 [scrollbar-width:thin]">
+          {filtres.length === 0 ? (
+            <p className="text-gray-400 text-sm italic text-center py-8">
+              {t('no_results')}
+            </p>
+          ) : (
+            <ul className="space-y-1">
+              {filtres.map((tp) => {
+                const selected = selection.has(tp.nom)
+                const dejaPossede = existingNames.has(tp.nom)
+                return (
+                  <li key={tp.nom}>
+                    <label
+                      className={`flex items-start gap-3 p-2 rounded cursor-pointer border transition ${
+                        selected
+                          ? 'bg-[rgba(201,168,76,0.12)] border-[#C9A84C]'
+                          : 'bg-black/30 border-[rgba(201,168,76,0.15)] hover:bg-[rgba(201,168,76,0.06)]'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => togglerSel(tp.nom)}
+                        className="mt-1 accent-yellow-500 flex-shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 flex-wrap">
+                          <span className="text-yellow-200 font-bold">{tp.nom}</span>
+                          <span className="text-[10px] text-gray-500 italic">{tp.nomEn}</span>
+                          <span className="text-[10px] uppercase tracking-wider text-[#C9A84C]/80">
+                            {tp.categorie}
+                          </span>
+                          {dejaPossede && (
+                            <span
+                              className="text-[10px] px-1.5 py-0.5 rounded-full"
+                              style={{
+                                background: 'rgba(16,185,129,0.15)',
+                                color: '#34d399',
+                                border: '1px solid rgba(16,185,129,0.3)'
+                              }}
+                              title={t('already_owned')}
+                            >
+                              ✓
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-gray-400 text-xs italic mt-1 line-clamp-2">
+                          {tp.description}
+                        </p>
+                        <p className="text-[10px] text-gray-500 mt-1">
+                          PV {tp.hp_max} · CA {tp.ca} · For {tp.force} Dex {tp.dexterite} Cha {tp.charisme}
+                        </p>
+                        <p className="text-[10px] text-gray-500 italic mt-0.5 line-clamp-1">
+                          ◆ {tp.personnalite}
+                        </p>
+                      </div>
+                    </label>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+
+        {erreur && (
+          <p className="px-4 py-2 text-red-300 text-xs border-t border-red-900/40">
+            {erreur}
+          </p>
+        )}
+        <div
+          className="px-4 py-3 flex items-center justify-between gap-2 border-t flex-wrap"
+          style={{ borderColor: 'rgba(201,168,76,0.2)' }}
+        >
+          <span className="text-xs text-gray-400">
+            {selection.size} / {filtres.length}
+          </span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={toutSelectionner}
+              className="px-3 py-1.5 rounded text-xs bg-gray-700 hover:bg-gray-600 text-gray-200"
+            >
+              {t('select_all')}
+            </button>
+            <button
+              type="button"
+              onClick={importer}
+              disabled={selection.size === 0 || enImport}
+              className="px-3 py-1.5 rounded text-xs font-bold bg-yellow-500 hover:bg-yellow-400 text-gray-900 disabled:opacity-50"
+            >
+              {enImport
+                ? tc('loading')
+                : t('import_button', { n: selection.size })}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }

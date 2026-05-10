@@ -1,7 +1,365 @@
 'use client'
 
-import { useState, useEffect, useId, CSSProperties } from 'react'
+import { useState, useEffect, useRef, CSSProperties } from 'react'
+import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabase'
+import type { DiceBoxHandle } from './Dice3DBoxScene'
+
+// @3d-dice/dice-box est strictement client-side (Babylon.js + AmmoJS via
+// web worker). On charge le wrapper dynamiquement, ssr désactivé.
+const Dice3DBoxScene = dynamic(() => import('./Dice3DBoxScene'), { ssr: false })
+
+// ---------------------------------------------------------------------------
+// Silhouettes SVG des dés. Utilisées pour le sélecteur de type (icônes nettes
+// et lisibles à 22 px) ET pour le mode fallback si le moteur 3D plante.
+// ---------------------------------------------------------------------------
+const DIE_SHAPES: Record<string, string> = {
+  d4: '50,8 92,86 8,86',
+  d6: '15,15 85,15 85,85 15,85',
+  d8: '50,5 92,50 50,95 8,50',
+  d10: '50,5 90,38 78,90 22,90 10,38',
+  d12: '50,5 92,38 76,92 24,92 8,38',
+  d20: '50,5 88,28 88,72 50,95 12,72 12,28'
+}
+
+function DieSilhouetteIcon({
+  type,
+  size = 22,
+  highlight = false
+}: {
+  type: string
+  size?: number
+  highlight?: boolean
+}) {
+  const points = DIE_SHAPES[type] ?? DIE_SHAPES.d6
+  // Identifiant stable basé sur (type+highlight) — évite les collisions quand
+  // plusieurs icônes coexistent sans nécessiter useId.
+  const gradId = `die-grad-${type}-${highlight ? 'on' : 'off'}`
+  const stops = highlight
+    ? ['#fef08a', '#C9A84C', '#8B7333']
+    : ['#9ca3af', '#6b7280', '#4b5563']
+  return (
+    <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true">
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor={stops[0]} />
+          <stop offset="55%" stopColor={stops[1]} />
+          <stop offset="100%" stopColor={stops[2]} />
+        </linearGradient>
+      </defs>
+      <polygon
+        points={points}
+        fill={`url(#${gradId})`}
+        stroke="rgba(0,0,0,0.45)"
+        strokeWidth="3"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// DiceArt2D : SVG stylisé qui représente le dé avec un faux relief 3D
+// (gradient + facettes intérieures + drop-shadow). Pas de WebGL, pas de
+// CSS 3D — uniquement DOM + SVG. Anime le numéro pendant le roll pour
+// donner l'illusion du dé qui tournoie.
+// ---------------------------------------------------------------------------
+
+// Palette neutre (or) et palettes critiques (succès / échec) — appliquées
+// via les linearGradients du SVG.
+type DicePalette = {
+  light: string
+  mid: string
+  dark: string
+  accent: string
+}
+
+const PALETTE_GOLD: DicePalette = {
+  light: '#fef08a',
+  mid: '#C9A84C',
+  dark: '#8B7333',
+  accent: '#fef9c3'
+}
+const PALETTE_CRIT_SUCCESS: DicePalette = {
+  light: '#fef9c3',
+  mid: '#facc15',
+  dark: '#a16207',
+  accent: '#ffffff'
+}
+const PALETTE_CRIT_FAIL: DicePalette = {
+  light: '#fecaca',
+  mid: '#dc2626',
+  dark: '#7f1d1d',
+  accent: '#fff5f5'
+}
+
+// Pour chaque type de dé, on définit :
+// - outline : la silhouette principale du polygone
+// - facets : un tableau de sous-polygones avec un coefficient d'ombrage
+//   (1 = clair, 0 = sombre) qui crée l'illusion 3D des faces visibles
+// - numAnchor : où centrer le numéro (souvent (50, 60-65) pour un meilleur
+//   alignement visuel selon la forme)
+type FacetDef = { points: string; shade: number }
+type DiceArtDef = {
+  outline: string
+  facets: FacetDef[]
+  numAnchor: { x: number; y: number }
+  numScale: number // facteur de taille du chiffre (relatif)
+}
+
+const DICE_ART: Record<string, DiceArtDef> = {
+  // D4 — triangle équilatéral, 3 sous-triangles depuis le centroïde.
+  d4: {
+    outline: '50,8 92,86 8,86',
+    numAnchor: { x: 50, y: 68 },
+    numScale: 0.42,
+    facets: [
+      { points: '50,8 50,60 8,86', shade: 0.85 },   // gauche
+      { points: '50,8 92,86 50,60', shade: 1.0 },   // droite
+      { points: '8,86 50,60 92,86', shade: 0.55 }   // bas
+    ]
+  },
+  // D6 — silhouette hexagonale d'un cube en projection iso : top / left / right.
+  d6: {
+    outline: '50,10 85,30 85,70 50,90 15,70 15,30',
+    numAnchor: { x: 50, y: 60 },
+    numScale: 0.36,
+    facets: [
+      { points: '50,10 85,30 50,50 15,30', shade: 1.05 }, // top (le plus clair)
+      { points: '15,30 50,50 50,90 15,70', shade: 0.85 }, // left
+      { points: '85,30 50,50 50,90 85,70', shade: 0.55 }  // right (le plus sombre)
+    ]
+  },
+  // D8 — losange vertical, 4 sous-triangles depuis le centre.
+  d8: {
+    outline: '50,5 92,50 50,95 8,50',
+    numAnchor: { x: 50, y: 56 },
+    numScale: 0.4,
+    facets: [
+      { points: '50,5 92,50 50,50', shade: 1.0 },   // top-right (clair)
+      { points: '50,5 50,50 8,50', shade: 0.85 },   // top-left
+      { points: '8,50 50,50 50,95', shade: 0.6 },   // bottom-left
+      { points: '50,50 92,50 50,95', shade: 0.45 }  // bottom-right (sombre)
+    ]
+  },
+  // D10 — pentagone allongé, 5 facettes en triangles autour du sommet.
+  d10: {
+    outline: '50,5 90,38 78,90 22,90 10,38',
+    numAnchor: { x: 50, y: 60 },
+    numScale: 0.36,
+    facets: [
+      { points: '50,5 90,38 50,55', shade: 1.0 },   // haut-droite
+      { points: '50,5 50,55 10,38', shade: 0.85 },  // haut-gauche
+      { points: '10,38 50,55 22,90', shade: 0.6 },  // bas-gauche
+      { points: '22,90 50,55 78,90', shade: 0.45 }, // bas (sombre)
+      { points: '78,90 50,55 90,38', shade: 0.7 }   // bas-droite
+    ]
+  },
+  // D12 — pentagone régulier avec un pentagone intérieur + 5 trapèzes
+  // périphériques pour faux relief.
+  d12: {
+    outline: '50,5 92,38 76,92 24,92 8,38',
+    numAnchor: { x: 50, y: 60 },
+    numScale: 0.36,
+    facets: [
+      // Pentagone central (clair)
+      { points: '50,32 70,46 62,70 38,70 30,46', shade: 1.05 },
+      // 5 trapèzes périphériques, ombrage variable pour l'effet 3D
+      { points: '50,5 92,38 70,46 50,32', shade: 0.85 },
+      { points: '92,38 76,92 62,70 70,46', shade: 0.65 },
+      { points: '76,92 24,92 38,70 62,70', shade: 0.5 },
+      { points: '24,92 8,38 30,46 38,70', shade: 0.7 },
+      { points: '8,38 50,5 50,32 30,46', shade: 0.95 }
+    ]
+  },
+  // D20 — hexagone pour silhouette d'icosaèdre, triangle central + 6
+  // triangles autour pour évoquer l'icosaèdre vu de face.
+  d20: {
+    outline: '50,5 88,28 88,72 50,95 12,72 12,28',
+    numAnchor: { x: 50, y: 56 },
+    numScale: 0.32,
+    facets: [
+      // Triangle central (face avant de l'icosaèdre, le plus clair)
+      { points: '50,30 75,55 25,55', shade: 1.1 },
+      // 6 triangles autour
+      { points: '50,5 88,28 75,55 50,30', shade: 0.9 },
+      { points: '88,28 88,72 75,55', shade: 0.55 },
+      { points: '88,72 50,95 75,55', shade: 0.45 },
+      { points: '50,95 12,72 25,55 75,55', shade: 0.5 },
+      { points: '12,72 12,28 25,55', shade: 0.65 },
+      { points: '12,28 50,5 50,30 25,55', shade: 0.85 }
+    ]
+  }
+}
+
+function paletteFor(value: number | undefined, sides: number): DicePalette {
+  if (value === 1) return PALETTE_CRIT_FAIL
+  if (sides === 20 && value === 20) return PALETTE_CRIT_SUCCESS
+  return PALETTE_GOLD
+}
+
+// Mélange un hex vers blanc/noir selon shade (>1 vers blanc, <1 vers noir).
+// shade=1 retourne la couleur de base.
+function shadeColor(hex: string, factor: number): string {
+  const m = hex.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i)
+  if (!m) return hex
+  const r = parseInt(m[1], 16)
+  const g = parseInt(m[2], 16)
+  const b = parseInt(m[3], 16)
+  const mix = (c: number) =>
+    factor > 1
+      ? Math.round(c + (255 - c) * (factor - 1))
+      : Math.round(c * factor)
+  const clamp = (n: number) => Math.max(0, Math.min(255, n))
+  const toHex = (n: number) => clamp(n).toString(16).padStart(2, '0')
+  return `#${toHex(mix(r))}${toHex(mix(g))}${toHex(mix(b))}`
+}
+
+function DiceArt2D({
+  type,
+  sides,
+  size,
+  value,
+  rolling,
+  delay = 0
+}: {
+  type: string
+  sides: number
+  size: number
+  value?: number
+  rolling: boolean
+  delay?: number
+}) {
+  const art = DICE_ART[type] ?? DICE_ART.d6
+  const palette = paletteFor(value, sides)
+
+  // Pendant le roll, on cycle un numéro aléatoire toutes les 80 ms : ça donne
+  // l'illusion que le dé "roule" et change de face. Quand le roll s'arrête,
+  // on affiche la valeur finale.
+  const [displayValue, setDisplayValue] = useState<number | null>(null)
+  useEffect(() => {
+    if (!rolling) {
+      setDisplayValue(value ?? null)
+      return
+    }
+    setDisplayValue(Math.floor(Math.random() * sides) + 1)
+    const id = window.setInterval(() => {
+      setDisplayValue(Math.floor(Math.random() * sides) + 1)
+    }, 80)
+    return () => window.clearInterval(id)
+  }, [rolling, value, sides])
+
+  // Identifiants stables pour les gradients SVG. Inclure delay évite les
+  // collisions quand plusieurs dés du même type coexistent.
+  const uid = `${type}-${delay}`
+  const idMain = `dice-grad-main-${uid}`
+  const idShine = `dice-shine-${uid}`
+
+  // Critique : drop-shadow plus marqué.
+  const isCritS = sides === 20 && value === 20
+  const isCritF = value === 1
+  const dropShadow = isCritS
+    ? 'drop-shadow(0 0 16px rgba(254,240,138,0.85)) drop-shadow(0 4px 6px rgba(0,0,0,0.5))'
+    : isCritF
+      ? 'drop-shadow(0 0 16px rgba(220,38,38,0.85)) drop-shadow(0 4px 6px rgba(0,0,0,0.5))'
+      : 'drop-shadow(0 4px 10px rgba(0,0,0,0.55)) drop-shadow(0 0 4px rgba(201,168,76,0.3))'
+
+  const wrapperStyle: CSSProperties = {
+    width: size,
+    height: size,
+    position: 'relative',
+    display: 'inline-block',
+    filter: dropShadow,
+    animationName: rolling ? 'dice-rolling-shake' : 'dice-idle-wobble',
+    animationDuration: rolling ? '0.55s' : '4.5s',
+    animationTimingFunction: rolling ? 'linear' : 'ease-in-out',
+    animationIterationCount: 'infinite',
+    animationFillMode: 'both',
+    animationDelay: `${delay}ms`
+  }
+
+  return (
+    <div style={wrapperStyle}>
+      <svg viewBox="0 0 100 100" width={size} height={size}>
+        <defs>
+          {/* Gradient principal : éclairage diagonal pour faux relief 3D */}
+          <linearGradient id={idMain} x1="0" y1="0" x2="0.85" y2="1">
+            <stop offset="0%" stopColor={palette.light} />
+            <stop offset="50%" stopColor={palette.mid} />
+            <stop offset="100%" stopColor={palette.dark} />
+          </linearGradient>
+          {/* Reflet brillant en haut à gauche */}
+          <radialGradient id={idShine} cx="0.3" cy="0.25" r="0.6">
+            <stop offset="0%" stopColor={palette.accent} stopOpacity="0.6" />
+            <stop offset="60%" stopColor={palette.accent} stopOpacity="0" />
+          </radialGradient>
+        </defs>
+
+        {/* Outline + remplissage de base */}
+        <polygon
+          points={art.outline}
+          fill={`url(#${idMain})`}
+          stroke="rgba(0,0,0,0.55)"
+          strokeWidth="2.8"
+          strokeLinejoin="round"
+        />
+
+        {/* Facettes intérieures pour l'illusion 3D — chaque sous-polygone
+            reçoit une teinte dérivée de la couleur centrale du gradient. */}
+        {art.facets.map((f, i) => (
+          <polygon
+            key={i}
+            points={f.points}
+            fill={shadeColor(palette.mid, f.shade)}
+            stroke="rgba(0,0,0,0.25)"
+            strokeWidth="0.8"
+            strokeLinejoin="round"
+            opacity={0.92}
+          />
+        ))}
+
+        {/* Reflet superposé pour insister sur le métal */}
+        <polygon
+          points={art.outline}
+          fill={`url(#${idShine})`}
+          stroke="none"
+          pointerEvents="none"
+        />
+
+        {/* Outline final par-dessus, plus épais, pour un trait propre */}
+        <polygon
+          points={art.outline}
+          fill="none"
+          stroke="rgba(0,0,0,0.7)"
+          strokeWidth="2.2"
+          strokeLinejoin="round"
+        />
+
+        {/* Numéro résultat ou défilement pendant le roll */}
+        {displayValue !== null && (
+          <text
+            x={art.numAnchor.x}
+            y={art.numAnchor.y}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize={Math.round(100 * art.numScale)}
+            fontWeight="900"
+            fill={isCritF ? '#ffffff' : '#1a120a'}
+            stroke={isCritF ? '#7f1d1d' : 'rgba(255,255,255,0.5)'}
+            strokeWidth={isCritF ? 1.4 : 1.0}
+            paintOrder="stroke fill"
+            style={{
+              fontFamily: 'var(--font-cinzel), Cinzel, serif',
+              filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.5))'
+            }}
+          >
+            {displayValue}
+          </text>
+        )}
+      </svg>
+    </div>
+  )
+}
 
 type DiceType = { label: string; sides: number }
 
@@ -13,90 +371,6 @@ const DICE: DiceType[] = [
   { label: 'd12', sides: 12 },
   { label: 'd20', sides: 20 }
 ]
-
-const FORMES: Record<string, string> = {
-  d4: '50,8 86,71 14,71',
-  d6: '15,15 85,15 85,85 15,85',
-  d8: '50,5 95,50 50,95 5,50',
-  d10: '50,5 88,35 72,95 28,95 12,35',
-  d12: '50,5 93,36 77,86 24,86 7,36',
-  d20: '50,5 89,28 89,72 50,95 11,72 11,28'
-}
-
-type GradientKey = 'red' | 'orange' | 'amber' | 'silver' | 'yellow' | 'gold' | 'crit'
-
-const GRADIENTS: Record<GradientKey, [string, string, string]> = {
-  red: ['#b91c1c', '#ef4444', '#fca5a5'],
-  orange: ['#c2410c', '#f97316', '#fdba74'],
-  amber: ['#d97706', '#fbbf24', '#fde68a'],
-  silver: ['#9ca3af', '#e5e7eb', '#ffffff'],
-  yellow: ['#eab308', '#facc15', '#fef08a'],
-  gold: ['#ca8a04', '#facc15', '#fef9c3'],
-  crit: ['#fde047', '#fef08a', '#ffffff']
-}
-
-function gradientKeyPour(resultat: number, faces: number): GradientKey {
-  if (resultat === 1) return 'red'
-  if (faces === 20 && resultat === 20) return 'crit'
-  if (resultat === faces) return 'gold'
-  const ratio = resultat / faces
-  if (ratio <= 0.25) return 'orange'
-  if (ratio <= 0.5) return 'amber'
-  if (ratio >= 0.85) return 'yellow'
-  return 'silver'
-}
-
-function DiceShape({
-  type,
-  value,
-  gradient,
-  className = '',
-  style,
-  showText = true
-}: {
-  type: string
-  value?: number
-  gradient: GradientKey
-  className?: string
-  style?: CSSProperties
-  showText?: boolean
-}) {
-  const uid = useId().replace(/:/g, '')
-  const id = `grad-${uid}`
-  const points = FORMES[type] ?? FORMES.d6
-  const [c1, c2, c3] = GRADIENTS[gradient]
-  return (
-    <svg viewBox="0 0 100 100" className={className} style={style}>
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor={c1} />
-          <stop offset="50%" stopColor={c2} />
-          <stop offset="100%" stopColor={c3} />
-        </linearGradient>
-      </defs>
-      <polygon
-        points={points}
-        fill={`url(#${id})`}
-        stroke="rgba(0,0,0,0.3)"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-      {showText && value !== undefined && (
-        <text
-          x="50"
-          y="55"
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fontSize={value >= 10 ? 30 : 38}
-          fontWeight="bold"
-          fill="#111827"
-        >
-          {value}
-        </text>
-      )}
-    </svg>
-  )
-}
 
 type JetRow = {
   id: string
@@ -118,21 +392,63 @@ export default function DiceLauncher() {
   const [activeTab, setActiveTab] = useState<'lancer' | 'historique'>('lancer')
   const [historique, setHistorique] = useState<JetRow[]>([])
   const [historiqueLoading, setHistoriqueLoading] = useState(false)
+  // État du moteur 3D : 'init' (en chargement), 'ready' (utilisable),
+  // 'failed' (on retombe sur DiceArt2D + jet random local).
+  const [boxStatus, setBoxStatus] = useState<'init' | 'ready' | 'failed'>('init')
+  const boxRef = useRef<DiceBoxHandle | null>(null)
+
+  // Timeout de sécurité : si la lib ne signale pas onReady en 3 s, on
+  // bascule en mode failed pour ne pas bloquer l'UI sur un canvas vide.
+  useEffect(() => {
+    if (!open || boxStatus !== 'init') return
+    const id = window.setTimeout(() => {
+      setBoxStatus((s) => {
+        if (s === 'init') {
+          console.warn(
+            '[dice] init non terminée après 3 s — bascule sur le fallback SVG'
+          )
+          return 'failed'
+        }
+        return s
+      })
+    }, 3000)
+    return () => window.clearTimeout(id)
+  }, [open, boxStatus])
+
+  // À l'ouverture du panneau on (re)passe en mode init pour que le box ait
+  // une chance de se monter. À la fermeture, on remet à 'init' aussi pour
+  // ne pas garder un statut périmé.
+  useEffect(() => {
+    if (!open) {
+      setBoxStatus('init')
+    }
+  }, [open])
 
   const fetchHistorique = async () => {
     setHistoriqueLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
+    let user = null
+    try {
+      const { data } = await supabase.auth.getUser()
+      user = data.user
+    } catch (err) {
+      console.warn('[dice] historique : getUser échec :', err)
+    }
     if (!user) {
       setHistorique([])
       setHistoriqueLoading(false)
       return
     }
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('jets_de_des')
       .select('id, type_de, nombre, resultats, created_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(20)
+    if (error) {
+      console.error('[dice] historique : select error :', error)
+    } else {
+      console.log('[dice] historique : récupéré', data?.length ?? 0, 'jet(s)')
+    }
     setHistorique((data ?? []) as JetRow[])
     setHistoriqueLoading(false)
   }
@@ -140,6 +456,20 @@ export default function DiceLauncher() {
   useEffect(() => {
     if (open && activeTab === 'historique') fetchHistorique()
   }, [open, activeTab])
+
+  // Ouverture externe (CommandPalette → action "Lancer un d20").
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const detail = (e as CustomEvent<{ dice?: string }>).detail
+      if (detail?.dice) {
+        const d = DICE.find((x) => x.label === detail.dice)
+        if (d) setSelectedDice(d)
+      }
+      setOpen(true)
+    }
+    window.addEventListener('dice:open', onOpen)
+    return () => window.removeEventListener('dice:open', onOpen)
+  }, [])
 
   // Shake de l'écran entier pendant un échec critique
   useEffect(() => {
@@ -158,12 +488,30 @@ export default function DiceLauncher() {
     setResults([])
     setCritEffect(null)
 
-    await new Promise((r) => setTimeout(r, 1000))
-
-    const jets = Array.from(
-      { length: count },
-      () => Math.floor(Math.random() * selectedDice.sides) + 1
-    )
+    const notation = `${count}${selectedDice.label}`
+    let jets: number[] = []
+    let usedBox = false
+    if (boxStatus === 'ready' && boxRef.current?.ready) {
+      try {
+        jets = await boxRef.current.roll(notation)
+        usedBox = jets.length === count
+        if (!usedBox) {
+          console.warn('[dice-box] résultats incomplets, fallback random:', jets)
+        }
+      } catch (err) {
+        console.error('[dice-box] roll a échoué, fallback random:', err)
+      }
+    }
+    if (!usedBox) {
+      // Fallback : timing visuel + tirage local (le composant DiceArt2D
+      // anime alors le défilement de chiffres).
+      await new Promise((r) => setTimeout(r, 1000))
+      jets = Array.from(
+        { length: count },
+        () => Math.floor(Math.random() * selectedDice.sides) + 1
+      )
+    }
+    console.log('[dice] roll result:', jets)
     setResults(jets)
     setRolling(false)
     setShowParticles(true)
@@ -182,16 +530,59 @@ export default function DiceLauncher() {
       }
     }
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      await supabase.from('jets_de_des').insert({
-        user_id: user.id,
-        type_de: selectedDice.label,
-        nombre: count,
-        resultats: jets,
-        partage: share
-      })
+    // ---- Persistance Supabase ----
+    let user: { id: string } | null = null
+    try {
+      const { data, error: authError } = await supabase.auth.getUser()
+      if (authError) console.warn('[dice] getUser auth error:', authError)
+      user = data.user
+    } catch (err) {
+      console.warn('[dice] getUser a planté (lock multi-onglet ?) :', err)
     }
+    console.log('[dice] before save, user:', user?.id ?? '(anonyme)')
+    if (!user) {
+      console.warn(
+        '[dice] aucun user authentifié — jet non sauvegardé ; reconnecte-toi pour activer l’historique.'
+      )
+      return
+    }
+    const payload = {
+      user_id: user.id,
+      type_de: selectedDice.label,
+      nombre: count,
+      // La colonne `resultats` est int[] dans la table existante. On envoie
+      // les valeurs individuelles ; le total est recalculé à la lecture.
+      // (Format JSON {total, dice} = nécessiterait une migration jsonb côté
+      // BDD avant tout changement ici.)
+      resultats: jets,
+      partage: share
+    }
+    console.log('[dice] supabase insert payload:', payload)
+    const { data: inserted, error } = await supabase
+      .from('jets_de_des')
+      .insert(payload)
+      .select('id, type_de, nombre, resultats, created_at')
+      .single()
+    console.log('[dice] supabase response:', { data: inserted, error })
+    if (error) {
+      // Détail complet pour diagnostiquer une RLS / contrainte / colonne :
+      console.error('[dice] save error:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      })
+      return
+    }
+    console.log('[dice] save ok, id:', inserted?.id)
+    // Mise à jour optimiste — le nouveau jet apparaît instantanément dans
+    // l'onglet Historique sans attendre le round-trip d'un re-fetch.
+    if (inserted) {
+      setHistorique((prev) => [inserted as JetRow, ...prev].slice(0, 20))
+    }
+    // Re-fetch en arrière-plan pour rester aligné avec la BDD (au cas où un
+    // autre onglet aurait écrit aussi).
+    fetchHistorique()
   }
 
   const total = results.reduce((a, b) => a + b, 0)
@@ -199,14 +590,27 @@ export default function DiceLauncher() {
   return (
     <>
       <style>{`
-        @keyframes dice-roll {
-          0%   { transform: rotate(0deg) scale(1); }
-          25%  { transform: rotate(220deg) scale(1.2); }
-          50%  { transform: rotate(440deg) scale(0.85); }
-          75%  { transform: rotate(620deg) scale(1.15); }
-          100% { transform: rotate(720deg) scale(1); }
+        /* Animation principale du roll : rotation rapide sur 3 axes. Tour
+           complet sur ~1.1 s, infinie pendant la phase rolling. */
+        /* Animation du roll : combinaison de rotation 2D + shake + scale
+           pour donner l'impression que le dé bouge dans tous les sens. */
+        @keyframes dice-rolling-shake {
+          0%   { transform: rotate(0deg)   translate(0, 0)     scale(1);    }
+          10%  { transform: rotate(72deg)  translate(-3px, 1px) scale(1.05); }
+          25%  { transform: rotate(180deg) translate(2px, -2px) scale(0.95); }
+          40%  { transform: rotate(252deg) translate(-2px, 2px) scale(1.05); }
+          55%  { transform: rotate(324deg) translate(2px, -1px) scale(0.97); }
+          70%  { transform: rotate(396deg) translate(-1px, 2px) scale(1.05); }
+          85%  { transform: rotate(468deg) translate(2px, 0)    scale(0.96); }
+          100% { transform: rotate(540deg) translate(0, 0)     scale(1);    }
         }
-        .dice-rolling { animation: dice-roll 1s cubic-bezier(.5,.1,.3,1) infinite; }
+        /* Idle : balancement très léger pour garder le dé "vivant". */
+        @keyframes dice-idle-wobble {
+          0%, 100% { transform: rotate(0deg); }
+          25%      { transform: rotate(2deg) translateY(-1px); }
+          50%      { transform: rotate(0deg) translateY(0); }
+          75%      { transform: rotate(-2deg) translateY(-1px); }
+        }
         @keyframes particle-fly {
           0%   { transform: translate(0,0) scale(1); opacity: 1; }
           60%  { opacity: 1; }
@@ -590,11 +994,10 @@ export default function DiceLauncher() {
                           : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                       }`}
                     >
-                      <DiceShape
+                      <DieSilhouetteIcon
                         type={d.label}
-                        gradient={actif ? 'gold' : 'silver'}
-                        showText={false}
-                        className="w-5 h-5"
+                        size={22}
+                        highlight={actif}
                       />
                       {d.label}
                     </button>
@@ -636,61 +1039,142 @@ export default function DiceLauncher() {
               {rolling ? 'Lancement...' : `Lancer ${count}${selectedDice.label}`}
             </button>
 
-            <div className="min-h-[140px] bg-gray-900 rounded-lg flex flex-col items-center justify-center p-4 relative overflow-hidden">
-              {rolling && (
-                <DiceShape
-                  type={selectedDice.label}
-                  gradient="silver"
-                  showText={false}
-                  className="w-24 h-24 dice-rolling"
+            {/* Bandeau résultat — placé AU-DESSUS du canvas pour rester
+                visible sans avoir à scroller / regarder en bas. Affiche le
+                total en gros + le détail des dés individuels juste sous. */}
+            {!rolling && results.length > 0 && count > 1 && (
+              <div
+                className="bg-gray-800 rounded-lg px-4 py-2 flex items-baseline justify-between gap-3 flex-wrap"
+                style={{
+                  border: '1px solid rgba(201,168,76,0.3)',
+                  boxShadow: '0 0 0 1px rgba(201,168,76,0.05) inset'
+                }}
+              >
+                <div className="flex items-baseline gap-2">
+                  <span
+                    className="text-[10px] uppercase tracking-[0.22em] font-bold"
+                    style={{ color: '#C9A84C' }}
+                  >
+                    Total
+                  </span>
+                  <span
+                    className="text-2xl font-bold leading-none"
+                    style={{
+                      color: '#fef08a',
+                      fontFamily: 'var(--font-cinzel), Cinzel, serif',
+                      textShadow: '0 0 10px rgba(201,168,76,0.6)'
+                    }}
+                  >
+                    {total}
+                  </span>
+                </div>
+                <span className="text-[11px] font-mono text-gray-400 truncate">
+                  {results.join(' + ')}
+                </span>
+              </div>
+            )}
+
+            <div
+              className="bg-gray-900 rounded-lg relative overflow-hidden"
+              style={{ height: 420 }}
+            >
+              {/* Le canvas Babylon est TOUJOURS dimensionné et visible (pas
+                  de display:none) — sinon il se monte avec un layout 0×0 et
+                  ne dessine jamais rien. On masque visuellement avec
+                  visibility/opacity quand l'init n'est pas finie ou a
+                  échoué, mais le canvas garde ses dimensions. */}
+              <div
+                className="absolute inset-0"
+                style={{
+                  visibility: boxStatus === 'failed' ? 'hidden' : 'visible',
+                  opacity: boxStatus === 'ready' ? 1 : 0.001,
+                  transition: 'opacity 0.4s'
+                }}
+              >
+                <Dice3DBoxScene
+                  ref={boxRef}
+                  // Bleu nuit profond : la lib bascule automatiquement vers
+                  // la variante du matériau qui rend les chiffres en clair
+                  // (luminance < 175 → suffixe _light → numbers blancs).
+                  themeColor="#1a1f3a"
+                  onReady={() => {
+                    console.log('[dice-launcher] box prête')
+                    setBoxStatus('ready')
+                  }}
+                  onError={(err) => {
+                    console.error('[dice-launcher] init box échouée :', err)
+                    setBoxStatus('failed')
+                  }}
                 />
-              )}
-              {!rolling && results.length === 0 && (
-                <p className="text-gray-500 text-sm">Prêt à lancer...</p>
-              )}
-              {!rolling && results.length > 0 && (
-                <>
-                  <div className="flex flex-wrap gap-2 justify-center">
-                    {results.map((r, i) => (
-                      <DiceShape
+              </div>
+              {/* Fallback / phase init : DiceArt2D superposé. Visible tant
+                  que boxStatus !== 'ready'. Disparaît avec un fade quand le
+                  canvas devient visible. */}
+              <div
+                className="absolute inset-0 flex flex-col items-center justify-center p-3 pointer-events-none"
+                style={{
+                  opacity: boxStatus === 'ready' ? 0 : 1,
+                  transition: 'opacity 0.4s'
+                }}
+              >
+                {boxStatus === 'init' && !rolling && results.length === 0 && (
+                  <p className="text-gray-500 text-xs mb-2">
+                    Chargement du moteur 3D…
+                  </p>
+                )}
+                {boxStatus === 'failed' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // L'utilisateur peut retenter une init manuelle
+                      console.log('[dice] retry init manuel')
+                      setBoxStatus('init')
+                    }}
+                    className="pointer-events-auto mb-2 px-3 py-1 text-[10px] uppercase tracking-wider rounded bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700"
+                    title="Relancer l'initialisation du moteur 3D"
+                  >
+                    ⚠ Mode 3D indisponible — réessayer
+                  </button>
+                )}
+                <div className="flex flex-wrap items-center justify-center gap-4 py-2">
+                  {Array.from({ length: count }).map((_, i) => {
+                    const dieSize = count > 4 ? 64 : count > 2 ? 80 : 96
+                    return (
+                      <DiceArt2D
                         key={i}
                         type={selectedDice.label}
-                        value={r}
-                        gradient={gradientKeyPour(r, selectedDice.sides)}
-                        className="w-14 h-14 result-pop drop-shadow-lg"
-                        style={{ animationDelay: `${i * 80}ms` } as CSSProperties}
+                        sides={selectedDice.sides}
+                        size={dieSize}
+                        value={results[i]}
+                        rolling={rolling}
+                        delay={i * 90}
                       />
-                    ))}
-                  </div>
-                  {count > 1 && (
-                    <p className="text-yellow-500 font-bold mt-3">
-                      Total : {total}
-                    </p>
-                  )}
-                  {showParticles && (
-                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                      {Array.from({ length: 16 }).map((_, i) => {
-                        const angle = (i / 16) * Math.PI * 2
-                        const distance = 70 + Math.random() * 50
-                        const dx = Math.cos(angle) * distance
-                        const dy = Math.sin(angle) * distance
-                        const couleurs = ['bg-yellow-400', 'bg-yellow-300', 'bg-orange-400', 'bg-white']
-                        const couleur = couleurs[i % couleurs.length]
-                        return (
-                          <span
-                            key={i}
-                            className={`particle absolute w-2 h-2 rounded-full ${couleur}`}
-                            style={{
-                              ['--dx' as string]: `${dx}px`,
-                              ['--dy' as string]: `${dy}px`,
-                              animationDelay: `${Math.random() * 100}ms`
-                            } as CSSProperties}
-                          />
-                        )
-                      })}
-                    </div>
-                  )}
-                </>
+                    )
+                  })}
+                </div>
+              </div>
+              {!rolling && showParticles && results.length > 0 && (
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                  {Array.from({ length: 16 }).map((_, i) => {
+                    const angle = (i / 16) * Math.PI * 2
+                    const distance = 70 + Math.random() * 50
+                    const dx = Math.cos(angle) * distance
+                    const dy = Math.sin(angle) * distance
+                    const couleurs = ['bg-yellow-400', 'bg-yellow-300', 'bg-orange-400', 'bg-white']
+                    const couleur = couleurs[i % couleurs.length]
+                    return (
+                      <span
+                        key={i}
+                        className={`particle absolute w-2 h-2 rounded-full ${couleur}`}
+                        style={{
+                          ['--dx' as string]: `${dx}px`,
+                          ['--dy' as string]: `${dy}px`,
+                          animationDelay: `${Math.random() * 100}ms`
+                        } as CSSProperties}
+                      />
+                    )
+                  })}
+                </div>
               )}
             </div>
 

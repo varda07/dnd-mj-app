@@ -7,6 +7,12 @@ import { useRouter, useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import { CONDITIONS_MAP, isConditionKey, type ConditionKey } from '@/app/data/conditions'
+import {
+  slotsRecommandes,
+  usesShortRest,
+  extraireDes,
+  type DiceExpr
+} from '@/app/data/sorts_dnd5e'
 
 type StatKey = 'force' | 'dexterite' | 'constitution' | 'intelligence' | 'sagesse' | 'charisme'
 
@@ -49,6 +55,8 @@ type Personnage = {
   langues: string
   autres_maitrises: string
   conditions: ConditionKey[]
+  sorts_slots_max: Record<string, number>
+  sorts_slots_used: Record<string, number>
 }
 
 type Sort = {
@@ -58,7 +66,16 @@ type Sort = {
   niveau: number
   ecole: string | null
   description: string | null
+  temps_incantation: string | null
+  portee: string | null
+  duree: string | null
+  composantes_verbal: boolean
+  composantes_somatique: boolean
+  composantes_materiel: string | null
+  concentration: boolean
+  rituel: boolean
   disponible: boolean
+  prepare: boolean
 }
 
 type SortTemplate = {
@@ -122,7 +139,9 @@ const FICHE_COLUMNS = [
   'traits_classe',
   'exploits',
   'langues',
-  'autres_maitrises'
+  'autres_maitrises',
+  'sorts_slots_max',
+  'sorts_slots_used'
 ] as const
 
 const modifier = (v: number) => Math.floor((v - 10) / 2)
@@ -153,7 +172,11 @@ const normalize = (row: Record<string, unknown>): Personnage => ({
   autres_maitrises: (row.autres_maitrises as string) ?? '',
   conditions: Array.isArray(row.conditions)
     ? (row.conditions as unknown[]).filter(isConditionKey)
-    : []
+    : [],
+  sorts_slots_max:
+    (row.sorts_slots_max as Record<string, number>) ?? {},
+  sorts_slots_used:
+    (row.sorts_slots_used as Record<string, number>) ?? {}
 })
 
 export default function FichePersonnage() {
@@ -202,7 +225,9 @@ export default function FichePersonnage() {
           .maybeSingle(),
         supabase
           .from('personnage_sorts')
-          .select('id, disponible, sorts(id, nom, niveau, ecole, description)')
+          .select(
+            'id, disponible, prepare, sorts(id, nom, niveau, ecole, description, temps_incantation, portee, duree, composantes_verbal, composantes_somatique, composantes_materiel, concentration, rituel)'
+          )
           .eq('personnage_id', id)
       ])
       if (!p) {
@@ -222,13 +247,26 @@ export default function FichePersonnage() {
         )
       }
       setPerso(normalize(p as Record<string, unknown>))
+      type FetchedSort = {
+        id: string
+        nom: string
+        niveau: number
+        ecole: string | null
+        description: string | null
+        temps_incantation: string | null
+        portee: string | null
+        duree: string | null
+        composantes_verbal: boolean | null
+        composantes_somatique: boolean | null
+        composantes_materiel: string | null
+        concentration: boolean | null
+        rituel: boolean | null
+      }
       const assignedRows = (ps ?? []) as Array<{
         id: string
         disponible: boolean
-        sorts:
-          | { id: string; nom: string; niveau: number; ecole: string | null; description: string | null }
-          | { id: string; nom: string; niveau: number; ecole: string | null; description: string | null }[]
-          | null
+        prepare: boolean | null
+        sorts: FetchedSort | FetchedSort[] | null
       }>
       const sortsAssigned: Sort[] = assignedRows
         .map((row) => {
@@ -241,11 +279,26 @@ export default function FichePersonnage() {
             niveau: s.niveau,
             ecole: s.ecole,
             description: s.description,
-            disponible: row.disponible
+            temps_incantation: s.temps_incantation,
+            portee: s.portee,
+            duree: s.duree,
+            composantes_verbal: !!s.composantes_verbal,
+            composantes_somatique: !!s.composantes_somatique,
+            composantes_materiel: s.composantes_materiel,
+            concentration: !!s.concentration,
+            rituel: !!s.rituel,
+            disponible: row.disponible,
+            prepare: row.prepare ?? true
           }
         })
         .filter((x): x is Sort => x !== null)
-        .sort((a, b) => a.niveau - b.niveau || a.nom.localeCompare(b.nom))
+        .sort(
+          (a, b) =>
+            // Préparés en premier, puis par niveau, puis par nom
+            (a.prepare === b.prepare ? 0 : a.prepare ? -1 : 1) ||
+            a.niveau - b.niveau ||
+            a.nom.localeCompare(b.nom)
+        )
       setSorts(sortsAssigned)
       setSaveState('saved')
       setSaveError(null)
@@ -451,18 +504,33 @@ export default function FichePersonnage() {
     const { data, error } = await supabase
       .from('personnage_sorts')
       .insert(rows)
-      .select('id, disponible, sorts(id, nom, niveau, ecole, description)')
+      .select(
+        'id, disponible, prepare, sorts(id, nom, niveau, ecole, description, temps_incantation, portee, duree, composantes_verbal, composantes_somatique, composantes_materiel, concentration, rituel)'
+      )
     if (error) {
       console.error('[fiche] attribuer sorts :', error)
       return
     }
+    type FetchedSort = {
+      id: string
+      nom: string
+      niveau: number
+      ecole: string | null
+      description: string | null
+      temps_incantation: string | null
+      portee: string | null
+      duree: string | null
+      composantes_verbal: boolean | null
+      composantes_somatique: boolean | null
+      composantes_materiel: string | null
+      concentration: boolean | null
+      rituel: boolean | null
+    }
     const ajoutes: Sort[] = ((data ?? []) as Array<{
       id: string
       disponible: boolean
-      sorts:
-        | { id: string; nom: string; niveau: number; ecole: string | null; description: string | null }
-        | { id: string; nom: string; niveau: number; ecole: string | null; description: string | null }[]
-        | null
+      prepare: boolean | null
+      sorts: FetchedSort | FetchedSort[] | null
     }>)
       .map((row) => {
         const s = Array.isArray(row.sorts) ? row.sorts[0] : row.sorts
@@ -474,13 +542,25 @@ export default function FichePersonnage() {
           niveau: s.niveau,
           ecole: s.ecole,
           description: s.description,
-          disponible: row.disponible
+          temps_incantation: s.temps_incantation,
+          portee: s.portee,
+          duree: s.duree,
+          composantes_verbal: !!s.composantes_verbal,
+          composantes_somatique: !!s.composantes_somatique,
+          composantes_materiel: s.composantes_materiel,
+          concentration: !!s.concentration,
+          rituel: !!s.rituel,
+          disponible: row.disponible,
+          prepare: row.prepare ?? true
         }
       })
       .filter((x): x is Sort => x !== null)
     setSorts((prev) =>
       [...prev, ...ajoutes].sort(
-        (a, b) => a.niveau - b.niveau || a.nom.localeCompare(b.nom)
+        (a, b) =>
+          (a.prepare === b.prepare ? 0 : a.prepare ? -1 : 1) ||
+          a.niveau - b.niveau ||
+          a.nom.localeCompare(b.nom)
       )
     )
     setSortsModalOpen(false)
@@ -499,6 +579,160 @@ export default function FichePersonnage() {
     setSorts((prev) =>
       prev.map((x) => (x.junction_id === s.junction_id ? { ...x, disponible: nouvelle } : x))
     )
+  }
+
+  const togglePrepare = async (s: Sort) => {
+    const nouvelle = !s.prepare
+    const { error } = await supabase
+      .from('personnage_sorts')
+      .update({ prepare: nouvelle })
+      .eq('id', s.junction_id)
+    if (error) {
+      console.error('[fiche] toggle prepare :', error)
+      return
+    }
+    setSorts((prev) =>
+      prev
+        .map((x) => (x.junction_id === s.junction_id ? { ...x, prepare: nouvelle } : x))
+        .sort(
+          (a, b) =>
+            (a.prepare === b.prepare ? 0 : a.prepare ? -1 : 1) ||
+            a.niveau - b.niveau ||
+            a.nom.localeCompare(b.nom)
+        )
+    )
+  }
+
+  // ============== Slots de sorts ==============
+
+  const slotMax = (lvl: number) => perso?.sorts_slots_max?.[String(lvl)] ?? 0
+  const slotUsed = (lvl: number) => perso?.sorts_slots_used?.[String(lvl)] ?? 0
+
+  const ajusterSlotMax = (lvl: number, delta: number) => {
+    if (!perso) return
+    const cur = slotMax(lvl)
+    const next = Math.max(0, Math.min(20, cur + delta))
+    if (next === cur) return
+    const max = { ...perso.sorts_slots_max, [String(lvl)]: next }
+    // Si on baisse le max sous le used courant, on aligne le used.
+    const used = { ...perso.sorts_slots_used }
+    if ((used[String(lvl)] ?? 0) > next) used[String(lvl)] = next
+    setPerso({ ...perso, sorts_slots_max: max, sorts_slots_used: used })
+  }
+
+  const consommerSlot = (lvl: number) => {
+    if (!perso) return false
+    const max = slotMax(lvl)
+    const used = slotUsed(lvl)
+    if (max === 0 || used >= max) return false
+    setPerso({
+      ...perso,
+      sorts_slots_used: {
+        ...perso.sorts_slots_used,
+        [String(lvl)]: used + 1
+      }
+    })
+    return true
+  }
+
+  const restaurerSlot = (lvl: number) => {
+    if (!perso) return
+    const used = slotUsed(lvl)
+    if (used === 0) return
+    setPerso({
+      ...perso,
+      sorts_slots_used: {
+        ...perso.sorts_slots_used,
+        [String(lvl)]: Math.max(0, used - 1)
+      }
+    })
+  }
+
+  const reposLong = () => {
+    if (!perso) return
+    setPerso({ ...perso, sorts_slots_used: {} })
+    // Restaurer aussi tous les sorts marqués utilisés (junction.disponible).
+    void supabase
+      .from('personnage_sorts')
+      .update({ disponible: true })
+      .eq('personnage_id', perso.id)
+      .then(() => {
+        setSorts((prev) => prev.map((x) => ({ ...x, disponible: true })))
+      })
+  }
+
+  const reposCourt = () => {
+    if (!perso) return
+    // Pour Sorcier (Pacte Magique), repos court restaure les emplacements.
+    if (!usesShortRest(perso.classe)) return
+    setPerso({ ...perso, sorts_slots_used: {} })
+  }
+
+  const appliquerSlotsRecommandes = () => {
+    if (!perso) return
+    const reco = slotsRecommandes(perso.classe, perso.niveau)
+    if (Object.keys(reco).length === 0) {
+      toast('Pas de progression connue pour cette classe.')
+      return
+    }
+    setPerso({
+      ...perso,
+      sorts_slots_max: reco,
+      sorts_slots_used: {}
+    })
+  }
+
+  // ============== Lancer un sort ==============
+
+  type CastModal = { sort: Sort; minLevel: number } | null
+  const [castModal, setCastModal] = useState<CastModal>(null)
+  const [castingFx, setCastingFx] = useState<{ id: string; cantrip: boolean } | null>(null)
+  const [diceProposal, setDiceProposal] = useState<{ sort: Sort; dice: DiceExpr[] } | null>(null)
+
+  const declencherCast = (s: Sort) => {
+    if (s.niveau === 0) {
+      // Cantrip : effet visuel uniquement.
+      setCastingFx({ id: s.junction_id, cantrip: true })
+      setTimeout(() => setCastingFx(null), 1200)
+      proposerLancerDes(s)
+      return
+    }
+    setCastModal({ sort: s, minLevel: s.niveau })
+  }
+
+  const confirmerCast = (lvl: number) => {
+    if (!castModal) return
+    const ok = consommerSlot(lvl)
+    if (!ok) {
+      toast(`Aucun emplacement de niveau ${lvl} disponible.`)
+      return
+    }
+    const s = castModal.sort
+    setCastingFx({ id: s.junction_id, cantrip: false })
+    setTimeout(() => setCastingFx(null), 1200)
+    setCastModal(null)
+    // Marque le sort comme utilisé sur la junction (pour les sorts à charge).
+    void supabase
+      .from('personnage_sorts')
+      .update({ disponible: false })
+      .eq('id', s.junction_id)
+    setSorts((prev) =>
+      prev.map((x) => (x.junction_id === s.junction_id ? { ...x, disponible: false } : x))
+    )
+    proposerLancerDes(s)
+  }
+
+  const proposerLancerDes = (s: Sort) => {
+    const dice = extraireDes(s.description)
+    if (dice.length > 0) setDiceProposal({ sort: s, dice })
+  }
+
+  const lancerDesPourSort = (d: DiceExpr) => {
+    if (typeof window === 'undefined') return
+    window.dispatchEvent(
+      new CustomEvent('dice:open', { detail: { dice: `d${d.faces}` } })
+    )
+    setDiceProposal(null)
   }
 
   const retirerSort = async (s: Sort) => {
@@ -542,7 +776,8 @@ export default function FichePersonnage() {
   const percepPassive = 10 + modStat('sagesse') + (perso.comp_maitrises['Perception'] ? bm : 0)
   const initiative = modStat('dexterite')
   const deVieRestants = niveau - perso.de_vie_utilises
-  const sortsAttaque = sorts.filter((s) => s.niveau === 0)
+  const cantrips = sorts.filter((s) => s.niveau === 0)
+  const sortsAttaque = cantrips
   const sortsConnus = sorts.filter((s) => s.niveau > 0)
 
   const saveLabel: Record<SaveState, { text: string; color: string }> = {
@@ -1103,10 +1338,120 @@ export default function FichePersonnage() {
               </div>
             </Panel>
 
-            <Panel title="Sorts connus">
+            <Panel title="🪄 Emplacements de sorts">
               <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
                 <p className="text-xs text-gray-500">
-                  {sortsConnus.length + sortsAttaque.length} sort(s) attribué(s)
+                  Cases pleines = utilisées · cases vides = disponibles
+                </p>
+                {isOwner && (
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={appliquerSlotsRecommandes}
+                      className="px-3 py-1.5 rounded text-xs font-bold bg-stone-700 hover:bg-stone-600 text-yellow-200 border border-yellow-700/50"
+                      title="Applique la table PHB pour la classe + niveau de ce personnage."
+                    >
+                      📜 Auto (PHB)
+                    </button>
+                    {usesShortRest(perso.classe) && (
+                      <button
+                        type="button"
+                        onClick={reposCourt}
+                        className="px-3 py-1.5 rounded text-xs font-bold bg-amber-700/30 hover:bg-amber-700/50 text-amber-200 border border-amber-700/50"
+                        title="Sorcier : repos court restaure tous les emplacements du Pacte."
+                      >
+                        ☕ Repos court
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={reposLong}
+                      className="px-3 py-1.5 rounded text-xs font-bold bg-yellow-600 hover:bg-yellow-500 text-gray-900"
+                    >
+                      🌙 Repos long
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((lvl) => {
+                  const max = slotMax(lvl)
+                  const used = slotUsed(lvl)
+                  if (max === 0 && !isOwner) return null
+                  return (
+                    <div
+                      key={lvl}
+                      className={`flex items-center gap-2 p-2 rounded ${
+                        max === 0
+                          ? 'bg-stone-900/30'
+                          : 'bg-stone-900/60 border border-yellow-800/30'
+                      }`}
+                    >
+                      <span className="text-yellow-200 font-bold text-sm w-12 flex-shrink-0">
+                        Niv. {lvl}
+                      </span>
+                      <div className="flex-1 flex items-center gap-1 flex-wrap">
+                        {Array.from({ length: max }).map((_, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            disabled={!isOwner}
+                            onClick={() =>
+                              i < used ? restaurerSlot(lvl) : consommerSlot(lvl)
+                            }
+                            aria-label={
+                              i < used
+                                ? `Emplacement ${lvl} utilisé`
+                                : `Emplacement ${lvl} disponible`
+                            }
+                            className={`w-5 h-5 rounded-full border-2 transition ${
+                              i < used
+                                ? 'bg-yellow-500 border-yellow-300 shadow-[0_0_6px_rgba(201,168,76,0.5)]'
+                                : 'bg-transparent border-yellow-700/60 hover:border-yellow-400'
+                            }`}
+                          />
+                        ))}
+                        {max === 0 && (
+                          <span className="text-stone-500 text-xs italic">
+                            (aucun emplacement)
+                          </span>
+                        )}
+                      </div>
+                      {isOwner && (
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => ajusterSlotMax(lvl, -1)}
+                            className="w-6 h-6 rounded text-yellow-300 bg-stone-800 hover:bg-stone-700 border border-yellow-800/40 text-xs"
+                            aria-label="Diminuer le maximum"
+                          >
+                            −
+                          </button>
+                          <span className="text-xs text-gray-400 w-10 text-center">
+                            {max - used}/{max}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => ajusterSlotMax(lvl, +1)}
+                            className="w-6 h-6 rounded text-yellow-300 bg-stone-800 hover:bg-stone-700 border border-yellow-800/40 text-xs"
+                            aria-label="Augmenter le maximum"
+                          >
+                            +
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </Panel>
+
+            <Panel title="✨ Sorts">
+              <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
+                <p className="text-xs text-gray-500">
+                  {sortsConnus.length + cantrips.length} sort(s) attribué(s)
+                  {' · '}
+                  {sortsConnus.filter((s) => s.prepare).length} préparé(s)
                 </p>
                 {isOwner && (
                   <button
@@ -1118,47 +1463,60 @@ export default function FichePersonnage() {
                   </button>
                 )}
               </div>
-              {sortsConnus.length === 0 ? (
-                <p className="text-gray-500 italic text-sm">Aucun sort attribué à ce personnage.</p>
+
+              {cantrips.length === 0 && sortsConnus.length === 0 ? (
+                <p className="text-gray-500 italic text-sm">
+                  Aucun sort attribué à ce personnage.
+                </p>
               ) : (
-                <div className="space-y-2">
-                  {sortsConnus.map((s) => (
-                    <div
-                      key={s.junction_id}
-                      className={`bg-stone-900/60 border border-yellow-800/30 rounded p-2 ${
-                        !s.disponible ? 'opacity-50' : ''
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <span className="text-yellow-100 font-bold">{s.nom}</span>
-                        <span className="text-xs text-gray-500">
-                          Niv. {s.niveau}
-                          {s.ecole ? ` · ${s.ecole}` : ''}
+                <div className="space-y-4">
+                  {/* Cantrips (niveau 0) — toujours disponibles, séparés visuellement */}
+                  {cantrips.length > 0 && (
+                    <div>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-yellow-600 font-bold mb-2 flex items-center gap-2">
+                        <span>∞ Tours de magie</span>
+                        <span className="text-stone-500 italic normal-case tracking-normal text-[11px] font-normal">
+                          Toujours disponibles
                         </span>
+                      </p>
+                      <div className="space-y-2">
+                        {cantrips.map((s) => (
+                          <SortLigne
+                            key={s.junction_id}
+                            sort={s}
+                            isOwner={isOwner}
+                            cantrip
+                            casting={castingFx?.id === s.junction_id}
+                            onCast={() => declencherCast(s)}
+                            onRetirer={() => retirerSort(s)}
+                          />
+                        ))}
                       </div>
-                      {s.description && (
-                        <p className="text-gray-400 text-xs italic mt-1">{s.description}</p>
-                      )}
-                      {isOwner && (
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          <button
-                            type="button"
-                            onClick={() => toggleSortDisponible(s)}
-                            className="px-2 py-1 text-[10px] uppercase tracking-wider rounded border border-gray-700 bg-stone-800 hover:bg-stone-700 text-gray-300"
-                          >
-                            {s.disponible ? 'Marquer utilisé' : 'Restaurer'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => retirerSort(s)}
-                            className="px-2 py-1 text-[10px] uppercase tracking-wider rounded border border-red-900 bg-red-950/40 text-red-300 hover:bg-red-900/40 ml-auto"
-                          >
-                            Retirer ce sort
-                          </button>
-                        </div>
-                      )}
                     </div>
-                  ))}
+                  )}
+
+                  {/* Sorts niveau 1+ — préparés en haut, non préparés grisés */}
+                  {sortsConnus.length > 0 && (
+                    <div>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-yellow-600 font-bold mb-2">
+                        Sorts connus
+                      </p>
+                      <div className="space-y-2">
+                        {sortsConnus.map((s) => (
+                          <SortLigne
+                            key={s.junction_id}
+                            sort={s}
+                            isOwner={isOwner}
+                            casting={castingFx?.id === s.junction_id}
+                            onCast={() => declencherCast(s)}
+                            onTogglePrepare={() => togglePrepare(s)}
+                            onToggleDispo={() => toggleSortDisponible(s)}
+                            onRetirer={() => retirerSort(s)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </Panel>
@@ -1321,7 +1679,265 @@ export default function FichePersonnage() {
           <p className="text-yellow-100 font-bold">{rollMessage}</p>
         </div>
       )}
+
+      {castModal && (
+        <div
+          className="fixed inset-0 z-[120] bg-black/75 flex items-center justify-center p-4"
+          onClick={() => setCastModal(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-xl shadow-2xl"
+            style={{
+              background: '#12141a',
+              border: '1px solid rgba(201,168,76,0.5)'
+            }}
+          >
+            <div
+              className="px-4 py-3 border-b"
+              style={{ borderColor: 'rgba(201,168,76,0.2)' }}
+            >
+              <p className="text-[10px] uppercase tracking-[0.22em] text-[#C9A84C] font-bold">
+                Lancer le sort
+              </p>
+              <h3 className="text-yellow-100 font-bold text-lg mt-1">
+                {castModal.sort.nom}
+              </h3>
+              <p className="text-xs text-gray-400 mt-1">
+                Niveau minimum : {castModal.minLevel}. Choisis l&apos;emplacement à dépenser
+                (montée d&apos;emplacement possible).
+              </p>
+            </div>
+            <div className="p-3 grid grid-cols-3 gap-2">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9]
+                .filter((lvl) => lvl >= castModal.minLevel)
+                .map((lvl) => {
+                  const max = slotMax(lvl)
+                  const used = slotUsed(lvl)
+                  const dispo = max - used
+                  const indispo = max === 0 || dispo === 0
+                  return (
+                    <button
+                      key={lvl}
+                      type="button"
+                      disabled={indispo}
+                      onClick={() => confirmerCast(lvl)}
+                      className={`p-2 rounded text-sm font-bold transition ${
+                        indispo
+                          ? 'bg-stone-900/50 border border-stone-700 text-stone-600 cursor-not-allowed'
+                          : 'bg-yellow-500/10 border border-yellow-600/60 text-yellow-200 hover:bg-yellow-500/25'
+                      }`}
+                    >
+                      Niv. {lvl}
+                      <span className="block text-[10px] font-normal text-gray-400 mt-0.5">
+                        {dispo}/{max}
+                      </span>
+                    </button>
+                  )
+                })}
+            </div>
+            <div
+              className="px-3 py-2 border-t flex justify-end"
+              style={{ borderColor: 'rgba(201,168,76,0.15)' }}
+            >
+              <button
+                type="button"
+                onClick={() => setCastModal(null)}
+                className="px-3 py-1.5 rounded text-xs bg-stone-700 hover:bg-stone-600 text-gray-200"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {diceProposal && (
+        <div
+          className="fixed bottom-6 right-6 z-[110] rounded-lg shadow-2xl p-3 max-w-xs"
+          style={{
+            background: '#12141a',
+            border: '1px solid rgba(201,168,76,0.5)'
+          }}
+        >
+          <p className="text-[10px] uppercase tracking-[0.2em] text-[#C9A84C] font-bold mb-1">
+            Dés détectés dans {diceProposal.sort.nom}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {diceProposal.dice.map((d, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => lancerDesPourSort(d)}
+                className="px-2.5 py-1 rounded bg-yellow-500/15 border border-yellow-600/60 text-yellow-200 hover:bg-yellow-500/30 text-xs font-bold"
+              >
+                🎲 {d.n}d{d.faces}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setDiceProposal(null)}
+              className="px-2 py-1 text-xs text-gray-400 hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </main>
+  )
+}
+
+// ----------------------------------------------------------------------------
+// SortLigne : ligne d'un sort dans la fiche perso, avec V/S/M, prepare,
+// "Lancer", et effet visuel de cast.
+// ----------------------------------------------------------------------------
+function SortLigne({
+  sort,
+  isOwner,
+  cantrip,
+  casting,
+  onCast,
+  onTogglePrepare,
+  onToggleDispo,
+  onRetirer
+}: {
+  sort: Sort
+  isOwner: boolean
+  cantrip?: boolean
+  casting: boolean
+  onCast: () => void
+  onTogglePrepare?: () => void
+  onToggleDispo?: () => void
+  onRetirer: () => void
+}) {
+  const grise = !cantrip && !sort.prepare
+  const utilise = !sort.disponible && !cantrip
+  return (
+    <div
+      className={`relative bg-stone-900/60 border rounded p-2 transition ${
+        utilise ? 'border-stone-700 opacity-60' : 'border-yellow-800/30'
+      } ${grise ? 'opacity-50' : ''}`}
+    >
+      {/* Effet visuel d'incantation */}
+      {casting && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 rounded animate-pulse"
+          style={{
+            boxShadow: cantrip
+              ? '0 0 20px 4px rgba(201,168,76,0.55), inset 0 0 20px rgba(201,168,76,0.25)'
+              : '0 0 26px 6px rgba(139,92,246,0.65), inset 0 0 26px rgba(139,92,246,0.35)',
+            background: cantrip
+              ? 'radial-gradient(circle at 50% 100%, rgba(201,168,76,0.18), transparent 70%)'
+              : 'radial-gradient(circle at 50% 50%, rgba(139,92,246,0.18), transparent 70%)'
+          }}
+        />
+      )}
+
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
+          <span className="text-yellow-100 font-bold truncate">{sort.nom}</span>
+          {sort.composantes_verbal && (
+            <span className="text-[9px] px-1 py-0.5 rounded bg-stone-800 border border-yellow-800/40 text-gray-400">
+              V
+            </span>
+          )}
+          {sort.composantes_somatique && (
+            <span className="text-[9px] px-1 py-0.5 rounded bg-stone-800 border border-yellow-800/40 text-gray-400">
+              S
+            </span>
+          )}
+          {sort.composantes_materiel && (
+            <span
+              className="text-[9px] px-1 py-0.5 rounded bg-stone-800 border border-yellow-800/40 text-gray-400"
+              title={`Composante matérielle : ${sort.composantes_materiel}`}
+            >
+              M
+            </span>
+          )}
+          {sort.concentration && (
+            <span
+              className="text-[9px] px-1 py-0.5 rounded text-yellow-300 border"
+              style={{
+                background: 'rgba(201,168,76,0.1)',
+                borderColor: 'rgba(201,168,76,0.4)'
+              }}
+              title="Concentration"
+            >
+              ◉
+            </span>
+          )}
+          {sort.rituel && (
+            <span
+              className="text-[9px] px-1 py-0.5 rounded text-yellow-300 border"
+              style={{
+                background: 'rgba(201,168,76,0.1)',
+                borderColor: 'rgba(201,168,76,0.4)'
+              }}
+              title="Rituel"
+            >
+              ✦
+            </span>
+          )}
+        </div>
+        <span className="text-xs text-gray-500 ml-auto">
+          {cantrip ? 'Tour' : `Niv. ${sort.niveau}`}
+          {sort.ecole ? ` · ${sort.ecole}` : ''}
+        </span>
+      </div>
+
+      {sort.description && (
+        <p className="text-gray-400 text-xs italic mt-1">{sort.description}</p>
+      )}
+
+      <div className="flex items-center gap-2 mt-2 flex-wrap">
+        <button
+          type="button"
+          onClick={onCast}
+          disabled={utilise}
+          className="px-2.5 py-1 text-[11px] uppercase tracking-wider rounded font-bold border transition disabled:opacity-40 disabled:cursor-not-allowed"
+          style={{
+            background: 'rgba(201,168,76,0.15)',
+            borderColor: 'rgba(201,168,76,0.5)',
+            color: '#C9A84C'
+          }}
+        >
+          🪄 Lancer
+        </button>
+        {!cantrip && isOwner && onTogglePrepare && (
+          <label className="inline-flex items-center gap-1.5 text-[11px] text-gray-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={sort.prepare}
+              onChange={onTogglePrepare}
+              className="accent-yellow-500"
+            />
+            Préparé
+          </label>
+        )}
+        {!cantrip && isOwner && onToggleDispo && (
+          <button
+            type="button"
+            onClick={onToggleDispo}
+            className="px-2 py-1 text-[10px] uppercase tracking-wider rounded border border-gray-700 bg-stone-800 hover:bg-stone-700 text-gray-300"
+          >
+            {sort.disponible ? 'Marquer utilisé' : 'Restaurer'}
+          </button>
+        )}
+        {isOwner && (
+          <button
+            type="button"
+            onClick={onRetirer}
+            className="px-2 py-1 text-[10px] uppercase tracking-wider rounded border border-red-900 bg-red-950/40 text-red-300 hover:bg-red-900/40 ml-auto"
+          >
+            Retirer
+          </button>
+        )}
+      </div>
+    </div>
   )
 }
 

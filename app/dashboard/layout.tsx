@@ -1,6 +1,7 @@
 import DiceLauncher from '@/app/components/DiceLauncher'
 import SoundBox from '@/app/components/SoundBox'
-import GlobalSearch from '@/app/components/GlobalSearch'
+import CommandPalette from '@/app/components/CommandPalette'
+import Sidebar from '@/app/components/Sidebar'
 import ThemeLoader from './ThemeLoader'
 
 export default function DashboardLayout({
@@ -11,10 +12,13 @@ export default function DashboardLayout({
   return (
     <>
       <ThemeLoader />
-      {children}
+      <Sidebar />
+      <div className="md:pl-[var(--sidebar-w,200px)] min-h-screen transition-[padding] duration-200 ease-out">
+        {children}
+      </div>
       <SoundBox />
       <DiceLauncher />
-      <GlobalSearch />
+      <CommandPalette />
     </>
   )
 }

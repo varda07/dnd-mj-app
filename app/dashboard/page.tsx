@@ -7,7 +7,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import { useLocale } from '@/app/i18n/IntlProvider'
-import { openGlobalSearch } from '@/app/components/GlobalSearch'
+import { openCommandPalette } from '@/app/components/CommandPalette'
 import Combat from './combat/page'
 import {
   THEMES,
@@ -18,7 +18,7 @@ import {
   type ThemeKey
 } from '@/app/styles/themes'
 
-type ScenarioLite = { id: string; nom: string }
+type ScenarioLite = { id: string; nom: string; actif?: boolean }
 type PersoLite = {
   id: string
   nom: string
@@ -28,6 +28,16 @@ type PersoLite = {
   hp_max: number
   image_url: string | null
   scenario_id: string | null
+}
+
+type ScenarioActif = {
+  id: string
+  nom: string
+  description: string | null
+  nbPersos: number
+  nbEnnemis: number
+  nbPnj: number
+  combatActif: { round: number; tour: number } | null
 }
 
 export default function Dashboard() {
@@ -42,6 +52,7 @@ export default function Dashboard() {
   const [codeScenario, setCodeScenario] = useState('')
   const [messageJoueur, setMessageJoueur] = useState('')
   const [personnagesJoueurs, setPersonnagesJoueurs] = useState<PersoLite[]>([])
+  const [scenarioActif, setScenarioActif] = useState<ScenarioActif | null>(null)
   const [menuOuvert, setMenuOuvert] = useState(false)
   const [themeOuvert, setThemeOuvert] = useState(false)
   const [rejoindreOuvert, setRejoindreOuvert] = useState(false)
@@ -131,6 +142,67 @@ export default function Dashboard() {
     if (data) setPersonnagesJoueurs(data)
   }
 
+  const chargerScenarioActif = async (
+    id: string,
+    nom: string,
+    description: string | null
+  ) => {
+    const [persos, ennemis, liens, combat] = await Promise.all([
+      supabase
+        .from('personnages')
+        .select('id', { count: 'exact', head: true })
+        .eq('scenario_id', id),
+      supabase
+        .from('ennemis')
+        .select('id', { count: 'exact', head: true })
+        .eq('scenario_id', id),
+      supabase
+        .from('scenario_liens')
+        .select('id', { count: 'exact', head: true })
+        .eq('scenario_id', id)
+        .eq('element_type', 'pnj'),
+      supabase
+        .from('combats')
+        .select('round, tour_actuel, actif')
+        .eq('scenario_id', id)
+        .maybeSingle()
+    ])
+    setScenarioActif({
+      id,
+      nom,
+      description,
+      nbPersos: persos.count ?? 0,
+      nbEnnemis: ennemis.count ?? 0,
+      nbPnj: liens.count ?? 0,
+      combatActif:
+        combat.data?.actif
+          ? { round: combat.data.round, tour: combat.data.tour_actuel }
+          : null
+    })
+  }
+
+  const desactiverScenarioActif = async () => {
+    if (!scenarioActif) return
+    if (!window.confirm(t('confirm_unset_active'))) return
+    const idActif = scenarioActif.id
+    setScenarioActif(null)
+    setScenariosMj((prev) =>
+      prev.map((s) => (s.id === idActif ? { ...s, actif: false } : s))
+    )
+    const { error } = await supabase
+      .from('scenarios')
+      .update({ actif: false })
+      .eq('id', idActif)
+    if (error) {
+      // En cas d'échec, recharge l'état pour refléter la réalité.
+      console.error('[scenario] désactivation échouée :', error)
+      chargerScenarioActif(idActif, scenarioActif.nom, scenarioActif.description)
+      setScenariosMj((prev) =>
+        prev.map((s) => (s.id === idActif ? { ...s, actif: true } : s))
+      )
+    }
+  }
+
   useEffect(() => {
     const init = async () => {
       const { data } = await supabase.auth.getUser()
@@ -140,15 +212,25 @@ export default function Dashboard() {
       }
       setUserId(data.user.id)
       const [{ data: mine }, { data: joined }] = await Promise.all([
-        supabase.from('scenarios').select('id, nom').eq('mj_id', data.user.id).order('nom'),
+        supabase
+          .from('scenarios')
+          .select('id, nom, description, actif')
+          .eq('mj_id', data.user.id)
+          .order('nom'),
         supabase
           .from('scenarios_joueurs')
           .select('scenario:scenarios(id, nom)')
           .eq('joueur_id', data.user.id)
       ])
       if (mine) {
-        setScenariosMj(mine)
+        setScenariosMj(mine.map((s) => ({ id: s.id, nom: s.nom, actif: s.actif })))
         fetchPersonnagesJoueurs(mine.map((s) => s.id))
+        const actif = mine.find((s) => s.actif)
+        if (actif) {
+          chargerScenarioActif(actif.id, actif.nom, actif.description)
+        } else {
+          setScenarioActif(null)
+        }
       }
       if (joined) {
         const list = joined
@@ -246,7 +328,7 @@ export default function Dashboard() {
 
   return (
     <main className="min-h-screen bg-gray-900 text-white pb-[calc(56px+env(safe-area-inset-bottom))] md:pb-0">
-      <div className="bg-gray-800 h-12 md:h-auto px-3 md:p-4 flex md:grid md:grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-gray-700 theme-header-border theme-no-deco">
+      <div className="bg-gray-800 h-12 md:h-auto pl-12 pr-3 md:p-4 flex md:grid md:grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-gray-700 theme-header-border theme-no-deco">
         <div className="min-w-0 flex-1 md:flex-initial md:justify-self-start">
           <h1 className="text-[13px] md:text-xl font-medium md:font-bold text-yellow-500 truncate text-left tracking-[0.18em] md:tracking-normal">
             {t('app_title')}
@@ -423,7 +505,7 @@ export default function Dashboard() {
         <div className="relative md:justify-self-end flex items-center gap-1" ref={menuRef}>
           <button
             type="button"
-            onClick={openGlobalSearch}
+            onClick={openCommandPalette}
             aria-label={tSearch('open_tooltip')}
             title={tSearch('open_tooltip')}
             className="md:hidden w-10 h-10 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 rounded transition text-lg leading-none"
@@ -432,7 +514,7 @@ export default function Dashboard() {
           </button>
           <button
             type="button"
-            onClick={openGlobalSearch}
+            onClick={openCommandPalette}
             title={tSearch('open_tooltip')}
             className="hidden md:inline-flex items-center gap-2 h-9 px-3 rounded border border-gray-700 bg-gray-900/60 hover:bg-gray-700 text-gray-400 hover:text-white text-xs transition"
           >
@@ -702,6 +784,91 @@ export default function Dashboard() {
             </button>
           </div>
           <div className="p-3 md:p-6">
+            {scenarioActif && (
+              <section
+                className="mb-4 md:mb-6 rounded-lg overflow-hidden"
+                style={{
+                  background: '#12141a',
+                  border: '1px solid rgba(201,168,76,0.4)',
+                  boxShadow: '0 0 0 1px rgba(201,168,76,0.08) inset'
+                }}
+              >
+                <div className="flex flex-col md:flex-row md:items-stretch">
+                  <div className="flex-1 p-4 md:p-5 relative">
+                    <button
+                      type="button"
+                      onClick={desactiverScenarioActif}
+                      title={t('unset_active_tooltip')}
+                      aria-label={t('unset_active_tooltip')}
+                      className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full text-[#a8a8b0] hover:text-white hover:bg-[rgba(201,168,76,0.15)] border border-transparent hover:border-[rgba(201,168,76,0.3)] transition text-sm leading-none"
+                    >
+                      ✕
+                    </button>
+                    <p
+                      className="text-[9px] uppercase tracking-[0.25em] font-bold mb-1"
+                      style={{ color: '#C9A84C' }}
+                    >
+                      ★ {t('active_scenario_label')}
+                    </p>
+                    <h2 className="text-lg md:text-xl font-bold text-white truncate pr-8">
+                      {scenarioActif.nom}
+                    </h2>
+                    {scenarioActif.description && (
+                      <p className="text-xs md:text-sm text-[#a8a8b0] mt-1 line-clamp-2">
+                        {scenarioActif.description}
+                      </p>
+                    )}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-black/40 border border-[rgba(201,168,76,0.2)] text-[#a8a8b0]">
+                        🧙 {scenarioActif.nbPersos} {t('count_players')}
+                      </span>
+                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-black/40 border border-[rgba(201,168,76,0.2)] text-[#a8a8b0]">
+                        👹 {scenarioActif.nbEnnemis} {t('count_enemies')}
+                      </span>
+                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-black/40 border border-[rgba(201,168,76,0.2)] text-[#a8a8b0]">
+                        🧑 {scenarioActif.nbPnj} {t('count_pnj')}
+                      </span>
+                      {scenarioActif.combatActif && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-900/40 border border-red-500/40 text-red-200">
+                          ⚔ {t('combat_in_progress', {
+                            round: scenarioActif.combatActif.round,
+                            tour: scenarioActif.combatActif.tour + 1
+                          })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div
+                    className="flex md:flex-col md:justify-center gap-2 p-3 md:p-4 md:border-l border-t md:border-t-0"
+                    style={{ borderColor: 'rgba(201,168,76,0.15)' }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => router.push('/dashboard/combat')}
+                      className="flex-1 md:flex-initial px-3 py-2 rounded text-xs font-bold tracking-wider bg-[rgba(201,168,76,0.12)] hover:bg-[rgba(201,168,76,0.2)] text-[#C9A84C] border border-[rgba(201,168,76,0.3)] transition"
+                    >
+                      ⚔ {t('shortcut_combat')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => router.push('/dashboard/exploration')}
+                      className="flex-1 md:flex-initial px-3 py-2 rounded text-xs font-bold tracking-wider bg-[rgba(201,168,76,0.12)] hover:bg-[rgba(201,168,76,0.2)] text-[#C9A84C] border border-[rgba(201,168,76,0.3)] transition"
+                    >
+                      🧭 {t('shortcut_explore')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        router.push(`/dashboard/scenarios/${scenarioActif.id}/notes`)
+                      }
+                      className="flex-1 md:flex-initial px-3 py-2 rounded text-xs font-bold tracking-wider bg-[rgba(201,168,76,0.12)] hover:bg-[rgba(201,168,76,0.2)] text-[#C9A84C] border border-[rgba(201,168,76,0.3)] transition"
+                    >
+                      📝 {t('shortcut_notes')}
+                    </button>
+                  </div>
+                </div>
+              </section>
+            )}
             {personnagesJoueurs.length > 0 && (
               <div className="bg-gray-800 rounded-lg mb-6 overflow-hidden">
                 <button
@@ -905,8 +1072,8 @@ export default function Dashboard() {
       >
         {[
           { id: 'accueil', label: t('nav_home'), icon: '⌂', active: pathname === '/dashboard', onClick: () => router.push('/dashboard') },
-          { id: 'biblio', label: t('nav_library'), icon: '📚', active: pathname?.startsWith('/dashboard/bibliotheque'), onClick: () => router.push('/dashboard/bibliotheque') },
-          { id: 'aventure', label: t('nav_adventure'), icon: '🗡', active: pathname?.startsWith('/dashboard/aventure') || pathname?.startsWith('/dashboard/combat') || pathname?.startsWith('/dashboard/exploration'), onClick: () => router.push('/dashboard/aventure') },
+          { id: 'combat', label: t('nav_combat'), icon: '⚔', active: pathname?.startsWith('/dashboard/combat'), onClick: () => router.push('/dashboard/combat') },
+          { id: 'aventure', label: t('nav_adventure'), icon: '🗡', active: pathname?.startsWith('/dashboard/aventure') || pathname?.startsWith('/dashboard/exploration'), onClick: () => router.push('/dashboard/aventure') },
           { id: 'sons', label: t('nav_sounds'), icon: '🎵', active: false, onClick: () => window.dispatchEvent(new CustomEvent('soundbox:open')) }
         ].map((tab) => (
           <button

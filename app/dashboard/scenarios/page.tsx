@@ -25,6 +25,7 @@ type Scenario = {
   public: boolean
   nb_copies: number
   auteur_username: string | null
+  actif: boolean
   nb_chapitres?: number
 }
 
@@ -147,6 +148,43 @@ export default function Scenarios() {
   const supprimerScenario = async (id: string) => {
     if (!window.confirm(tc('confirm_delete'))) return
     await supabase.from('scenarios').delete().eq('id', id)
+    fetchScenarios()
+  }
+
+  const definirActif = async (scenario: Scenario) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    if (scenario.actif) {
+      // Désactivation manuelle.
+      const { error } = await supabase
+        .from('scenarios')
+        .update({ actif: false })
+        .eq('id', scenario.id)
+      if (error) {
+        setMessage(error.message)
+        return
+      }
+      fetchScenarios()
+      return
+    }
+    // Active ce scénario, et désactive tous les autres du MJ — un seul actif.
+    const { error: errClear } = await supabase
+      .from('scenarios')
+      .update({ actif: false })
+      .eq('mj_id', user.id)
+      .eq('actif', true)
+    if (errClear) {
+      setMessage(errClear.message)
+      return
+    }
+    const { error } = await supabase
+      .from('scenarios')
+      .update({ actif: true })
+      .eq('id', scenario.id)
+    if (error) {
+      setMessage(error.message)
+      return
+    }
     fetchScenarios()
   }
 
@@ -344,11 +382,31 @@ export default function Scenarios() {
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-3 flex-wrap min-w-0">
                   <h3 className="text-lg font-bold text-white truncate">{scenario.nom}</h3>
+                  {scenario.actif && (
+                    <span
+                      className="text-[10px] uppercase tracking-[0.2em] font-bold px-2 py-0.5 rounded-full"
+                      style={{
+                        background: 'rgba(201,168,76,0.15)',
+                        border: '1px solid rgba(201,168,76,0.4)',
+                        color: '#C9A84C'
+                      }}
+                    >
+                      ★ {t('active_badge')}
+                    </span>
+                  )}
                   <span className="text-xs text-gray-500 bg-gray-900/50 border border-gray-700 rounded-full px-2 py-0.5">
                     📖 {scenario.nb_chapitres ?? 0} chapitre{(scenario.nb_chapitres ?? 0) > 1 ? 's' : ''}
                   </span>
                 </div>
                 <div className="flex gap-3 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => definirActif(scenario)}
+                    className={`text-sm font-bold ${scenario.actif ? 'text-yellow-300' : 'text-gray-400 hover:text-yellow-400'}`}
+                    title={scenario.actif ? t('unset_active_tooltip') : t('set_active_tooltip')}
+                  >
+                    {scenario.actif ? `★ ${t('active_badge')}` : `☆ ${t('set_active')}`}
+                  </button>
                   <button
                     type="button"
                     onClick={() => router.push(`/dashboard/scenarios/${scenario.id}/edit`)}
