@@ -26,13 +26,13 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "D&D Manager",
-  description: "Gestionnaire de campagnes D&D — scénarios, personnages, combats",
+  title: "Codex",
+  description: "Codex — La Forge Éclipsée. Gestionnaire de campagnes D&D : scénarios, personnages, combats.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "D&D Manager",
+    title: "Codex",
   },
   icons: {
     icon: [
@@ -70,7 +70,7 @@ export default function RootLayout({
         {/* theme-color est émis par `export const viewport` — pas de <meta> manuel. */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="D&D Manager" />
+        <meta name="apple-mobile-web-app-title" content="Codex" />
         <link rel="apple-touch-icon" href="/icon-512.png" />
         <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
       </head>

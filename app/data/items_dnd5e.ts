@@ -955,6 +955,137 @@ export const ITEMS_DND5E: ItemMagique[] = [
       "L'influence dure jusqu'à la première action manifestement contraire à ses intérêts."
     ],
     description: "Sceptre d'or massif coiffé d'un orbe d'améthyste. Symbole de tyrannie ou de souveraineté."
+  },
+
+  // =================== ARMES MAGIQUES +N ===================
+  { nom: 'Hache +1', nomEn: 'Battleaxe +1', type: 'Arme', rarete: 'Peu commun', effets: ['+1 au toucher et aux dégâts.'], description: "Lame d'acier nain finement ouvragée, gravée d'une rune de tranchant." },
+  { nom: 'Hache +2', nomEn: 'Battleaxe +2', type: 'Arme', rarete: 'Rare', effets: ['+2 au toucher et aux dégâts.'], description: "Tranchant clair comme un miroir, le métal semble murmurer au combat." },
+  { nom: 'Hache +3', nomEn: 'Battleaxe +3', type: 'Arme', rarete: 'Très rare', effets: ['+3 au toucher et aux dégâts.'], description: "Forgée par un mythril rune-runique des forges céladdines." },
+  { nom: 'Lance +1', nomEn: 'Spear +1', type: 'Arme', rarete: 'Peu commun', effets: ['+1 au toucher et aux dégâts.', 'Lancée : revient en main à la fin du tour.'], description: "Hampe en frêne argenté, pointe en acier dragonné." },
+  { nom: 'Lance +2', nomEn: 'Spear +2', type: 'Arme', rarete: 'Rare', effets: ['+2 au toucher et aux dégâts.', 'Lancée : revient en main à la fin du tour.'], description: "Pointe étoilée qui scintille même dans l'obscurité." },
+  { nom: 'Marteau +1', nomEn: 'Warhammer +1', type: 'Arme', rarete: 'Peu commun', effets: ['+1 au toucher et aux dégâts.'], description: "Lourd marteau forgé par les Maîtres des Forges." },
+  { nom: 'Marteau +2', nomEn: 'Warhammer +2', type: 'Arme', rarete: 'Rare', effets: ['+2 au toucher et aux dégâts.', 'Une fois par jour, peut frapper avec 2d6 dégâts de tonnerre additionnels.'], description: "Tête runique gravée du mot 'Whelm'." },
+  { nom: 'Dague +1', nomEn: 'Dagger +1', type: 'Arme', rarete: 'Peu commun', effets: ['+1 au toucher et aux dégâts.', 'Finesse, lancer 6/18 m.'], description: "Lame fine en acier des elfes du crépuscule." },
+  { nom: 'Dague +2', nomEn: 'Dagger +2', type: 'Arme', rarete: 'Rare', effets: ['+2 au toucher et aux dégâts.', 'Finesse, lancer 6/18 m.'], description: "Pommeau d'obsidienne, la lame brille faiblement quand un ennemi approche." },
+  { nom: 'Arc long +1', nomEn: 'Longbow +1', type: 'Arme', rarete: 'Peu commun', effets: ['+1 au toucher et aux dégâts.', 'Portée 45/180 m.'], description: "Arc d'if patiné, corde tressée de soie elfique." },
+  { nom: 'Arc long +2', nomEn: 'Longbow +2', type: 'Arme', rarete: 'Rare', effets: ['+2 au toucher et aux dégâts.', 'Portée 45/180 m.'], description: "Bois sculpté de fleurs en filigrane d'or fin." },
+  { nom: 'Arbalète lourde +1', nomEn: 'Heavy Crossbow +1', type: 'Arme', rarete: 'Peu commun', effets: ['+1 au toucher et aux dégâts.', 'Charge instantanée une fois par tour.'], description: "Mécanisme d'horlogerie nain, frappe sèche et précise." },
+  { nom: 'Épée flamboyante', nomEn: 'Flame Tongue', type: 'Arme', rarete: 'Rare', syntonisation: true, effets: ['Lame s\'embrase en action bonus.', '+2d6 dégâts de feu sur attaque réussie quand enflammée.', 'Émet une lumière vive sur 12 m, faible sur 12 m supplémentaires.'], description: "Lame de bronze rougeoyant, naît dans le feu d'une forge volcanique." },
+  { nom: 'Épée givrée', nomEn: 'Frost Brand', type: 'Arme', rarete: 'Très rare', syntonisation: true, effets: ['+1d6 dégâts de froid sur attaque réussie.', 'Résistance au feu pendant la syntonisation.', "Émet une lumière froide bleutée à proximité d'un feu."], description: "Acier bleuté ciselé de runes glaciales, ne fond jamais." },
+  { nom: 'Épée foudroyante', nomEn: 'Sword of Lightning', type: 'Arme', rarete: 'Rare', syntonisation: true, charges: 5, recharge: '1d4+1 à l\'aube', effets: ['+2 au toucher et aux dégâts.', 'Dépense 1 charge pour ajouter 4d6 dégâts de foudre.'], description: "La lame s'illumine d'arcs électriques quand on la tire." },
+  { nom: 'Lame des éclairs', nomEn: 'Lightning Blade', type: 'Arme', rarete: 'Très rare', syntonisation: true, effets: ['+2 au toucher et aux dégâts.', 'Action : appel d\'éclair (ligne 9 m × 1,50 m, Dex DD 15, 5d8 foudre).', 'Recharge à l\'aube.'], description: "Lame forgée dans un nuage d'orage. Crépite en permanence." },
+  { nom: 'Bâton du mage', nomEn: 'Staff of the Magi', type: 'Bâton', rarete: 'Légendaire', syntonisation: true, charges: 50, recharge: '4d6+2 à l\'aube', effets: ['+2 au toucher et aux jets de sortilèges.', 'Absorption de sortilège (réaction) : annule un sort ciblé et regagne des charges égales au niveau.', 'Permet de lancer Boule de feu, Foudre, Mur de feu, Détection de la magie, Dissipation, Lévitation, Projection astrale et bien d\'autres.', 'Action : détruire le bâton = Souffle des Arcanes (40 m de rayon, dégâts de force, mort possible).'], description: "Bâton noir gravé d'étoiles tournoyantes — l'archétype du mage légendaire." },
+  { nom: 'Bâton de défense', nomEn: 'Staff of Defense', type: 'Bâton', rarete: 'Très rare', syntonisation: true, charges: 6, recharge: '1d6+4 à l\'aube', effets: ['+1 CA.', 'Permet de lancer Bouclier (1 charge), Armure de mage (2 charges) ou Sanctuaire (1 charge).'], description: "Bâton de bois clair gravé de cercles concentriques de protection." },
+
+  // =================== ARMURES MAGIQUES ===================
+  { nom: 'Cuir +1', nomEn: 'Leather Armor +1', type: 'Armure', rarete: 'Rare', effets: ['+1 CA.'], description: "Cuir tanné par un maître artisan, souple comme une seconde peau." },
+  { nom: 'Cuir +2', nomEn: 'Leather Armor +2', type: 'Armure', rarete: 'Très rare', effets: ['+2 CA.'], description: "Cuir runique, semble respirer au rythme du porteur." },
+  { nom: 'Mailles +1', nomEn: 'Chain Mail +1', type: 'Armure', rarete: 'Rare', effets: ['+1 CA.'], description: "Maille d'acier de Cormyr, tintement clair et rassurant." },
+  { nom: 'Mailles +2', nomEn: 'Chain Mail +2', type: 'Armure', rarete: 'Très rare', effets: ['+2 CA.'], description: "Maillons forgés selon des techniques naines perdues." },
+  { nom: 'Écailles +1', nomEn: 'Scale Mail +1', type: 'Armure', rarete: 'Rare', effets: ['+1 CA.'], description: "Écailles de carapace dragonne montées sur cuir." },
+  { nom: 'Demi-plates +1', nomEn: 'Half Plate +1', type: 'Armure', rarete: 'Rare', effets: ['+1 CA.'], description: "Plastron et jambières gravés des armoiries d'une maison oubliée." },
+  { nom: 'Plate +1', nomEn: 'Plate Armor +1', type: 'Armure', rarete: 'Rare', effets: ['+1 CA.'], description: "Plate complète polie comme un miroir, lourdes pièces magnifiquement articulées." },
+  { nom: 'Plate +3', nomEn: 'Plate Armor +3', type: 'Armure', rarete: 'Légendaire', effets: ['+3 CA.'], description: "Œuvre d'un maître-forge légendaire, pratiquement indestructible." },
+  {
+    nom: "Armure de l'invisibilité", nomEn: 'Armor of Invisibility', type: 'Armure', rarete: 'Légendaire', syntonisation: true,
+    effets: ['Action : devient invisible (le porteur + l\'armure) jusqu\'à attaque ou sort lancé.', 'Une fois par jour.'],
+    description: "Plate aux contours estompés, semble se fondre dans l'air ambiant."
+  },
+  {
+    nom: 'Plate du dragon', nomEn: 'Dragon Scale Armor', type: 'Armure', rarete: 'Très rare', syntonisation: true,
+    effets: ['+1 CA, avantage aux jets contre la Présence terrifiante des dragons.', 'Résistance au type de dégâts du dragon dont sont issues les écailles.', 'Action (1/jour) : détecte tous les dragons à 9 km, jusqu\'à 1 minute.'],
+    description: "Armure forgée à partir des écailles d'un dragon de couleur — résonne avec la lignée draconique."
+  },
+  {
+    nom: 'Armure démoniaque', nomEn: 'Demon Armor', type: 'Armure', rarete: 'Très rare', syntonisation: true,
+    effets: ['+1 CA, charisme +1.', 'Griffes naturelles : 1d8 tranchant + 1d8 nécrotique.', 'Malédiction : impossible de retirer l\'armure sans Délivrance des malédictions ; au repos long, jet Sag DD 17 ou tendance s\'aligne sur Chaotique Mauvais.'],
+    description: "Plate noire hérissée de pointes, faces démoniaques hurlent silencieusement sur le plastron."
+  },
+  {
+    nom: 'Cuir des ombres', nomEn: 'Shadow Leather', type: 'Armure', rarete: 'Rare', syntonisation: true,
+    effets: ['+1 CA.', 'Avantage aux tests de Discrétion dans la pénombre ou l\'obscurité.', "Action : déplacement de 9 m d'ombre en ombre (1/repos court)."],
+    description: "Cuir noir absorbant la lumière, brodé de fils tirés d'une cape de la Pénombre."
+  },
+
+  // =================== POTIONS SUPPLÉMENTAIRES ===================
+  { nom: 'Potion de force', nomEn: 'Potion of Giant Strength (Stone)', type: 'Potion', rarete: 'Rare', effets: ['Force 23 pendant 1 heure.'], description: "Liquide gris semblable à du mortier, donne la puissance d'un géant de pierre." },
+  { nom: 'Potion d\'invisibilité (petite)', nomEn: 'Potion of Invisibility (Lesser)', type: 'Potion', rarete: 'Peu commun', effets: ['Invisibilité 10 minutes (action requise pour boire).'], description: "Version mineure ; fiole transparente qui semble vide." },
+  { nom: 'Potion de communication avec les morts', nomEn: 'Potion of Speak with Dead', type: 'Potion', rarete: 'Peu commun', effets: ['Permet de lancer Communication avec les morts sur un cadavre touché.'], description: "Liquide noir qui réfléchit son propre passé." },
+  { nom: 'Potion de gaz', nomEn: 'Potion of Gaseous Form', type: 'Potion', rarete: 'Rare', effets: ['Le buveur prend forme gazeuse pendant 1 heure (comme le sort).'], description: "Bulles tourbillonnant dans une fiole de cristal — semble peser plus léger que l\'air." },
+  { nom: "Potion d'amitié des géants", nomEn: 'Potion of Giant Friendship', type: 'Potion', rarete: 'Très rare', effets: ['Charme les géants à portée de vue pendant 1 heure (Sag DD 15 pour résister).'], description: "Liquide ambré, parfum de granit et de pin." },
+
+  // =================== BIJOUX & AMULETTES ===================
+  {
+    nom: 'Anneau de la protection mentale', nomEn: 'Ring of Mind Shielding', type: 'Anneau', rarete: 'Peu commun', syntonisation: true,
+    effets: ['Immunise contre la lecture des pensées et la communication télépathique non consentie.', 'Détection de l\'alignement échoue.', 'Si le porteur meurt en portant l\'anneau, son âme peut y résider.'],
+    description: "Anneau d'argent gravé d'une spirale fermée."
+  },
+  {
+    nom: 'Anneau de l\'élargissement', nomEn: 'Ring of Enlarge', type: 'Anneau', rarete: 'Peu commun', syntonisation: true, charges: 3, recharge: '1d3 à l\'aube',
+    effets: ['Action (1 charge) : Agrandissement (taille +1) pendant 1 minute.'],
+    description: "Anneau s'étend visiblement quand activé."
+  },
+  {
+    nom: 'Amulette de la nature', nomEn: 'Amulet of Nature', type: 'Objet merveilleux', rarete: 'Rare', syntonisation: true,
+    effets: ['Avantage aux tests de Nature et Survie.', 'Communique avec les animaux comme par le sort Communication avec les bêtes (à volonté).'],
+    description: "Médaillon en bois flotté incrusté d'une feuille de chêne dorée."
+  },
+
+  // =================== BAGUETTES SUPPLÉMENTAIRES ===================
+  {
+    nom: 'Baguette d\'éclairs', nomEn: 'Wand of Lightning Bolts', type: 'Baguette', rarete: 'Rare', syntonisation: true, charges: 7, recharge: '1d6+1 à l\'aube',
+    effets: ['Action (1-7 charges) : Foudre (5d6 + 1d6 par charge supplémentaire, jusqu\'à 7 charges).'],
+    description: "Baguette de cristal traversée d'arcs bleus crépitants."
+  },
+  {
+    nom: 'Baguette de paralysie', nomEn: 'Wand of Paralysis', type: 'Baguette', rarete: 'Rare', syntonisation: true, charges: 7, recharge: '1d6+1 à l\'aube',
+    effets: ['Action (1 charge) : projette un rayon paralysant, cible Con DD 15 ou paralysée 1 minute.'],
+    description: "Baguette d'os blanc gravée de motifs squelettiques."
+  },
+  {
+    nom: 'Baguette de soins de masse', nomEn: 'Wand of Mass Healing', type: 'Baguette', rarete: 'Très rare', syntonisation: true, charges: 5, recharge: '1d4+1 à l\'aube',
+    effets: ['Action (3 charges) : Soins de masse (jusqu\'à 6 créatures à 18 m, chacune regagne 3d8+5 PV).'],
+    description: "Bois clair veiné d'or, dégage une chaleur apaisante."
+  },
+
+  // =================== LÉGENDAIRES & ARTÉFACTS ===================
+  {
+    nom: 'Œil de Vecna', nomEn: 'Eye of Vecna', type: 'Objet merveilleux', rarete: 'Artéfact', syntonisation: true,
+    effets: [
+      'Remplace l\'œil du porteur. Vision dans le noir 36 m, voit l\'invisible et à travers les illusions.',
+      'À volonté : Détection de la magie, Vision véritable.',
+      '1/jour : Souhait (mais Vecna peut corrompre le souhait).',
+      'Malédiction : tendance s\'aligne sur Vecna ; voix murmurante 24/7.'
+    ],
+    description: "Œil tatoué d'écailles parcheminées — celui de l\'archi-liche Vecna, arraché à son orbite."
+  },
+  {
+    nom: 'Main de Vecna', nomEn: 'Hand of Vecna', type: 'Objet merveilleux', rarete: 'Artéfact', syntonisation: true,
+    effets: [
+      'Remplace une main du porteur. Force 20, +1 au toucher et aux dégâts au corps à corps.',
+      'Attaque : 1d8 nécrotique + drain de niveau (Con DD 18 ou -1 niveau effectif).',
+      '1/jour : Frappe de mort (cible doit réussir Con DD 18 ou tombe à 0 PV).',
+      'Malédiction : la tendance s\'aligne sur Vecna ; la main complotera contre son propriétaire.'
+    ],
+    description: "Main momifiée et noire — celle de Vecna lui-même, palpitant d'un pouls funeste."
+  },
+  {
+    nom: 'Sphère d\'annihilation', nomEn: 'Sphere of Annihilation', type: 'Objet merveilleux', rarete: 'Légendaire', syntonisation: true,
+    effets: [
+      'Globe noir de 60 cm, plan de la non-existence.',
+      "Mouvement par contrôle mental (Int DD 25), 1d8 × 1,50 m.",
+      'Toute matière entrant en contact subit 4d10 dégâts de force par mètre cube. Pas de jet de sauvegarde.'
+    ],
+    description: "Trou noir parfaitement sphérique, absorbe lumière et matière. Détruite uniquement par téléportation dans un autre plan."
+  },
+  {
+    nom: 'Talisman du pur bien', nomEn: 'Talisman of Pure Good', type: 'Objet merveilleux', rarete: 'Légendaire', syntonisation: true,
+    effets: [
+      '+2 aux jets d\'attaque et de sauvegarde.',
+      'À volonté : peut faire chuter une créature mauvaise dans une fissure d\'énergie radiante (Dex DD 20 ou destruction).',
+      'Le porteur doit être d\'alignement Bon, sinon subit 6d6 radiants par jour.'
+    ],
+    description: "Pendentif platine en forme de soleil rayonnant, brûlant à la main d\'un être mauvais."
   }
 ]
 

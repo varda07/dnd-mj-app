@@ -31,8 +31,8 @@
     "export_failed": "Échec de l'export."
   },
   "login": {
-    "app_title": "D&D MANAGER",
-    "app_slogan": "Campaign Tools",
+    "app_title": "CODEX",
+    "app_slogan": "LA FORGE ÉCLIPSÉE",
     "email": "Email",
     "email_placeholder": "vous@exemple.com",
     "password": "Mot de passe",
@@ -43,7 +43,7 @@
     "signup_error": "Erreur création compte : {message}"
   },
   "dashboard": {
-    "app_title": "D&D MANAGER",
+    "app_title": "CODEX",
     "interface_mj": "MJ",
     "interface_player": "Joueur",
     "interface": "Interface",
@@ -123,7 +123,7 @@
     "collapse": "Replier le menu",
     "expand": "Déplier le menu",
     "home": "Accueil",
-    "tagline": "Eclipsed Forge",
+    "tagline": "La Forge Éclipsée",
     "section_forge": "Forge",
     "section_aventure": "Aventure",
     "section_outils": "Outils",

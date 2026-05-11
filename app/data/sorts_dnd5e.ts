@@ -1102,6 +1102,198 @@ export const SORTS_DND5E: SortOfficiel[] = [
     classes_compatibles: ['Ensorceleur', 'Magicien'],
     description:
       "Tu prends 1d4+1 tours d'affilée, pendant lesquels les autres sont figés dans le temps. Le sort prend fin si tu blesses une autre créature ou affectes un objet porté."
+  },
+
+  // ---- Niveau 0 supplémentaires ----
+  {
+    nom: 'Main de mage', nomEn: 'Mage Hand', niveau: 0, ecole: 'Invocation',
+    temps_incantation: '1 action', action_type: 'action', portee: '9 m', duree: '1 minute',
+    composantes_verbal: true, composantes_somatique: true, composantes_materiel: '',
+    concentration: false, rituel: false,
+    classes_compatibles: ['Barde', 'Ensorceleur', 'Magicien', 'Sorcier', 'Artificier'],
+    description: "Main spectrale flottante (jusqu'à 4,5 kg). En action : prendre/lâcher un objet, l'utiliser, ouvrir un récipient, sans déclencher de pièges."
+  },
+  {
+    nom: 'Illusion mineure', nomEn: 'Minor Illusion', niveau: 0, ecole: 'Illusion',
+    temps_incantation: '1 action', action_type: 'action', portee: '9 m', duree: '1 minute',
+    composantes_verbal: false, composantes_somatique: true, composantes_materiel: 'Un peu de laine',
+    concentration: false, rituel: false,
+    classes_compatibles: ['Barde', 'Ensorceleur', 'Magicien', 'Sorcier'],
+    description: "Crée un son ou une image visuelle (cube de 1,50 m). Investigation Int DD = DD sort pour détecter la supercherie."
+  },
+  {
+    nom: 'Aspersion d\'acide', nomEn: 'Acid Splash', niveau: 0, ecole: 'Invocation',
+    temps_incantation: '1 action', action_type: 'action', portee: '18 m', duree: 'Instantanée',
+    composantes_verbal: true, composantes_somatique: true, composantes_materiel: '',
+    concentration: false, rituel: false,
+    classes_compatibles: ['Ensorceleur', 'Magicien', 'Artificier'],
+    description: "Jusqu'à 2 cibles dans 1,50 m l'une de l'autre. Jet de Dex ou 1d6 acide (2d6/3d6/4d6 aux niv 5/11/17)."
+  },
+  {
+    nom: 'Moquerie cruelle', nomEn: 'Vicious Mockery', niveau: 0, ecole: 'Enchantement',
+    temps_incantation: '1 action', action_type: 'action', portee: '18 m', duree: 'Instantanée',
+    composantes_verbal: true, composantes_somatique: false, composantes_materiel: '',
+    concentration: false, rituel: false,
+    classes_compatibles: ['Barde'],
+    description: "Cible Sag ou 1d4 psychique + désavantage à sa prochaine attaque (2d4/3d4/4d4 aux niv 5/11/17)."
+  },
+  {
+    nom: 'Gourdin magique', nomEn: 'Shillelagh', niveau: 0, ecole: 'Transmutation',
+    temps_incantation: '1 action bonus', action_type: 'bonus', portee: 'Contact', duree: '1 minute',
+    composantes_verbal: true, composantes_somatique: true, composantes_materiel: 'Du gui et un trèfle',
+    concentration: false, rituel: false,
+    classes_compatibles: ['Druide'],
+    description: "Bâton ou massue touchée : 1d8 contondant + utilise Sag pour l'attaque. Devient magique."
+  },
+  {
+    nom: 'Lumières dansantes', nomEn: 'Dancing Lights', niveau: 0, ecole: 'Évocation',
+    temps_incantation: '1 action', action_type: 'action', portee: '36 m', duree: '1 minute',
+    composantes_verbal: true, composantes_somatique: true, composantes_materiel: 'Un peu de phosphore ou un ver luisant',
+    concentration: true, rituel: false,
+    classes_compatibles: ['Barde', 'Ensorceleur', 'Magicien'],
+    description: "Crée jusqu'à 4 lumières flottantes (chacune 3 m de rayon de lumière faible) ou un humanoïde lumineux. Déplaçables à 18 m en action bonus."
+  },
+
+  // ---- Niveau 1-3 supplémentaires ----
+  {
+    nom: 'Fou rire', nomEn: 'Tasha\'s Hideous Laughter', niveau: 1, ecole: 'Enchantement',
+    temps_incantation: '1 action', action_type: 'action', portee: '9 m', duree: 'Concentration jusqu\'à 1 min',
+    composantes_verbal: true, composantes_somatique: true, composantes_materiel: 'Petites tartes et une plume agitée',
+    concentration: true, rituel: false,
+    classes_compatibles: ['Barde', 'Magicien', 'Sorcier'],
+    description: "Cible Sag (Int < 5 immunise) ou à terre, hilare et incapacitée. Sag à chaque tour pour résister, ou si subit dégâts."
+  },
+  {
+    nom: 'Trouver un familier', nomEn: 'Find Familiar', niveau: 1, ecole: 'Invocation',
+    temps_incantation: '1 heure', action_type: 'rituel', portee: '3 m', duree: 'Permanente',
+    composantes_verbal: true, composantes_somatique: true, composantes_materiel: '10 PO d\'encens, bocal de cuivre, brûleur d\'arôme',
+    concentration: false, rituel: true,
+    classes_compatibles: ['Magicien'],
+    description: "Invoque un familier (chat, chouette, rat, hibou, etc.) — forme céleste, féerique ou fiélon. Communique télépathiquement à 30 m."
+  },
+  {
+    nom: 'Immobilisation de personne', nomEn: 'Hold Person', niveau: 2, ecole: 'Enchantement',
+    temps_incantation: '1 action', action_type: 'action', portee: '18 m', duree: 'Concentration jusqu\'à 1 min',
+    composantes_verbal: true, composantes_somatique: true, composantes_materiel: 'Un petit fer droit',
+    concentration: true, rituel: false,
+    classes_compatibles: ['Barde', 'Clerc', 'Druide', 'Ensorceleur', 'Magicien', 'Sorcier'],
+    description: "Humanoïde Sag ou paralysé. Sag à la fin de chaque tour. Slot +1 = +1 cible (chacune doit être à 9 m d'une autre cible)."
+  },
+  {
+    nom: 'Sanctuaire', nomEn: 'Sanctuary', niveau: 1, ecole: 'Abjuration',
+    temps_incantation: '1 action bonus', action_type: 'bonus', portee: '9 m', duree: '1 minute',
+    composantes_verbal: true, composantes_somatique: true, composantes_materiel: 'Un petit miroir d\'argent',
+    concentration: false, rituel: false,
+    classes_compatibles: ['Clerc', 'Artificier'],
+    description: "Allié touché : les attaquants doivent réussir Sag ou choisir une autre cible. Prend fin si le bénéficiaire attaque ou lance un sort offensif."
+  },
+  {
+    nom: 'Bannissement', nomEn: 'Banishment', niveau: 4, ecole: 'Abjuration',
+    temps_incantation: '1 action', action_type: 'action', portee: '18 m', duree: 'Concentration jusqu\'à 1 min',
+    composantes_verbal: true, composantes_somatique: true, composantes_materiel: "Un objet repoussant à la cible",
+    concentration: true, rituel: false,
+    classes_compatibles: ['Clerc', 'Magicien', 'Paladin', 'Sorcier'],
+    description: "Cible Cha ou bannie vers un demi-plan (revient en 1 min). Si extra-planaire, bannie définitivement. Slot +1 = +1 cible."
+  },
+
+  // ---- Niveau 4-6 ----
+  {
+    nom: 'Invisibilité supérieure', nomEn: 'Greater Invisibility', niveau: 4, ecole: 'Illusion',
+    temps_incantation: '1 action', action_type: 'action', portee: 'Contact', duree: 'Concentration jusqu\'à 1 min',
+    composantes_verbal: true, composantes_somatique: true, composantes_materiel: '',
+    concentration: true, rituel: false,
+    classes_compatibles: ['Barde', 'Ensorceleur', 'Magicien'],
+    description: "Une créature touchée devient invisible. Contrairement à Invisibilité, elle peut attaquer et lancer des sorts sans rompre l'effet."
+  },
+  {
+    nom: 'Immobilisation de monstre', nomEn: 'Hold Monster', niveau: 5, ecole: 'Enchantement',
+    temps_incantation: '1 action', action_type: 'action', portee: '27 m', duree: 'Concentration jusqu\'à 1 min',
+    composantes_verbal: true, composantes_somatique: true, composantes_materiel: 'Un petit fer droit',
+    concentration: true, rituel: false,
+    classes_compatibles: ['Barde', 'Ensorceleur', 'Magicien', 'Sorcier'],
+    description: "Comme Immobilisation de personne mais s'applique à toute créature (sauf morts-vivants). Slot +1 = +1 cible."
+  },
+  {
+    nom: 'Mur de force', nomEn: 'Wall of Force', niveau: 5, ecole: 'Évocation',
+    temps_incantation: '1 action', action_type: 'action', portee: '36 m', duree: 'Concentration jusqu\'à 10 min',
+    composantes_verbal: true, composantes_somatique: true, composantes_materiel: 'Une pincée de poudre d\'amét­hyste',
+    concentration: true, rituel: false,
+    classes_compatibles: ['Magicien'],
+    description: "Mur invisible indestructible : panneau de 10 × 3 m ou sphère/dôme de 3 m de rayon. Désintégration ou Dissipation peuvent l'éliminer."
+  },
+  {
+    nom: 'Vision lucide', nomEn: 'True Seeing', niveau: 6, ecole: 'Divination',
+    temps_incantation: '1 action', action_type: 'action', portee: 'Contact', duree: '1 heure',
+    composantes_verbal: true, composantes_somatique: true, composantes_materiel: 'Onguent de 25 PO de poudre de champignons et safran',
+    concentration: false, rituel: false,
+    classes_compatibles: ['Barde', 'Clerc', 'Magicien', 'Sorcier'],
+    description: "La créature touchée voit la vérité : magie invisible révélée, illusions percées, objets cachés visibles, vision dans le noir 36 m, voit le plan éthéré."
+  },
+  {
+    nom: 'Soins suprêmes', nomEn: 'Heal', niveau: 6, ecole: 'Évocation',
+    temps_incantation: '1 action', action_type: 'action', portee: '18 m', duree: 'Instantanée',
+    composantes_verbal: true, composantes_somatique: true, composantes_materiel: '',
+    concentration: false, rituel: false,
+    classes_compatibles: ['Clerc', 'Druide'],
+    description: "Cible regagne 70 PV et est guérie de toutes maladies, aveuglement et surdité. Slot +1 = +10 PV par niveau."
+  },
+
+  // ---- Niveau 7-9 ----
+  {
+    nom: 'Passage planaire', nomEn: 'Plane Shift', niveau: 7, ecole: 'Invocation',
+    temps_incantation: '1 action', action_type: 'action', portee: 'Contact', duree: 'Instantanée',
+    composantes_verbal: true, composantes_somatique: true, composantes_materiel: "Un diapason d'une matière liée au plan ciblé (au moins 250 PO)",
+    concentration: false, rituel: false,
+    classes_compatibles: ['Clerc', 'Druide', 'Ensorceleur', 'Magicien', 'Sorcier'],
+    description: "Transporte jusqu'à 8 créatures consentantes vers un autre plan. Ou bannit une cible non consentante (jet Cha pour résister)."
+  },
+  {
+    nom: 'Métamorphose suprême', nomEn: 'Shapechange', niveau: 9, ecole: 'Transmutation',
+    temps_incantation: '1 action', action_type: 'action', portee: 'Auto', duree: 'Concentration jusqu\'à 1 h',
+    composantes_verbal: true, composantes_somatique: true, composantes_materiel: 'Un jade gravé valant au moins 1 500 PO',
+    concentration: true, rituel: false,
+    classes_compatibles: ['Druide', 'Magicien'],
+    description: "Tu prends la forme d'une créature dont tu as vu un exemplaire (CR ≤ ton niveau). Stats remplacées, classe et niveau conservés. Peut changer de forme en action bonus."
+  },
+  {
+    nom: 'Résurrection véritable', nomEn: 'True Resurrection', niveau: 9, ecole: 'Nécromancie',
+    temps_incantation: '1 heure', action_type: 'rituel', portee: 'Contact', duree: 'Instantanée',
+    composantes_verbal: true, composantes_somatique: true, composantes_materiel: "Poudre de diamants (25 000 PO) consumée et eau bénite",
+    concentration: false, rituel: false,
+    classes_compatibles: ['Clerc', 'Druide'],
+    description: "Ramène à la vie une créature morte depuis 200 ans ou moins. Inclut reconstitution corporelle complète (peut ramener un corps détruit ou inexistant)."
+  },
+  {
+    nom: 'Tempête de météores', nomEn: 'Meteor Swarm', niveau: 9, ecole: 'Évocation',
+    temps_incantation: '1 action', action_type: 'action', portee: '1,6 km', duree: 'Instantanée',
+    composantes_verbal: true, composantes_somatique: true, composantes_materiel: '',
+    concentration: false, rituel: false,
+    classes_compatibles: ['Ensorceleur', 'Magicien'],
+    description: "4 météores flamboyants dans des cibles à portée. Chacun : créatures dans 12 m de rayon, Dex DD ou 20d6 feu + 20d6 contondant (moitié si réussi)."
+  },
+  {
+    nom: 'Mot de pouvoir tuer', nomEn: 'Power Word Kill', niveau: 9, ecole: 'Enchantement',
+    temps_incantation: '1 action', action_type: 'action', portee: '18 m', duree: 'Instantanée',
+    composantes_verbal: true, composantes_somatique: false, composantes_materiel: '',
+    concentration: false, rituel: false,
+    classes_compatibles: ['Barde', 'Ensorceleur', 'Magicien', 'Sorcier'],
+    description: "Cible avec PV ≤ 100 meurt instantanément, sans jet de sauvegarde. Aucun effet sur les créatures à plus de 100 PV."
+  },
+  {
+    nom: 'Prescience', nomEn: 'Foresight', niveau: 9, ecole: 'Divination',
+    temps_incantation: '1 minute', action_type: 'rituel', portee: 'Contact', duree: '8 heures',
+    composantes_verbal: true, composantes_somatique: true, composantes_materiel: "Une plume d'oiseau-tonnerre",
+    concentration: false, rituel: false,
+    classes_compatibles: ['Barde', 'Druide', 'Magicien', 'Sorcier'],
+    description: "La créature touchée a avantage à toutes les attaques, jets de sauvegarde et tests de caractéristique ; les attaques contre elle ont désavantage. Ne peut être surprise."
+  },
+  {
+    nom: 'Portail', nomEn: 'Gate', niveau: 9, ecole: 'Invocation',
+    temps_incantation: '1 action', action_type: 'action', portee: '18 m', duree: 'Concentration jusqu\'à 1 min',
+    composantes_verbal: true, composantes_somatique: true, composantes_materiel: 'Un diamant d\'au moins 5 000 PO',
+    concentration: true, rituel: false,
+    classes_compatibles: ['Clerc', 'Ensorceleur', 'Magicien'],
+    description: "Crée un portail vers un autre plan ou un lieu connu (rayon 1,50–6 m). Si on prononce le vrai nom d'une créature ciblée, elle est tirée à travers (jet pour résister selon le MJ)."
   }
 ]
 

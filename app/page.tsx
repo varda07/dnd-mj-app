@@ -50,9 +50,9 @@ export default function Home() {
         }
 
         .login-title {
-          font-family: var(--font-inter), 'Inter', system-ui, sans-serif;
-          font-weight: 500;
-          letter-spacing: 0.18em;
+          font-family: var(--font-cinzel), Cinzel, serif;
+          font-weight: 700;
+          letter-spacing: 0.22em;
           color: #C9A84C;
         }
 
@@ -153,7 +153,7 @@ export default function Home() {
       `}</style>
 
       <div className="w-full max-w-sm">
-        <h1 className="login-title text-xl sm:text-2xl text-center mb-3">
+        <h1 className="login-title text-3xl sm:text-5xl text-center mb-3">
           {t('app_title')}
         </h1>
 

@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import ImageCropper from '@/app/components/ImageCropper'
+import NumberInput from '@/app/components/NumberInput'
 import {
   construireEnveloppe,
   lireFichierJSON,
@@ -559,20 +560,22 @@ function BestiaireImporter({
             ))}
           </select>
           <div className="flex items-center gap-1">
-            <input
-              type="number"
+            <NumberInput
+              allowFloat
+              fallback={0}
               step="0.25"
               value={filtreCdMin}
-              onChange={(e) => setFiltreCdMin(parseFloat(e.target.value) || 0)}
+              onChange={setFiltreCdMin}
               placeholder="CD min"
               className="w-full px-2 py-1.5 rounded bg-black/40 border border-[rgba(201,168,76,0.2)] text-white text-xs outline-none"
             />
             <span className="text-gray-500 text-xs">-</span>
-            <input
-              type="number"
+            <NumberInput
+              allowFloat
+              fallback={30}
               step="0.25"
               value={filtreCdMax}
-              onChange={(e) => setFiltreCdMax(parseFloat(e.target.value) || 30)}
+              onChange={setFiltreCdMax}
               placeholder="CD max"
               className="w-full px-2 py-1.5 rounded bg-black/40 border border-[rgba(201,168,76,0.2)] text-white text-xs outline-none"
             />

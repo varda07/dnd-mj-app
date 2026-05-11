@@ -193,7 +193,7 @@ export default function Sidebar() {
                 className="text-[13px] font-bold tracking-[0.2em] text-[#C9A84C] truncate"
                 style={{ fontFamily: 'var(--font-cinzel), Cinzel, serif' }}
               >
-                D&D MANAGER
+                CODEX
               </p>
               <p className="text-[9px] uppercase tracking-[0.2em] text-[#6a6a72] mt-0.5 truncate">
                 {t('tagline')}

@@ -682,6 +682,207 @@ export const PNJ_TEMPLATES: PnjTemplate[] = [
       "Cherche un ingrédient rare dans une grotte habitée.",
       "Apparaît au moment opportun — quelle est sa vraie motivation ?"
     ]
+  },
+
+  // ============== COMMERÇANTS SPÉCIALISÉS ==============
+  {
+    nom: 'Tanneur', nomEn: 'Tanner', categorie: 'Commerce',
+    description: "Travaille cuirs et peaux dans son atelier nauséabond en lisière du quartier.",
+    personnalite: "Réservé, sent fort, mais œil acéré pour les peaux rares. Connaît tous les trappeurs.",
+    hp_max: 14, ca: 11, force: 13, dexterite: 11, constitution: 13, intelligence: 10, sagesse: 12, charisme: 9,
+    attaques: [{ nom: 'Coutelas à tanner', bonus: '+3', degats: '1d4+1 tranchant' }],
+    hooks: ["Cherche une peau de créature exotique — paie cher.", "A reconnu un cuir suspect (peau humanoïde ?) qu'un client lui a vendu."]
+  },
+  {
+    nom: 'Joaillier', nomEn: 'Jeweler', categorie: 'Commerce',
+    description: "Lapidaire et orfèvre, taille pierres précieuses et monte des bijoux fins.",
+    personnalite: "Méticuleux, soupçonneux, connaît la valeur de chaque éclat. Yeux rapides et doigts fins.",
+    hp_max: 12, ca: 12, force: 9, dexterite: 14, constitution: 11, intelligence: 15, sagesse: 13, charisme: 12,
+    attaques: [{ nom: 'Stylet de précision', bonus: '+4', degats: '1d4+2 perforant' }],
+    hooks: ["Cherche à authentifier une gemme étrange ramenée d'un donjon.", "Soupçonne une cliente noble de blanchir des bijoux volés."]
+  },
+  {
+    nom: 'Apothicaire', nomEn: 'Herbalist', categorie: 'Commerce',
+    description: "Vend onguents, baumes et tisanes. Échoppe odorante remplie de bocaux numérotés.",
+    personnalite: "Curieux, érudit, soupçonneux des autorités. Préfère le secret du grimoire à la chaire universitaire.",
+    hp_max: 13, ca: 11, force: 9, dexterite: 12, constitution: 11, intelligence: 16, sagesse: 14, charisme: 11,
+    attaques: [{ nom: 'Couteau d\'apothicaire', bonus: '+3', degats: '1d4 perforant' }, { nom: 'Fiole inconnue (lancée)', bonus: '+3', degats: '2d4 acide ou poison selon préparation' }],
+    hooks: ["Demande une plante ne poussant que sur les tombes profanées.", "Une potion bizarre est en circulation — il pense que c'est une copie de sa formule."]
+  },
+  {
+    nom: 'Marchand ambulant', nomEn: 'Peddler', categorie: 'Commerce',
+    description: "Charrette à bras, vend des bricoles d'un village à l'autre. Toujours en route, jamais à la même place.",
+    personnalite: "Bavard, opportuniste, jure qu'il n'a jamais menti. Excellent observateur de la route.",
+    hp_max: 9, ca: 11, force: 10, dexterite: 12, constitution: 10, intelligence: 11, sagesse: 12, charisme: 14,
+    attaques: [{ nom: 'Bâton', bonus: '+2', degats: '1d6 contondant' }],
+    hooks: ["A vu une bande de mercenaires sur la route nord.", "Cherche escorte pour traverser une forêt réputée dangereuse."]
+  },
+
+  // ============== NOBLESSE & POUVOIR ==============
+  {
+    nom: 'Prince/Princesse héritier', nomEn: 'Heir', categorie: 'Société',
+    description: "Héritier(ère) d'un trône, formé(e) aux armes et à la diplomatie depuis l'enfance.",
+    personnalite: "Charisme étudié, ambition voilée. Sait flatter et menacer dans la même phrase.",
+    hp_max: 30, ca: 16, force: 14, dexterite: 14, constitution: 13, intelligence: 14, sagesse: 13, charisme: 17,
+    attaques: [{ nom: 'Rapière de cour', bonus: '+5', degats: '1d8+3 perforant' }],
+    hooks: ["Engagé dans un complot contre son parent régnant.", "Cherche un protecteur discret car craint un assassinat.", "Souhaite prouver sa valeur à la cour par un haut fait."]
+  },
+  {
+    nom: 'Duc', nomEn: 'Duke', categorie: 'Société',
+    description: "Seigneur d'une province, riche et puissant, à peine en dessous du couronné.",
+    personnalite: "Arrogant, manipulateur, calculateur. Joue ses pions à plusieurs cours simultanément.",
+    hp_max: 36, ca: 15, force: 14, dexterite: 12, constitution: 14, intelligence: 16, sagesse: 14, charisme: 17,
+    attaques: [{ nom: 'Épée de cérémonie', bonus: '+5', degats: '1d8+3 tranchant' }],
+    hooks: ["Cherche à déstabiliser un rival au royaume voisin.", "Sa fille a fui le mariage arrangé.", "Suspecte un espion à sa cour."]
+  },
+  {
+    nom: 'Bouffon de cour', nomEn: 'Court Jester', categorie: 'Société',
+    description: "Saltimbanque protégé par la couronne. A licence de tout dire, mais marche sur la corde raide.",
+    personnalite: "Tour à tour rieur et glaçant. Voit tout, entend tout, raconte ce qui amuse la cour.",
+    hp_max: 18, ca: 13, force: 10, dexterite: 16, constitution: 12, intelligence: 14, sagesse: 13, charisme: 16,
+    attaques: [{ nom: 'Dague dissimulée', bonus: '+5', degats: '1d4+3 perforant' }],
+    hooks: ["Sait quelque chose de compromettant sur le roi.", "Couvre un assassin politique — protecteur ou complice ?"]
+  },
+  {
+    nom: 'Espion royal', nomEn: 'Royal Spy', categorie: 'Société',
+    description: "Agent secret de la couronne, infiltre cours et guildes pour le compte du souverain.",
+    personnalite: "Discret, méthodique, plusieurs identités prêtes. Loyal jusqu'à l'os — au royaume, pas forcément au monarque.",
+    hp_max: 24, ca: 15, force: 11, dexterite: 17, constitution: 13, intelligence: 14, sagesse: 14, charisme: 13,
+    attaques: [{ nom: 'Épée courte', bonus: '+5', degats: '1d6+3 perforant' }, { nom: 'Arbalète de poche', bonus: '+5', degats: '1d6+3 perforant' }],
+    hooks: ["A volé un document dont la diffusion ferait tomber un duc.", "Cherche un infiltré dans la garde personnelle de la reine."]
+  },
+
+  // ============== GUERRE ==============
+  {
+    nom: 'Général', nomEn: 'General', categorie: 'Société',
+    description: "Commande une armée. Stratège vétéran, couvert de cicatrices et de médailles.",
+    personnalite: "Autoritaire, pragmatique, ne tolère pas l'incompétence. Loyal à sa troupe avant le royaume.",
+    hp_max: 90, ca: 18, force: 18, dexterite: 13, constitution: 16, intelligence: 15, sagesse: 14, charisme: 15,
+    attaques: [{ nom: 'Épée à deux mains', bonus: '+8', degats: '2d6+5 tranchant' }, { nom: 'Cri de commandement', bonus: '—', degats: 'Allié dans 9 m gagne 5 PV temporaires + Sag DD 13 ou désavantage contre lui.' }],
+    hooks: ["Prépare un coup d'état militaire.", "Cherche des vétérans pour une mission clandestine derrière les lignes."]
+  },
+  {
+    nom: 'Sergent', nomEn: 'Sergeant', categorie: 'Loi',
+    description: "Sous-officier vétéran qui fait tenir la troupe sur le terrain.",
+    personnalite: "Brusque, débrouillard, prêt à tout pour ses soldats. Mépris pour les officiers de salon.",
+    hp_max: 32, ca: 17, force: 15, dexterite: 12, constitution: 14, intelligence: 11, sagesse: 13, charisme: 12,
+    attaques: [{ nom: 'Hallebarde', bonus: '+5', degats: '1d10+3 perforant' }],
+    hooks: ["Trahi par son capitaine — cherche vengeance.", "Recrute des renforts pour une mission risquée."]
+  },
+  {
+    nom: 'Cavalier', nomEn: 'Cavalryman', categorie: 'Loi',
+    description: "Soldat à cheval, lance et bouclier, charge rapide.",
+    personnalite: "Fier, romanesque, cultive son honneur comme une coiffure.",
+    hp_max: 27, ca: 16, force: 14, dexterite: 14, constitution: 13, intelligence: 11, sagesse: 12, charisme: 11,
+    attaques: [{ nom: 'Lance de cavalerie', bonus: '+4', degats: '1d12+2 perforant (charge : +1d12)' }],
+    hooks: ["A perdu son cheval ; offre du service en échange d'une nouvelle monture.", "Mission de patrouille interrompue par une embuscade — un seul survivant…"]
+  },
+
+  // ============== MAGIE ==============
+  {
+    nom: 'Archimage', nomEn: 'Archmage', categorie: 'Autres',
+    description: "Magicien accompli, conseille rois ou règne sur une tour d'ivoire.",
+    personnalite: "Distant, calculateur, l'œil rivé sur des objectifs longs. Désintéressé des querelles mortelles.",
+    hp_max: 99, ca: 12, force: 10, dexterite: 14, constitution: 12, intelligence: 20, sagesse: 15, charisme: 16,
+    attaques: [{ nom: 'Dague', bonus: '+6', degats: '1d4+2 perforant' }, { nom: 'Sorts (magicien niv 18)', bonus: '+9', degats: 'Boule de feu 8d6, Foudre 8d6, Cône de froid 8d8, Désintégration 10d6+40' }],
+    hooks: ["Cherche un composant rare pour un rituel.", "Soupçonne un de ses apprentis de trahison.", "Disparu depuis 6 mois — qui occupe sa tour ?"]
+  },
+  {
+    nom: 'Apprenti magicien', nomEn: 'Apprentice Wizard', categorie: 'Autres',
+    description: "Jeune mage en formation, livres sous le bras et taches d'encre.",
+    personnalite: "Excité, naïf, sûr d'avoir lu plus que vécu. Cherche à prouver sa valeur.",
+    hp_max: 9, ca: 10, force: 8, dexterite: 12, constitution: 10, intelligence: 14, sagesse: 10, charisme: 11,
+    attaques: [{ nom: 'Dague', bonus: '+3', degats: '1d4+1 perforant' }, { nom: 'Projectile magique', bonus: '+4', degats: '3 dards × 1d4+1 force' }],
+    hooks: ["Son maître a disparu, il cherche aide.", "A volé un grimoire qu'il ne comprend pas — incidents bizarres en série."]
+  },
+  {
+    nom: 'Nécromancien', nomEn: 'Necromancer', categorie: 'Hors-la-loi',
+    description: "Mage spécialisé dans la magie de la mort, frontière du légal et du tabou.",
+    personnalite: "Froid, méthodique, fascination malsaine pour la mort. Ne ressent guère la peur.",
+    hp_max: 49, ca: 12, force: 9, dexterite: 14, constitution: 12, intelligence: 17, sagesse: 12, charisme: 11,
+    attaques: [
+      { nom: 'Bâton', bonus: '+2', degats: '1d6 contondant' },
+      { nom: 'Sorts', bonus: '+6', degats: 'Animation des morts (cadavre+3 squelettes), Drain vital 3d6 nécrotique, Doigt de mort 7d8+30 nécrotique' }
+    ],
+    hooks: ["Cherche des cadavres frais pour ses recherches.", "Promet un rituel de communication avec un défunt — moyennant prix terrible."]
+  },
+  {
+    nom: 'Alchimiste', nomEn: 'Alchemist', categorie: 'Commerce',
+    description: "Spécialiste des potions, élixirs et transmutations. Atelier sentant le soufre.",
+    personnalite: "Excentrique, distrait, exalté par chaque nouvelle formule. Souvent brûlé aux mains.",
+    hp_max: 22, ca: 11, force: 9, dexterite: 12, constitution: 11, intelligence: 16, sagesse: 13, charisme: 10,
+    attaques: [{ nom: 'Fiole d\'acide', bonus: '+3', degats: '2d6 acide (lancé)' }],
+    hooks: ["Cherche un mécène pour une expérience risquée.", "Vient de découvrir une formule alchimique inédite — quelqu'un la veut."]
+  },
+
+  // ============== RELIGION ==============
+  {
+    nom: 'Évêque', nomEn: 'Bishop', categorie: 'Religion',
+    description: "Haut prélat dirigeant un diocèse, équilibre dogme et politique.",
+    personnalite: "Diplomate, calculateur, parle d'amour divin tout en plaçant ses pions.",
+    hp_max: 36, ca: 15, force: 11, dexterite: 11, constitution: 12, intelligence: 14, sagesse: 17, charisme: 16,
+    attaques: [{ nom: 'Masse rituelle', bonus: '+3', degats: '1d6+1 contondant' }, { nom: 'Sorts (clerc niv 9)', bonus: '+7', degats: 'Soins de groupe, Mot de pouvoir étourdissant, Bannissement' }],
+    hooks: ["Pression pour bénir une alliance politique tout en sachant la maison adverse hérétique.", "Soupçonne un schisme dans son chapitre."]
+  },
+  {
+    nom: 'Acolyte', nomEn: 'Acolyte', categorie: 'Religion',
+    description: "Servant de temple, fait les corvées sacrées : encens, lectures, soins mineurs.",
+    personnalite: "Pieux, naïf ou désabusé selon l'âge. Croit aux signes envoyés par la divinité.",
+    hp_max: 9, ca: 10, force: 10, dexterite: 10, constitution: 10, intelligence: 10, sagesse: 14, charisme: 11,
+    attaques: [{ nom: 'Bâton', bonus: '+2', degats: '1d6 contondant' }, { nom: 'Sorts (clerc niv 1)', bonus: '+4', degats: 'Soins (1d8+2), Sanctuaire, Bénédiction' }],
+    hooks: ["Cherche à comprendre une vision mystique.", "Suit en cachette un pèlerin suspect."]
+  },
+
+  // ============== SAVANTS & ARTISTES ==============
+  {
+    nom: 'Cartographe', nomEn: 'Cartographer', categorie: 'Autres',
+    description: "Trace cartes et plans, voyageur infatigable, mémoire géographique remarquable.",
+    personnalite: "Précis, curieux, irritable face à l'approximation. Aime les énigmes spatiales.",
+    hp_max: 13, ca: 11, force: 10, dexterite: 13, constitution: 11, intelligence: 16, sagesse: 13, charisme: 10,
+    attaques: [{ nom: 'Compas pointu', bonus: '+3', degats: '1d4+1 perforant' }],
+    hooks: ["Cherche escorte pour cartographier une région hostile.", "Possède une carte ancienne menant à un site enseveli."]
+  },
+  {
+    nom: 'Historien', nomEn: 'Historian', categorie: 'Autres',
+    description: "Chercheur érudit, passe ses jours dans les archives et anciens parchemins.",
+    personnalite: "Distrait, érudit, parle latin gobelin sans s'en rendre compte. Très lucide sur les ambitions humaines.",
+    hp_max: 11, ca: 10, force: 8, dexterite: 11, constitution: 10, intelligence: 17, sagesse: 14, charisme: 12,
+    attaques: [{ nom: 'Couteau à papier', bonus: '+2', degats: '1d4 perforant' }],
+    hooks: ["A retrouvé une mention d'une cité disparue.", "Cherche un manuscrit volé il y a un siècle."]
+  },
+  {
+    nom: 'Barde de cour', nomEn: 'Court Bard', categorie: 'Autres',
+    description: "Musicien-conteur attaché à une cour, divertit et — discrètement — espionne.",
+    personnalite: "Suave, beau parleur, mémorise chaque indiscrétion. Loyalty à sa propre carrière avant tout.",
+    hp_max: 28, ca: 13, force: 10, dexterite: 14, constitution: 12, intelligence: 13, sagesse: 12, charisme: 18,
+    attaques: [{ nom: 'Rapière', bonus: '+4', degats: '1d8+2 perforant' }, { nom: 'Sorts (barde niv 5)', bonus: '+6', degats: 'Moquerie cruelle (1d4 psychique), Charme-personne, Hâte' }],
+    hooks: ["A entendu un secret qu'il monnaye au plus offrant.", "Compose une ballade incendiaire sur un seigneur — qui le veut mort."]
+  },
+  {
+    nom: 'Conteur', nomEn: 'Storyteller', categorie: 'Autres',
+    description: "Voyage de taverne en taverne avec son sac à histoires. Mémoire encyclopédique des contes locaux.",
+    personnalite: "Théâtral, mystérieux, change sa version selon l'auditoire. Sait quand mentir et quand se taire.",
+    hp_max: 16, ca: 11, force: 10, dexterite: 12, constitution: 11, intelligence: 13, sagesse: 15, charisme: 17,
+    attaques: [{ nom: 'Bâton de marche', bonus: '+2', degats: '1d6 contondant' }],
+    hooks: ["Connaît la version vraie d'une légende locale qui contredit l'histoire officielle.", "Un de ses contes a déclenché des disparitions."]
+  },
+
+  // ============== EXOTIQUES ==============
+  {
+    nom: 'Vieil ermite', nomEn: 'Old Hermit', categorie: 'Autres',
+    description: "Reclus depuis des décennies dans une cabane lointaine. Sait des choses qu'il n'a jamais partagées.",
+    personnalite: "Lunatique, distrait, parfois lucide comme l'éclair. Méfiant envers les voyageurs.",
+    hp_max: 27, ca: 11, force: 10, dexterite: 12, constitution: 12, intelligence: 12, sagesse: 17, charisme: 9,
+    attaques: [{ nom: 'Bâton', bonus: '+2', degats: '1d6 contondant' }, { nom: 'Sorts (druide niv 4)', bonus: '+5', degats: 'Soins (1d8+3), Ronces, Sphère de feu' }],
+    hooks: ["A vu un esprit revenir au lieu de son crime, identifie le coupable.", "Possède un artefact qu'il cache depuis 40 ans."]
+  },
+  {
+    nom: 'Diplomate étranger', nomEn: 'Foreign Envoy', categorie: 'Société',
+    description: "Représentant d'un royaume lointain, manières exotiques et patience infinie.",
+    personnalite: "Courtois, calculateur, sourit alors qu'il négocie ta soumission. Maîtrise plusieurs langues.",
+    hp_max: 22, ca: 14, force: 11, dexterite: 13, constitution: 12, intelligence: 16, sagesse: 14, charisme: 17,
+    attaques: [{ nom: 'Sabre courbe', bonus: '+3', degats: '1d6+1 tranchant' }],
+    hooks: ["Propose une alliance qui cache un piège diplomatique.", "Apporte un présent empoisonné (au figuré… ou au propre)."]
   }
 ]
 

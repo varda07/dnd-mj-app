@@ -330,7 +330,10 @@ export default function Dashboard() {
     <main className="min-h-screen bg-gray-900 text-white pb-[calc(56px+env(safe-area-inset-bottom))] md:pb-0">
       <div className="bg-gray-800 h-12 md:h-auto pl-12 pr-3 md:p-4 flex md:grid md:grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-gray-700 theme-header-border theme-no-deco">
         <div className="min-w-0 flex-1 md:flex-initial md:justify-self-start">
-          <h1 className="text-[13px] md:text-xl font-medium md:font-bold text-yellow-500 truncate text-left tracking-[0.18em] md:tracking-normal">
+          <h1
+            className="text-base md:text-2xl font-bold text-yellow-500 truncate text-left tracking-[0.22em]"
+            style={{ fontFamily: 'var(--font-cinzel), Cinzel, serif' }}
+          >
             {t('app_title')}
           </h1>
           <p

@@ -372,12 +372,15 @@ const DICE: DiceType[] = [
   { label: 'd20', sides: 20 }
 ]
 
+type RollMode = 'normal' | 'avantage' | 'desavantage'
+
 type JetRow = {
   id: string
   type_de: string
   nombre: number
   resultats: number[]
   created_at: string
+  mode?: RollMode | null
 }
 
 export default function DiceLauncher() {
@@ -390,6 +393,11 @@ export default function DiceLauncher() {
   const [showParticles, setShowParticles] = useState(false)
   const [critEffect, setCritEffect] = useState<'success' | 'fail' | null>(null)
   const [activeTab, setActiveTab] = useState<'lancer' | 'historique'>('lancer')
+  // Avantage / désavantage — uniquement applicable au d20.
+  const [advantage, setAdvantage] = useState(false)
+  const [disadvantage, setDisadvantage] = useState(false)
+  // Index du dé "retenu" pour le surbrillance dorée (advantage/disadvantage).
+  const [keptIndex, setKeptIndex] = useState<number | null>(null)
   const [historique, setHistorique] = useState<JetRow[]>([])
   const [historiqueLoading, setHistoriqueLoading] = useState(false)
   // État du moteur 3D : 'init' (en chargement), 'ready' (utilisable),
@@ -440,7 +448,7 @@ export default function DiceLauncher() {
     }
     const { data, error } = await supabase
       .from('jets_de_des')
-      .select('id, type_de, nombre, resultats, created_at')
+      .select('id, type_de, nombre, resultats, created_at, mode')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(20)
@@ -482,19 +490,31 @@ export default function DiceLauncher() {
     }
   }, [critEffect])
 
+  // Mode effectif : si avantage ET désavantage cochés → ils s'annulent.
+  const isD20 = selectedDice.sides === 20
+  const rollMode: RollMode =
+    !isD20 ? 'normal'
+    : advantage && disadvantage ? 'normal'
+    : advantage ? 'avantage'
+    : disadvantage ? 'desavantage'
+    : 'normal'
+
   const lancer = async () => {
     setRolling(true)
     setShowParticles(false)
     setResults([])
     setCritEffect(null)
+    setKeptIndex(null)
 
-    const notation = `${count}${selectedDice.label}`
+    // Avantage/désavantage force le nombre à 2 sur d20.
+    const effectiveCount = rollMode === 'normal' ? count : 2
+    const notation = `${effectiveCount}${selectedDice.label}`
     let jets: number[] = []
     let usedBox = false
     if (boxStatus === 'ready' && boxRef.current?.ready) {
       try {
         jets = await boxRef.current.roll(notation)
-        usedBox = jets.length === count
+        usedBox = jets.length === effectiveCount
         if (!usedBox) {
           console.warn('[dice-box] résultats incomplets, fallback random:', jets)
         }
@@ -507,9 +527,19 @@ export default function DiceLauncher() {
       // anime alors le défilement de chiffres).
       await new Promise((r) => setTimeout(r, 1000))
       jets = Array.from(
-        { length: count },
+        { length: effectiveCount },
         () => Math.floor(Math.random() * selectedDice.sides) + 1
       )
+    }
+    // Détermine l'index du dé retenu pour la surbrillance.
+    if (rollMode === 'avantage') {
+      const maxVal = Math.max(...jets)
+      setKeptIndex(jets.indexOf(maxVal))
+    } else if (rollMode === 'desavantage') {
+      const minVal = Math.min(...jets)
+      setKeptIndex(jets.indexOf(minVal))
+    } else {
+      setKeptIndex(null)
     }
     console.log('[dice] roll result:', jets)
     setResults(jets)
@@ -518,13 +548,20 @@ export default function DiceLauncher() {
     setTimeout(() => setShowParticles(false), 1400)
 
     // Effet critique UNIQUEMENT sur d20.
-    // Si plusieurs d20 sont lancés, un seul 20 ou un seul 1 suffit à déclencher l'effet.
-    // Priorité au succès critique si les deux sortent simultanément.
+    // En avantage/désavantage, seul le dé retenu compte pour le critique.
     if (selectedDice.sides === 20) {
-      if (jets.includes(20)) {
+      const valeursPourCrit =
+        rollMode === 'normal'
+          ? jets
+          : [
+              rollMode === 'avantage'
+                ? Math.max(...jets)
+                : Math.min(...jets)
+            ]
+      if (valeursPourCrit.includes(20)) {
         setCritEffect('success')
         setTimeout(() => setCritEffect(null), 2000)
-      } else if (jets.includes(1)) {
+      } else if (valeursPourCrit.includes(1)) {
         setCritEffect('fail')
         setTimeout(() => setCritEffect(null), 2000)
       }
@@ -549,19 +586,20 @@ export default function DiceLauncher() {
     const payload = {
       user_id: user.id,
       type_de: selectedDice.label,
-      nombre: count,
+      nombre: jets.length,
       // La colonne `resultats` est int[] dans la table existante. On envoie
       // les valeurs individuelles ; le total est recalculé à la lecture.
       // (Format JSON {total, dice} = nécessiterait une migration jsonb côté
       // BDD avant tout changement ici.)
       resultats: jets,
-      partage: share
+      partage: share,
+      mode: rollMode
     }
     console.log('[dice] supabase insert payload:', payload)
     const { data: inserted, error } = await supabase
       .from('jets_de_des')
       .insert(payload)
-      .select('id, type_de, nombre, resultats, created_at')
+      .select('id, type_de, nombre, resultats, created_at, mode')
       .single()
     console.log('[dice] supabase response:', { data: inserted, error })
     if (error) {
@@ -585,7 +623,12 @@ export default function DiceLauncher() {
     fetchHistorique()
   }
 
-  const total = results.reduce((a, b) => a + b, 0)
+  // En mode avantage/désavantage, le total = la valeur du dé retenu.
+  // En mode normal, c'est la somme.
+  const total =
+    rollMode === 'normal' || keptIndex === null
+      ? results.reduce((a, b) => a + b, 0)
+      : results[keptIndex] ?? 0
 
   return (
     <>
@@ -923,6 +966,16 @@ export default function DiceLauncher() {
                     hour: '2-digit',
                     minute: '2-digit'
                   })
+                  const mode = jet.mode ?? 'normal'
+                  const keptValue =
+                    mode === 'avantage'
+                      ? Math.max(...jet.resultats)
+                      : mode === 'desavantage'
+                      ? Math.min(...jet.resultats)
+                      : null
+                  const keptIdx =
+                    keptValue !== null ? jet.resultats.indexOf(keptValue) : -1
+                  const displayTotal = keptValue !== null ? keptValue : total
                   return (
                     <div
                       key={jet.id}
@@ -934,10 +987,20 @@ export default function DiceLauncher() {
                           : 'bg-gray-900 border-gray-700'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-bold text-gray-200">
+                      <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
+                        <span className="text-sm font-bold text-gray-200 flex items-center gap-1">
                           {jet.nombre}
                           {jet.type_de}
+                          {mode === 'avantage' && (
+                            <span className="text-[9px] uppercase tracking-widest px-1 py-0.5 rounded bg-yellow-500/20 text-yellow-300 border border-yellow-500/40">
+                              ✨ avantage
+                            </span>
+                          )}
+                          {mode === 'desavantage' && (
+                            <span className="text-[9px] uppercase tracking-widest px-1 py-0.5 rounded bg-red-600/20 text-red-300 border border-red-600/40">
+                              💀 désavantage
+                            </span>
+                          )}
                         </span>
                         <span
                           className={`text-sm font-bold ${
@@ -948,18 +1011,24 @@ export default function DiceLauncher() {
                               : 'text-yellow-500'
                           }`}
                         >
-                          Total : {total}
+                          {mode === 'normal' ? 'Total' : 'Retenu'} : {displayTotal}
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-1 mb-1">
                         {jet.resultats.map((r, i) => {
                           const isCritS = isD20 && r === 20
                           const isCritF = isD20 && r === 1
+                          const isKept = i === keptIdx
+                          const isDimmed = keptIdx !== -1 && !isKept
                           return (
                             <span
                               key={i}
                               className={`px-2 py-0.5 rounded text-xs font-mono font-bold ${
-                                isCritS
+                                isKept
+                                  ? 'bg-yellow-500 text-gray-900 ring-2 ring-yellow-300'
+                                  : isDimmed
+                                  ? 'bg-gray-800 text-gray-500 line-through'
+                                  : isCritS
                                   ? 'bg-yellow-500 text-gray-900'
                                   : isCritF
                                   ? 'bg-red-600 text-white'
@@ -1006,17 +1075,66 @@ export default function DiceLauncher() {
               </div>
             </div>
 
+            {isD20 && (
+              <div className="grid grid-cols-2 gap-2">
+                <label
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded border cursor-pointer transition select-none ${
+                    advantage
+                      ? 'bg-yellow-500/15 border-yellow-500 text-yellow-200'
+                      : 'bg-gray-900 border-gray-700 text-gray-300 hover:border-yellow-600/60'
+                  }`}
+                  title="Avantage : lance 2d20 et garde le meilleur"
+                >
+                  <input
+                    type="checkbox"
+                    checked={advantage}
+                    onChange={(e) => setAdvantage(e.target.checked)}
+                    className="w-4 h-4 accent-yellow-500"
+                  />
+                  <span className="text-xs font-bold">✨ Avantage</span>
+                </label>
+                <label
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded border cursor-pointer transition select-none ${
+                    disadvantage
+                      ? 'bg-red-700/20 border-red-600 text-red-200'
+                      : 'bg-gray-900 border-gray-700 text-gray-300 hover:border-red-600/60'
+                  }`}
+                  title="Désavantage : lance 2d20 et garde le plus mauvais"
+                >
+                  <input
+                    type="checkbox"
+                    checked={disadvantage}
+                    onChange={(e) => setDisadvantage(e.target.checked)}
+                    className="w-4 h-4 accent-red-500"
+                  />
+                  <span className="text-xs font-bold">💀 Désavantage</span>
+                </label>
+                {advantage && disadvantage && (
+                  <p className="col-span-2 text-[10px] text-gray-400 italic text-center">
+                    Les deux cochés s'annulent — jet normal.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div>
               <label className="text-gray-400 text-sm">
-                Nombre de dés : <span className="text-yellow-500 font-bold">{count}</span>
+                Nombre de dés :{' '}
+                <span className="text-yellow-500 font-bold">
+                  {rollMode === 'normal' ? count : 2}
+                </span>
+                {rollMode !== 'normal' && (
+                  <span className="text-[10px] text-gray-500 ml-1">(forcé en {rollMode})</span>
+                )}
               </label>
               <input
                 type="range"
                 min={1}
                 max={10}
                 value={count}
+                disabled={rollMode !== 'normal'}
                 onChange={(e) => setCount(parseInt(e.target.value))}
-                className="w-full accent-yellow-500"
+                className="w-full accent-yellow-500 disabled:opacity-50"
               />
             </div>
 
@@ -1036,13 +1154,21 @@ export default function DiceLauncher() {
               disabled={rolling}
               className="w-full p-3 bg-yellow-500 text-gray-900 font-bold rounded hover:bg-yellow-400 disabled:opacity-60 transition"
             >
-              {rolling ? 'Lancement...' : `Lancer ${count}${selectedDice.label}`}
+              {rolling
+                ? 'Lancement...'
+                : `Lancer ${rollMode === 'normal' ? count : 2}${selectedDice.label}${
+                    rollMode === 'avantage'
+                      ? ' (✨ avantage)'
+                      : rollMode === 'desavantage'
+                      ? ' (💀 désavantage)'
+                      : ''
+                  }`}
             </button>
 
             {/* Bandeau résultat — placé AU-DESSUS du canvas pour rester
                 visible sans avoir à scroller / regarder en bas. Affiche le
                 total en gros + le détail des dés individuels juste sous. */}
-            {!rolling && results.length > 0 && count > 1 && (
+            {!rolling && results.length > 0 && (count > 1 || rollMode !== 'normal') && (
               <div
                 className="bg-gray-800 rounded-lg px-4 py-2 flex items-baseline justify-between gap-3 flex-wrap"
                 style={{
@@ -1055,7 +1181,11 @@ export default function DiceLauncher() {
                     className="text-[10px] uppercase tracking-[0.22em] font-bold"
                     style={{ color: '#C9A84C' }}
                   >
-                    Total
+                    {rollMode === 'avantage'
+                      ? 'Retenu (Avantage)'
+                      : rollMode === 'desavantage'
+                      ? 'Retenu (Désavantage)'
+                      : 'Total'}
                   </span>
                   <span
                     className="text-2xl font-bold leading-none"
@@ -1069,7 +1199,23 @@ export default function DiceLauncher() {
                   </span>
                 </div>
                 <span className="text-[11px] font-mono text-gray-400 truncate">
-                  {results.join(' + ')}
+                  {rollMode !== 'normal' && keptIndex !== null
+                    ? results.map((r, i) =>
+                        i === keptIndex ? (
+                          <span key={i} className="text-yellow-300 font-bold">
+                            [{r}]
+                          </span>
+                        ) : (
+                          <span key={i} className="line-through opacity-60">
+                            {r}
+                          </span>
+                        )
+                      ).reduce<React.ReactNode[]>((acc, el, i) => {
+                        if (i > 0) acc.push(' / ')
+                        acc.push(el)
+                        return acc
+                      }, [])
+                    : results.join(' + ')}
                 </span>
               </div>
             )}
@@ -1137,18 +1283,39 @@ export default function DiceLauncher() {
                   </button>
                 )}
                 <div className="flex flex-wrap items-center justify-center gap-4 py-2">
-                  {Array.from({ length: count }).map((_, i) => {
-                    const dieSize = count > 4 ? 64 : count > 2 ? 80 : 96
+                  {Array.from({
+                    length: rollMode === 'normal' ? count : 2
+                  }).map((_, i) => {
+                    const total = rollMode === 'normal' ? count : 2
+                    const dieSize = total > 4 ? 64 : total > 2 ? 80 : 96
+                    const kept = keptIndex === i
+                    const dimmed = keptIndex !== null && !kept
                     return (
-                      <DiceArt2D
+                      <div
                         key={i}
-                        type={selectedDice.label}
-                        sides={selectedDice.sides}
-                        size={dieSize}
-                        value={results[i]}
-                        rolling={rolling}
-                        delay={i * 90}
-                      />
+                        style={{
+                          position: 'relative',
+                          padding: 4,
+                          borderRadius: 16,
+                          background: kept
+                            ? 'radial-gradient(circle, rgba(254,240,138,0.35) 0%, rgba(201,168,76,0.18) 60%, transparent 100%)'
+                            : 'transparent',
+                          boxShadow: kept
+                            ? '0 0 18px 4px rgba(254,240,138,0.65), 0 0 32px 8px rgba(201,168,76,0.3)'
+                            : 'none',
+                          opacity: dimmed ? 0.45 : 1,
+                          transition: 'opacity 0.3s, box-shadow 0.3s'
+                        }}
+                      >
+                        <DiceArt2D
+                          type={selectedDice.label}
+                          sides={selectedDice.sides}
+                          size={dieSize}
+                          value={results[i]}
+                          rolling={rolling}
+                          delay={i * 90}
+                        />
+                      </div>
                     )
                   })}
                 </div>

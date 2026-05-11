@@ -11,6 +11,7 @@ import {
 } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import NumberInput from '@/app/components/NumberInput'
 
 // ============================================================================
 // Tile editor — Eclipsed Forge style
@@ -844,29 +845,23 @@ export default function MapEditorPage() {
               <div className="grid grid-cols-2 gap-2">
                 <label className="text-[11px] text-gray-500">
                   Largeur
-                  <input
-                    type="number"
+                  <NumberInput
                     min={1}
                     max={60}
+                    fallback={cols}
                     value={cols}
-                    onChange={(e) => {
-                      const v = parseInt(e.target.value)
-                      if (!Number.isNaN(v)) resizeMap(v, rows)
-                    }}
+                    onChange={(v) => resizeMap(v, rows)}
                     className="w-full p-1.5 mt-1 rounded bg-black/40 text-white border border-[rgba(201,168,76,0.2)] outline-none text-sm"
                   />
                 </label>
                 <label className="text-[11px] text-gray-500">
                   Hauteur
-                  <input
-                    type="number"
+                  <NumberInput
                     min={1}
                     max={60}
+                    fallback={rows}
                     value={rows}
-                    onChange={(e) => {
-                      const v = parseInt(e.target.value)
-                      if (!Number.isNaN(v)) resizeMap(cols, v)
-                    }}
+                    onChange={(v) => resizeMap(cols, v)}
                     className="w-full p-1.5 mt-1 rounded bg-black/40 text-white border border-[rgba(201,168,76,0.2)] outline-none text-sm"
                   />
                 </label>

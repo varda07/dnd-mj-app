@@ -12,6 +12,12 @@ import {
   isConditionKey,
   type ConditionKey
 } from '@/app/data/conditions'
+import {
+  xpPourCD,
+  xpRequisProchainNiveau,
+  labelCD
+} from '@/app/data/dnd5e'
+import NumberInput from '@/app/components/NumberInput'
 
 type Scenario = { id: string; nom: string; bg_image_url: string | null; mj_id: string }
 
@@ -35,6 +41,9 @@ type BaseParticipant = {
   force?: number | null
   constitution?: number | null
   armes?: Arme[]
+  xp?: number | null         // perso uniquement
+  cd?: number | null         // ennemi uniquement (challenge rating)
+  pieces_or?: number | null  // perso uniquement (fortune)
 }
 
 type Participant = BaseParticipant & { kind: 'perso' | 'ennemi' }
@@ -74,9 +83,11 @@ type InitiativeEntry = {
 type StatutKO = 'inconscient' | 'stabilise' | 'mort' | 'vaincu'
 
 type EtatCombat = {
-  status: StatutKO
+  status?: StatutKO
   death_success?: number
   death_failure?: number
+  reaction_used?: boolean
+  bonus_used?: boolean
 }
 
 type CombatRow = {
@@ -128,6 +139,11 @@ function CombatInner() {
   const [bgImageUrl, setBgImageUrl] = useState('')
   const [uploadingBg, setUploadingBg] = useState(false)
   const [showVictory, setShowVictory] = useState(false)
+  // XP distribué et toasts de level-up disponibles après distribution
+  const [xpDistributed, setXpDistributed] = useState(false)
+  const [levelUpToasts, setLevelUpToasts] = useState<
+    { id: string; nom: string; nouveauNiveauPossible: number }[]
+  >([])
   const [attributionTarget, setAttributionTarget] = useState<Record<string, string>>({})
   const [menuConditionsPour, setMenuConditionsPour] = useState<string | null>(null)
   const [userId, setUserId] = useState<string>('')
@@ -135,6 +151,30 @@ function CombatInner() {
   const [combatId, setCombatId] = useState<string | null>(null)
   const [ordreSauvegarde, setOrdreSauvegarde] = useState<InitiativeEntry[]>([])
   const [showRoundAnnouncement, setShowRoundAnnouncement] = useState(false)
+  const [combatToast, setCombatToast] = useState<string | null>(null)
+
+  // Modale Dégâts de zone (AOE)
+  type AoeSaveType = 'dex' | 'con' | 'none'
+  type AoeSaveMode = 'half' | 'cancel'
+  type AoeRow = { pieceId: string; nom: string; jet: number; total: number; success: boolean; degats: number }
+  const [aoeOpen, setAoeOpen] = useState(false)
+  const [aoeTargets, setAoeTargets] = useState<Set<string>>(new Set())
+  const [aoeDamageExpr, setAoeDamageExpr] = useState('8d6')
+  const [aoeSaveType, setAoeSaveType] = useState<AoeSaveType>('dex')
+  const [aoeSaveMode, setAoeSaveMode] = useState<AoeSaveMode>('half')
+  const [aoeDD, setAoeDD] = useState(15)
+  const [aoeResults, setAoeResults] = useState<AoeRow[] | null>(null)
+  const [aoeApplying, setAoeApplying] = useState(false)
+
+  // Modale Loot (après distribution XP)
+  type LootRecap = { nom: string; items: string[]; or: number }
+  const [lootOpen, setLootOpen] = useState(false)
+  const [lootItemsSelected, setLootItemsSelected] = useState<Set<string>>(new Set())
+  const [lootGold, setLootGold] = useState(0)
+  const [lootDistMode, setLootDistMode] = useState<'single' | 'split'>('split')
+  const [lootTargetId, setLootTargetId] = useState<string>('')
+  const [lootApplying, setLootApplying] = useState(false)
+  const [lootRecap, setLootRecap] = useState<LootRecap[] | null>(null)
   const [timerDuration, setTimerDuration] = useState<number>(0)
   const [timerSec, setTimerSec] = useState<number>(0)
   const [timerExpired, setTimerExpired] = useState(false)
@@ -320,11 +360,11 @@ function CombatInner() {
     const [{ data: p }, { data: e }, { data: it }, { data: cb }] = await Promise.all([
       supabase
         .from('personnages')
-        .select('id, nom, hp_max, hp_actuel, dexterite, image_url, conditions, classe, niveau, ca, vitesse, force, constitution, armes')
+        .select('id, nom, hp_max, hp_actuel, dexterite, image_url, conditions, classe, niveau, ca, vitesse, force, constitution, armes, xp, pieces_or')
         .eq('scenario_id', scenarioId),
       supabase
         .from('ennemis')
-        .select('id, nom, hp_max, hp_actuel, dexterite, image_url, conditions, force, constitution')
+        .select('id, nom, hp_max, hp_actuel, dexterite, image_url, conditions, force, constitution, cd')
         .eq('scenario_id', scenarioId),
       supabase.from('items').select('*').eq('scenario_id', scenarioId),
       supabase.from('combats').select('*').eq('scenario_id', scenarioId).maybeSingle()
@@ -702,9 +742,11 @@ function CombatInner() {
     console.log('[KO]', t0, 'triggerKO appelé pour', p.nom, 'isPerso:', isPerso, 'piece_id:', pid)
     const status: StatutKO = isPerso ? 'inconscient' : 'vaincu'
     setEtatsCombat((prev) => {
+      const cur = prev[pid] ?? {}
       const next = {
         ...prev,
         [pid]: {
+          ...cur,
           status,
           ...(p.kind === 'perso' ? { death_success: 0, death_failure: 0 } : {})
         } as EtatCombat
@@ -814,15 +856,94 @@ function CombatInner() {
       if (!cur || cur.status === 'mort' || cur.status === 'stabilise') return prev
       const success = (cur.death_success ?? 0) + (type === 'success' ? 1 : 0)
       const failure = (cur.death_failure ?? 0) + (type === 'failure' ? 1 : 0)
-      let nextStatus: StatutKO = cur.status
+      let nextStatus: StatutKO = cur.status ?? 'inconscient'
       if (success >= 3) nextStatus = 'stabilise'
       else if (failure >= 3) nextStatus = 'mort'
       const nextEtat: EtatCombat = {
+        ...cur,
         status: nextStatus,
         death_success: Math.min(3, success),
         death_failure: Math.min(3, failure)
       }
       const next = { ...prev, [pieceId]: nextEtat }
+      void saveCombatState({ etats_combat: next })
+      return next
+    })
+  }, [saveCombatState])
+
+  // ============== Réaction & Action bonus ==============
+  // Toggle l'état "utilisé" pour la réaction du pieceId courant. Persiste
+  // dans etats_combat. On retire l'entrée si elle ne porte plus rien
+  // (status absent + tous les flags à false) pour garder la map propre.
+  const toggleReaction = useCallback((pieceId: string) => {
+    if (!isMJRef.current) return
+    setEtatsCombat((prev) => {
+      const cur = prev[pieceId] ?? {}
+      const nextUsed = !cur.reaction_used
+      const nextEtat: EtatCombat = { ...cur, reaction_used: nextUsed }
+      // Si l'entrée devient totalement vide on la nettoie pour éviter
+      // de polluer la BDD avec des objets {} inutiles.
+      const next = { ...prev }
+      if (
+        !nextEtat.status &&
+        !nextEtat.reaction_used &&
+        !nextEtat.bonus_used &&
+        !nextEtat.death_success &&
+        !nextEtat.death_failure
+      ) {
+        delete next[pieceId]
+      } else {
+        next[pieceId] = nextEtat
+      }
+      void saveCombatState({ etats_combat: next })
+      return next
+    })
+  }, [saveCombatState])
+
+  const toggleBonusAction = useCallback((pieceId: string) => {
+    if (!isMJRef.current) return
+    setEtatsCombat((prev) => {
+      const cur = prev[pieceId] ?? {}
+      const nextUsed = !cur.bonus_used
+      const nextEtat: EtatCombat = { ...cur, bonus_used: nextUsed }
+      const next = { ...prev }
+      if (
+        !nextEtat.status &&
+        !nextEtat.reaction_used &&
+        !nextEtat.bonus_used &&
+        !nextEtat.death_success &&
+        !nextEtat.death_failure
+      ) {
+        delete next[pieceId]
+      } else {
+        next[pieceId] = nextEtat
+      }
+      void saveCombatState({ etats_combat: next })
+      return next
+    })
+  }, [saveCombatState])
+
+  // Reset des flags réaction/bonus pour le participant dont c'est le tour.
+  // Appelé à chaque changement de turnIndex (cf. useEffect plus bas).
+  const rechargerActions = useCallback((pieceId: string) => {
+    if (!isMJRef.current) return
+    setEtatsCombat((prev) => {
+      const cur = prev[pieceId]
+      if (!cur) return prev
+      if (!cur.reaction_used && !cur.bonus_used) return prev
+      const nextEtat: EtatCombat = { ...cur, reaction_used: false, bonus_used: false }
+      const next = { ...prev }
+      if (
+        !nextEtat.status &&
+        !nextEtat.reaction_used &&
+        !nextEtat.bonus_used &&
+        !nextEtat.death_success &&
+        !nextEtat.death_failure
+      ) {
+        delete next[pieceId]
+      } else {
+        next[pieceId] = nextEtat
+      }
       void saveCombatState({ etats_combat: next })
       return next
     })
@@ -841,6 +962,309 @@ function CombatInner() {
       return next
     })
   }, [saveCombatState])
+
+  // Parse une expression de type "XdY", "XdY+Z" ou "XdY-Z" et renvoie une
+  // valeur tirée aléatoirement. Si l'expression est invalide, renvoie 0.
+  const lancerExpressionDes = (expr: string): number => {
+    const m = expr
+      .trim()
+      .toLowerCase()
+      .match(/^(\d+)d(\d+)\s*([+-]\s*\d+)?$/)
+    if (!m) return 0
+    const n = parseInt(m[1], 10)
+    const faces = parseInt(m[2], 10)
+    if (n < 1 || faces < 2 || n > 100 || faces > 1000) return 0
+    let total = 0
+    for (let i = 0; i < n; i++) {
+      total += Math.floor(Math.random() * faces) + 1
+    }
+    if (m[3]) {
+      total += parseInt(m[3].replace(/\s+/g, ''), 10)
+    }
+    return Math.max(0, total)
+  }
+
+  const modStatParticipant = (p: BaseParticipant, key: 'dexterite' | 'constitution'): number => {
+    const v = p[key] ?? 10
+    return Math.floor(((v ?? 10) - 10) / 2)
+  }
+
+  // Identifie les cibles AOE possibles : tous les participants vivants.
+  const aoeCibles = ordreSauvegarde.map((entry) => {
+    const fresh = entry.kind === 'perso'
+      ? personnages.find((p) => p.id === entry.ref_id)
+      : ennemis.find((e) => e.id === entry.ref_id)
+    return fresh ? { entry, p: { ...fresh, kind: entry.kind } as Participant } : null
+  }).filter((x): x is { entry: InitiativeEntry; p: Participant } => x !== null)
+
+  const ouvrirAoe = () => {
+    // Par défaut : toutes les cibles pré-cochées (le MJ décoche)
+    const all = new Set(aoeCibles.map((c) => c.entry.piece_id))
+    setAoeTargets(all)
+    setAoeResults(null)
+    setAoeOpen(true)
+  }
+
+  const toggleAoeTarget = (pieceId: string) => {
+    setAoeTargets((prev) => {
+      const next = new Set(prev)
+      if (next.has(pieceId)) next.delete(pieceId)
+      else next.add(pieceId)
+      return next
+    })
+  }
+
+  const resoudreAoe = async () => {
+    if (aoeTargets.size === 0) return
+    setAoeApplying(true)
+    const total = lancerExpressionDes(aoeDamageExpr)
+    if (total === 0) {
+      setCombatToast(`⚠ Expression de dégâts invalide : "${aoeDamageExpr}"`)
+      setTimeout(() => setCombatToast(null), 3000)
+      setAoeApplying(false)
+      return
+    }
+    const rows: AoeRow[] = []
+    for (const c of aoeCibles) {
+      if (!aoeTargets.has(c.entry.piece_id)) continue
+      let jet = 0
+      let saveTotal = 0
+      let success = false
+      if (aoeSaveType !== 'none') {
+        jet = Math.floor(Math.random() * 20) + 1
+        const stat = aoeSaveType === 'dex' ? 'dexterite' : 'constitution'
+        saveTotal = jet + modStatParticipant(c.p, stat)
+        success = saveTotal >= aoeDD
+      }
+      let degats: number
+      if (aoeSaveType === 'none') {
+        degats = total
+      } else if (success && aoeSaveMode === 'half') {
+        degats = Math.floor(total / 2)
+      } else if (success && aoeSaveMode === 'cancel') {
+        degats = 0
+      } else {
+        degats = total
+      }
+      // Applique via modifierHp pour conserver la logique KO existante.
+      if (degats > 0) {
+        await modifierHp(c.p, -degats)
+      }
+      rows.push({
+        pieceId: c.entry.piece_id,
+        nom: c.entry.nom,
+        jet,
+        total: saveTotal,
+        success,
+        degats
+      })
+    }
+    setAoeResults(rows)
+    setAoeApplying(false)
+  }
+
+  const fermerAoe = () => {
+    setAoeOpen(false)
+    setAoeResults(null)
+  }
+
+  // ============== Loot ==============
+  const ouvrirLoot = () => {
+    setLootItemsSelected(new Set())
+    setLootGold(0)
+    setLootDistMode(persosParticipants.length > 1 ? 'split' : 'single')
+    setLootTargetId(persosParticipants[0]?.id ?? '')
+    setLootRecap(null)
+    setLootOpen(true)
+  }
+
+  const toggleLootItem = (id: string) => {
+    setLootItemsSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const distribuerLoot = async () => {
+    if (persosParticipants.length === 0) return
+    setLootApplying(true)
+    const itemsArr = items.filter((i) => lootItemsSelected.has(i.id))
+    const recapMap: Record<string, LootRecap> = {}
+    persosParticipants.forEach((p) => {
+      recapMap[p.id] = { nom: p.nom, items: [], or: 0 }
+    })
+
+    if (lootDistMode === 'single') {
+      const targetId = lootTargetId || persosParticipants[0]?.id
+      if (!targetId) {
+        setLootApplying(false)
+        return
+      }
+      // Items → un seul PJ
+      if (itemsArr.length > 0) {
+        await supabase
+          .from('items')
+          .update({ personnage_id: targetId })
+          .in('id', itemsArr.map((i) => i.id))
+        setItems((arr) =>
+          arr.map((i) =>
+            lootItemsSelected.has(i.id) ? { ...i, personnage_id: targetId } : i
+          )
+        )
+        if (recapMap[targetId]) {
+          recapMap[targetId].items = itemsArr.map((i) => i.nom)
+        }
+      }
+      // Or → un seul PJ
+      if (lootGold > 0) {
+        const target = persosParticipants.find((p) => p.id === targetId)
+        if (target) {
+          const nouvOr = (target.pieces_or ?? 0) + lootGold
+          await supabase.from('personnages').update({ pieces_or: nouvOr }).eq('id', targetId)
+          setPersonnages((arr) =>
+            arr.map((p) => (p.id === targetId ? { ...p, pieces_or: nouvOr } : p))
+          )
+          if (recapMap[targetId]) recapMap[targetId].or = lootGold
+        }
+      }
+    } else {
+      // Partage équitable
+      // Items distribués round-robin
+      const n = persosParticipants.length
+      const updates: { itemId: string; persoId: string }[] = []
+      itemsArr.forEach((item, i) => {
+        const persoId = persosParticipants[i % n].id
+        updates.push({ itemId: item.id, persoId })
+        recapMap[persoId]?.items.push(item.nom)
+      })
+      // Batch updates : grouper par persoId
+      const byPerso: Record<string, string[]> = {}
+      updates.forEach(({ itemId, persoId }) => {
+        ;(byPerso[persoId] = byPerso[persoId] ?? []).push(itemId)
+      })
+      for (const persoId of Object.keys(byPerso)) {
+        const ids = byPerso[persoId]
+        await supabase.from('items').update({ personnage_id: persoId }).in('id', ids)
+      }
+      setItems((arr) =>
+        arr.map((i) => {
+          const u = updates.find((x) => x.itemId === i.id)
+          return u ? { ...i, personnage_id: u.persoId } : i
+        })
+      )
+      // Or split au floor
+      if (lootGold > 0) {
+        const part = Math.floor(lootGold / n)
+        if (part > 0) {
+          for (const p of persosParticipants) {
+            const nouvOr = (p.pieces_or ?? 0) + part
+            await supabase.from('personnages').update({ pieces_or: nouvOr }).eq('id', p.id)
+            recapMap[p.id].or = part
+          }
+          setPersonnages((arr) =>
+            arr.map((p) =>
+              persosParticipants.find((pp) => pp.id === p.id)
+                ? { ...p, pieces_or: (p.pieces_or ?? 0) + part }
+                : p
+            )
+          )
+        }
+      }
+    }
+    setLootRecap(Object.values(recapMap).filter((r) => r.items.length > 0 || r.or > 0))
+    setLootApplying(false)
+  }
+
+  const fermerLootEtTerminer = () => {
+    setLootOpen(false)
+    setLootRecap(null)
+    setShowVictory(false)
+    resetInterface()
+  }
+
+  // Listener pour l'événement combat:toast (dispatché depuis lancerJetMortCombat)
+  useEffect(() => {
+    const onToast = (e: Event) => {
+      const detail = (e as CustomEvent<{ msg?: string }>).detail
+      if (detail?.msg) {
+        setCombatToast(detail.msg)
+        setTimeout(() => setCombatToast(null), 3500)
+      }
+    }
+    window.addEventListener('combat:toast', onToast)
+    return () => window.removeEventListener('combat:toast', onToast)
+  }, [])
+
+  // Jet de mort automatique : 1 = 2 échecs, 2..9 = 1 échec, 10..19 = 1 succès,
+  // 20 = stabilisé + 1 PV. Pour combat, on garde le tracking dans etatsCombat.
+  const lancerJetMortCombat = useCallback(
+    (pieceId: string, refId: string) => {
+      if (!isMJRef.current) return
+      const d20 = Math.floor(Math.random() * 20) + 1
+      setEtatsCombat((prev) => {
+        const cur = prev[pieceId]
+        if (!cur || cur.status === 'mort' || cur.status === 'stabilise') return prev
+        let success = cur.death_success ?? 0
+        let failure = cur.death_failure ?? 0
+        let toastMsg = ''
+        if (d20 === 20) {
+          // Réveil — le PJ remonte à 1 PV
+          success = 0
+          failure = 0
+          // Met à jour le HP du perso aussi (en BDD + local)
+          void supabase.from('personnages').update({ hp_actuel: 1 }).eq('id', refId)
+          setPersonnages((arr) =>
+            arr.map((p) => (p.id === refId ? { ...p, hp_actuel: 1 } : p))
+          )
+          toastMsg = `🎲 20 — Réveil ! +1 PV.`
+          // Retirer le KO state (status non-applicable)
+          const next = { ...prev }
+          delete next[pieceId]
+          void saveCombatState({ etats_combat: next })
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('combat:toast', { detail: { msg: toastMsg } })
+            )
+          }
+          return next
+        } else if (d20 === 1) {
+          failure = Math.min(3, failure + 2)
+          toastMsg = `🎲 1 — Échec critique (${failure}/3)`
+        } else if (d20 >= 10) {
+          success = Math.min(3, success + 1)
+          toastMsg = `🎲 ${d20} — Succès (${success}/3)`
+        } else {
+          failure = Math.min(3, failure + 1)
+          toastMsg = `🎲 ${d20} — Échec (${failure}/3)`
+        }
+        let nextStatus: StatutKO = cur.status ?? 'inconscient'
+        if (success >= 3) {
+          nextStatus = 'stabilise'
+          toastMsg += ' — ✨ Stabilisé !'
+        } else if (failure >= 3) {
+          nextStatus = 'mort'
+          toastMsg += ' — ✝ MORT'
+        }
+        const nextEtat: EtatCombat = {
+          ...cur,
+          status: nextStatus,
+          death_success: success,
+          death_failure: failure
+        }
+        const next = { ...prev, [pieceId]: nextEtat }
+        void saveCombatState({ etats_combat: next })
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('combat:toast', { detail: { msg: toastMsg } })
+          )
+        }
+        return next
+      })
+    },
+    [saveCombatState]
+  )
 
   const resetInterface = () => {
     setShowVictory(false)
@@ -868,11 +1292,71 @@ function CombatInner() {
 
   const terminerCombat = async () => {
     await saveCombatState({ actif: false, ordre_initiative: [], round: 1, tour_actuel: 0, etats_combat: {} })
-
+    setXpDistributed(false)
     setShowVictory(true)
-    setTimeout(() => {
-      resetInterface()
-    }, 3000)
+  }
+
+  const fermerVictoire = () => {
+    setShowVictory(false)
+    resetInterface()
+  }
+
+  // Calcule la liste des persos participants au combat (filtrés via selectedIds)
+  // avec leurs infos XP/niveau pour la distribution.
+  const persosParticipants = personnages.filter((p) =>
+    selectedIds.has(`perso-${p.id}`)
+  )
+
+  // Total XP du combat = somme des CD des ennemis du scénario sélectionnés.
+  const ennemisParticipants = ennemis.filter((e) =>
+    selectedIds.has(`ennemi-${e.id}`)
+  )
+  const xpTotalCombat = ennemisParticipants.reduce(
+    (sum, e) => sum + xpPourCD(e.cd ?? 0),
+    0
+  )
+  const xpParPerso =
+    persosParticipants.length > 0
+      ? Math.floor(xpTotalCombat / persosParticipants.length)
+      : 0
+
+  const distribuerXP = async () => {
+    if (xpDistributed) return
+    if (persosParticipants.length === 0 || xpParPerso === 0) {
+      setXpDistributed(true)
+      return
+    }
+    const toasts: { id: string; nom: string; nouveauNiveauPossible: number }[] = []
+    const updates = await Promise.all(
+      persosParticipants.map(async (p) => {
+        const ancienXp = p.xp ?? 0
+        const ancienNiv = p.niveau ?? 1
+        const nouveauXp = ancienXp + xpParPerso
+        const seuil = xpRequisProchainNiveau(ancienNiv)
+        const peutMonter = seuil !== null && ancienXp < seuil && nouveauXp >= seuil
+        const { error } = await supabase
+          .from('personnages')
+          .update({ xp: nouveauXp })
+          .eq('id', p.id)
+        if (error) {
+          console.error('[combat] distribuer XP :', error)
+          return null
+        }
+        if (peutMonter) {
+          toasts.push({ id: p.id, nom: p.nom, nouveauNiveauPossible: ancienNiv + 1 })
+        }
+        return { id: p.id, xp: nouveauXp }
+      })
+    )
+    // Patch local des persos pour rafraîchir l'affichage sans re-fetch
+    setPersonnages((arr) =>
+      arr.map((p) => {
+        const u = updates.find((x) => x && x.id === p.id)
+        return u ? { ...p, xp: u.xp } : p
+      })
+    )
+    setXpDistributed(true)
+    setLevelUpToasts(toasts)
   }
 
   const attribuerItem = async (itemId: string, personnageId: string) => {
@@ -933,6 +1417,13 @@ function CombatInner() {
   }
 
   const tourActuelId = ordreSauvegarde[turnIndex]?.piece_id ?? null
+
+  // Recharge la réaction et l'action bonus du participant dont c'est le tour.
+  // Se déclenche à chaque bascule de tour ; pas d'effet si rien n'était utilisé.
+  useEffect(() => {
+    if (!combatDemarre || !tourActuelId) return
+    rechargerActions(tourActuelId)
+  }, [tourActuelId, combatDemarre, rechargerActions])
 
   const itemsDisponibles = items.filter((i) => !i.personnage_id)
   const itemsAttribues = items.filter((i) => i.personnage_id)
@@ -1174,6 +1665,15 @@ function CombatInner() {
                   )}
                   <button
                     type="button"
+                    onClick={ouvrirAoe}
+                    disabled={!isMJ || aoeCibles.length === 0}
+                    title="Appliquer des dégâts de zone à plusieurs cibles avec jet de sauvegarde."
+                    className="px-3 py-2 md:px-4 md:py-2.5 bg-orange-700 text-white font-bold rounded hover:bg-orange-600 disabled:opacity-50 text-sm md:text-base"
+                  >
+                    💥 Dégâts de zone
+                  </button>
+                  <button
+                    type="button"
                     onClick={terminerCombat}
                     disabled={!isMJ || showVictory}
                     className="px-3 py-2 md:px-4 md:py-2.5 bg-green-600 text-white font-bold rounded hover:bg-green-500 disabled:opacity-50 text-sm md:text-base"
@@ -1212,8 +1712,8 @@ function CombatInner() {
                       const etat = etatsCombat[entry.piece_id]
                       const isAnimating = koAnimating.has(entry.piece_id)
                       const isPerso = entry.kind === 'perso'
-                      const koActif = !!etat && etat.status !== 'stabilise'
-                      const koInfo = etat
+                      const koActif = !!etat?.status && etat.status !== 'stabilise'
+                      const koInfo = etat?.status
                         ? etat.status === 'mort'
                           ? { emoji: '🪦', label: 'MORT', badgeClass: 'bg-black text-red-200 border-red-700' }
                           : etat.status === 'stabilise'
@@ -1363,7 +1863,7 @@ function CombatInner() {
                           <p
                             className={`text-xs font-bold truncate ${
                               etat?.status === 'mort' ? 'text-gray-500 line-through'
-                                : etat ? 'text-gray-400'
+                                : etat?.status ? 'text-gray-400'
                                 : isPerso ? 'text-blue-200' : 'text-red-200'
                             }`}
                             title={entry.nom}
@@ -1383,13 +1883,52 @@ function CombatInner() {
                               <span className="block text-[9px] font-black tracking-widest mt-0.5">{koInfo.label}</span>
                             </div>
                           )}
-                          {hp_max > 0 && !etat && (
+                          {hp_max > 0 && !etat?.status && (
                             <>
                               <div className="h-1 bg-gray-700 rounded overflow-hidden mt-1">
                                 <div className={`h-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
                               </div>
                               <p className="text-[10px] text-gray-300 mt-0.5">❤️ {hp_actuel}/{hp_max}</p>
                             </>
+                          )}
+                          {/* Réaction + Action bonus (cachées si le participant est KO/mort) */}
+                          {!etat?.status && (
+                            <div className="mt-1 flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => toggleReaction(entry.piece_id)}
+                                disabled={!isMJ}
+                                title={
+                                  etat?.reaction_used
+                                    ? 'Réaction utilisée — clic pour annuler'
+                                    : 'Réaction disponible — clic = consommer'
+                                }
+                                className={`flex-1 px-1 py-0.5 rounded text-[10px] font-bold border transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                                  etat?.reaction_used
+                                    ? 'bg-stone-900/70 border-stone-700 text-stone-500'
+                                    : 'border-emerald-500/60 text-emerald-300 bg-emerald-700/15 hover:bg-emerald-700/30 shadow-[0_0_6px_rgba(74,222,128,0.4)]'
+                                }`}
+                              >
+                                🛡 RÉAC
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => toggleBonusAction(entry.piece_id)}
+                                disabled={!isMJ}
+                                title={
+                                  etat?.bonus_used
+                                    ? 'Action bonus utilisée — clic pour annuler'
+                                    : 'Action bonus disponible — clic = consommer'
+                                }
+                                className={`flex-1 px-1 py-0.5 rounded text-[10px] font-bold border transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                                  etat?.bonus_used
+                                    ? 'bg-stone-900/70 border-stone-700 text-stone-500'
+                                    : 'border-amber-500/60 text-amber-200 bg-amber-700/15 hover:bg-amber-700/30 shadow-[0_0_6px_rgba(251,191,36,0.45)]'
+                                }`}
+                              >
+                                ⚡ BONUS
+                              </button>
+                            </div>
                           )}
                           {/* Death Saves uniquement pour les PJ inconscients */}
                           {isPerso && etat?.status === 'inconscient' && (
@@ -1438,9 +1977,35 @@ function CombatInner() {
                                   )
                                 })}
                               </div>
+                              {isMJ && (
+                                <button
+                                  type="button"
+                                  onClick={() => lancerJetMortCombat(entry.piece_id, entry.ref_id)}
+                                  className="w-full px-2 py-1 rounded text-[10px] uppercase tracking-widest font-bold border transition"
+                                  style={{
+                                    background:
+                                      'linear-gradient(135deg, rgba(201,168,76,0.25), rgba(180,120,60,0.15))',
+                                    borderColor: 'rgba(201,168,76,0.55)',
+                                    color: '#fef08a'
+                                  }}
+                                  title="Lancer un d20 pour le jet contre la mort"
+                                >
+                                  🎲 Jet de mort
+                                </button>
+                              )}
                             </div>
                           )}
-                          {conditions.length > 0 && !etat && (
+                          {isPerso && etat?.status === 'stabilise' && (
+                            <div className="mt-1 px-1.5 py-1 rounded bg-emerald-700/30 border border-emerald-500/50 text-[10px] text-emerald-200 text-center font-bold">
+                              ✨ Stabilisé
+                            </div>
+                          )}
+                          {isPerso && etat?.status === 'mort' && (
+                            <div className="mt-1 px-1.5 py-1 rounded bg-red-950/60 border border-red-700/70 text-[10px] text-red-200 text-center font-bold tracking-widest">
+                              ✝ MORT
+                            </div>
+                          )}
+                          {conditions.length > 0 && !etat?.status && (
                             <div className="flex flex-wrap gap-0.5 mt-1">
                               {conditions.slice(0, 5).map((cle) => {
                                 const c = CONDITIONS_MAP[cle]
@@ -1785,30 +2350,694 @@ function CombatInner() {
       )}
 
       {showVictory && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-6">
-          <div className="bg-gradient-to-br from-yellow-600 via-yellow-500 to-yellow-700 p-8 rounded-xl border-4 border-yellow-300 shadow-2xl max-w-lg w-full text-center animate-pulse">
-            <h2 className="text-5xl font-bold text-gray-900 mb-3">{tCombat('victory')}</h2>
-            <p className="text-gray-900 font-bold mb-4 text-lg">
-              {tCombat('victory_msg')}
-            </p>
-            {itemsDisponibles.length > 0 ? (
-              <div>
-                <p className="text-gray-900 font-bold mb-2">{tCombat('loot')}</p>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {itemsDisponibles.map((i) => (
-                    <span
-                      key={i.id}
-                      className="px-3 py-1 rounded-full bg-gray-900 text-yellow-300 text-sm border border-yellow-400"
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div
+            className="w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden border max-h-[90vh] flex flex-col"
+            style={{
+              background: 'linear-gradient(180deg, #1a1410 0%, #14110d 100%)',
+              borderColor: 'rgba(201,168,76,0.5)',
+              boxShadow:
+                '0 30px 60px rgba(0,0,0,0.6), 0 0 80px rgba(201,168,76,0.2)'
+            }}
+          >
+            <div
+              className="px-6 py-4 border-b text-center"
+              style={{
+                background:
+                  'linear-gradient(90deg, rgba(201,168,76,0.25), rgba(180,120,60,0.18), rgba(201,168,76,0.25))',
+                borderColor: 'rgba(201,168,76,0.4)'
+              }}
+            >
+              <h2 className="text-3xl font-serif font-bold text-amber-100">
+                🏆 {tCombat('victory')}
+              </h2>
+              <p className="text-amber-300/80 text-sm">{tCombat('victory_msg')}</p>
+            </div>
+
+            <div className="px-6 py-5 space-y-5 overflow-y-auto">
+              <div
+                className="rounded-lg p-4 border text-center"
+                style={{
+                  background:
+                    'linear-gradient(135deg, rgba(201,168,76,0.18), rgba(180,120,60,0.08))',
+                  borderColor: 'rgba(201,168,76,0.4)'
+                }}
+              >
+                <p className="text-[10px] uppercase tracking-[0.25em] text-amber-400/80">
+                  XP totale gagnée
+                </p>
+                <p className="text-amber-100 font-serif text-4xl font-bold">
+                  {xpTotalCombat.toLocaleString('fr-FR')} XP
+                </p>
+                {ennemisParticipants.length > 0 && (
+                  <p className="text-stone-400 text-xs mt-1">
+                    {ennemisParticipants.length} ennemi{ennemisParticipants.length > 1 ? 's' : ''}
+                    {' · '}
+                    {ennemisParticipants
+                      .map((e) => `CD ${labelCD(e.cd ?? 0)}`)
+                      .join(', ')}
+                  </p>
+                )}
+              </div>
+
+              {persosParticipants.length > 0 && (
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-amber-400/70 mb-2">
+                    Part par PJ : <span className="text-amber-200 font-bold">{xpParPerso.toLocaleString('fr-FR')} XP</span>
+                    {' '}({persosParticipants.length} personnage{persosParticipants.length > 1 ? 's' : ''})
+                  </p>
+                  <div className="space-y-2">
+                    {persosParticipants.map((p) => {
+                      const ancienXp = p.xp ?? 0
+                      const ancienNiv = p.niveau ?? 1
+                      const nouveauXp = xpDistributed ? ancienXp : ancienXp + xpParPerso
+                      const xpAffiche = xpDistributed ? ancienXp : nouveauXp
+                      const seuil = xpRequisProchainNiveau(ancienNiv)
+                      const peutMonter = seuil !== null && xpAffiche >= seuil
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() =>
+                            router.push(`/dashboard/personnages/${p.id}`)
+                          }
+                          className="w-full text-left rounded-lg p-3 border bg-stone-900/40 hover:bg-stone-800/60 transition-all flex items-center gap-3"
+                          style={{ borderColor: 'rgba(201,168,76,0.25)' }}
+                        >
+                          {p.image_url ? (
+                            <img
+                              src={p.image_url}
+                              alt={p.nom}
+                              className="w-10 h-10 rounded-full object-cover ring-2 ring-amber-700/60 flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-stone-800 ring-2 ring-amber-700/60 flex items-center justify-center text-amber-300 text-sm font-bold flex-shrink-0">
+                              {p.nom.slice(0, 2).toUpperCase()}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-amber-100 font-bold truncate">
+                              {p.nom}{' '}
+                              <span className="text-stone-400 text-xs font-normal">
+                                · Niv. {ancienNiv}
+                              </span>
+                            </p>
+                            <p className="text-xs text-stone-400 font-mono">
+                              {ancienXp.toLocaleString('fr-FR')}{' '}
+                              {!xpDistributed && (
+                                <>
+                                  <span className="text-amber-400">+{xpParPerso.toLocaleString('fr-FR')}</span>
+                                  {' = '}
+                                  <span className="text-amber-200 font-bold">
+                                    {nouveauXp.toLocaleString('fr-FR')}
+                                  </span>
+                                </>
+                              )}
+                              {' '}XP
+                            </p>
+                          </div>
+                          {peutMonter && (
+                            <span
+                              className="px-2 py-1 rounded text-[10px] uppercase tracking-wider font-bold flex-shrink-0"
+                              style={{
+                                background:
+                                  'linear-gradient(135deg, #C9A84C 0%, #8B5A2B 100%)',
+                                color: '#1a1410'
+                              }}
+                            >
+                              ⬆ Niv. {ancienNiv + 1} possible
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {itemsDisponibles.length > 0 && (
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-amber-400/70 mb-2">
+                    {tCombat('loot')}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {itemsDisponibles.map((i) => (
+                      <span
+                        key={i.id}
+                        className="px-3 py-1 rounded-full bg-stone-900 text-amber-300 text-xs border border-amber-700/60"
+                      >
+                        ✨ {i.nom}{' '}
+                        <span className="text-stone-500">({i.rarete})</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div
+              className="px-6 py-4 border-t flex items-center justify-between gap-3"
+              style={{ borderColor: 'rgba(201,168,76,0.2)' }}
+            >
+              <button
+                type="button"
+                onClick={fermerVictoire}
+                className="px-4 py-2 text-sm text-stone-400 hover:text-stone-200"
+              >
+                Fermer sans distribuer
+              </button>
+              {!xpDistributed ? (
+                <button
+                  type="button"
+                  disabled={!isMJ || persosParticipants.length === 0 || xpTotalCombat === 0}
+                  onClick={distribuerXP}
+                  className="px-6 py-2 rounded-lg font-bold text-sm uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{
+                    background:
+                      'linear-gradient(135deg, #C9A84C 0%, #8B5A2B 100%)',
+                    color: '#1a1410',
+                    boxShadow: '0 4px 14px rgba(201,168,76,0.4)'
+                  }}
+                >
+                  ⚡ Distribuer l'XP
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowVictory(false)
+                    ouvrirLoot()
+                  }}
+                  className="px-6 py-2 rounded-lg font-bold text-sm uppercase tracking-wider"
+                  style={{
+                    background:
+                      'linear-gradient(135deg, #C9A84C 0%, #8B5A2B 100%)',
+                    color: '#1a1410',
+                    boxShadow: '0 4px 14px rgba(201,168,76,0.4)'
+                  }}
+                >
+                  🎁 Distribuer le butin
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modale Dégâts de zone */}
+      {aoeOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div
+            className="w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden border max-h-[90vh] flex flex-col"
+            style={{
+              background: 'linear-gradient(180deg, #1a1410 0%, #14110d 100%)',
+              borderColor: 'rgba(255,120,40,0.45)'
+            }}
+          >
+            <div
+              className="px-5 py-3 border-b text-center"
+              style={{
+                background:
+                  'linear-gradient(90deg, rgba(255,120,40,0.25), rgba(180,60,30,0.15), rgba(255,120,40,0.25))',
+                borderColor: 'rgba(255,120,40,0.4)'
+              }}
+            >
+              <h2 className="text-xl font-serif font-bold text-orange-100">
+                💥 Dégâts de zone
+              </h2>
+            </div>
+
+            <div className="p-5 space-y-4 overflow-y-auto">
+              {!aoeResults ? (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="block">
+                      <span className="text-[10px] uppercase tracking-widest text-orange-300/80">
+                        Dégâts (XdY ou XdY+Z)
+                      </span>
+                      <input
+                        type="text"
+                        value={aoeDamageExpr}
+                        onChange={(e) => setAoeDamageExpr(e.target.value)}
+                        placeholder="ex. 8d6"
+                        className="w-full bg-stone-900 border border-orange-800/40 rounded px-3 py-2 text-orange-100 outline-none focus:border-orange-600 mt-1"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-[10px] uppercase tracking-widest text-orange-300/80">
+                        DD du jet
+                      </span>
+                      <NumberInput
+                        min={1}
+                        max={30}
+                        fallback={10}
+                        value={aoeDD}
+                        onChange={setAoeDD}
+                        className="w-full bg-stone-900 border border-orange-800/40 rounded px-3 py-2 text-orange-100 outline-none focus:border-orange-600 mt-1"
+                      />
+                    </label>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-orange-300/80 mb-1">
+                      Jet de sauvegarde
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAoeSaveType('dex')}
+                        className={`py-1.5 px-2 rounded border text-xs font-bold ${
+                          aoeSaveType === 'dex'
+                            ? 'bg-orange-700/30 border-orange-500 text-orange-100'
+                            : 'bg-stone-900 border-stone-700 text-stone-300 hover:border-orange-700'
+                        }`}
+                      >
+                        🏃 Dextérité
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAoeSaveType('con')}
+                        className={`py-1.5 px-2 rounded border text-xs font-bold ${
+                          aoeSaveType === 'con'
+                            ? 'bg-orange-700/30 border-orange-500 text-orange-100'
+                            : 'bg-stone-900 border-stone-700 text-stone-300 hover:border-orange-700'
+                        }`}
+                      >
+                        🫀 Constitution
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAoeSaveType('none')}
+                        className={`py-1.5 px-2 rounded border text-xs font-bold ${
+                          aoeSaveType === 'none'
+                            ? 'bg-orange-700/30 border-orange-500 text-orange-100'
+                            : 'bg-stone-900 border-stone-700 text-stone-300 hover:border-orange-700'
+                        }`}
+                      >
+                        ⛔ Pas de jet
+                      </button>
+                    </div>
+                  </div>
+
+                  {aoeSaveType !== 'none' && (
+                    <div>
+                      <p className="text-[10px] uppercase tracking-widest text-orange-300/80 mb-1">
+                        Effet sur succès
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setAoeSaveMode('half')}
+                          className={`py-1.5 px-2 rounded border text-xs font-bold ${
+                            aoeSaveMode === 'half'
+                              ? 'bg-orange-700/30 border-orange-500 text-orange-100'
+                              : 'bg-stone-900 border-stone-700 text-stone-300 hover:border-orange-700'
+                          }`}
+                        >
+                          ½ Moitié des dégâts
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAoeSaveMode('cancel')}
+                          className={`py-1.5 px-2 rounded border text-xs font-bold ${
+                            aoeSaveMode === 'cancel'
+                              ? 'bg-orange-700/30 border-orange-500 text-orange-100'
+                              : 'bg-stone-900 border-stone-700 text-stone-300 hover:border-orange-700'
+                          }`}
+                        >
+                          ✓ Aucun dégât
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-orange-300/80 mb-1">
+                      Cibles ({aoeTargets.size}/{aoeCibles.length})
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-56 overflow-y-auto">
+                      {aoeCibles.map(({ entry, p }) => {
+                        const isChecked = aoeTargets.has(entry.piece_id)
+                        return (
+                          <label
+                            key={entry.piece_id}
+                            className={`flex items-center gap-2 px-2 py-1.5 rounded border cursor-pointer text-xs ${
+                              isChecked
+                                ? 'bg-orange-700/15 border-orange-600/50 text-orange-100'
+                                : 'bg-stone-900 border-stone-700 text-stone-300 hover:border-orange-700/60'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleAoeTarget(entry.piece_id)}
+                              className="accent-orange-500"
+                            />
+                            <span className={p.kind === 'perso' ? '' : 'text-red-300'}>
+                              {p.kind === 'perso' ? '🛡' : '👹'} {entry.nom}
+                            </span>
+                            <span className="ml-auto text-[10px] text-stone-400">
+                              {p.hp_actuel}/{p.hp_max}
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-widest text-orange-300/80">
+                    Récapitulatif — {aoeDamageExpr}
+                    {aoeSaveType !== 'none' && (
+                      <> · jet de {aoeSaveType === 'dex' ? 'Dex' : 'Con'} vs DD {aoeDD}{aoeSaveMode === 'half' ? ' (moitié)' : ' (annulation)'}</>
+                    )}
+                  </p>
+                  {aoeResults.map((r) => (
+                    <div
+                      key={r.pieceId}
+                      className="rounded border p-2 text-sm flex items-center gap-2 flex-wrap"
+                      style={{
+                        background:
+                          r.degats === 0
+                            ? 'rgba(74,222,128,0.08)'
+                            : 'rgba(220,38,38,0.08)',
+                        borderColor:
+                          r.degats === 0
+                            ? 'rgba(74,222,128,0.4)'
+                            : 'rgba(220,38,38,0.4)'
+                      }}
                     >
-                      ✨ {i.nom} <span className="text-gray-400">({i.rarete})</span>
-                    </span>
+                      <span className="text-amber-100 font-bold flex-1 min-w-[8rem]">
+                        {r.nom}
+                      </span>
+                      {aoeSaveType !== 'none' && (
+                        <span className="text-xs text-stone-400 font-mono">
+                          🎲 {r.jet} → {r.total} {r.success ? '✓' : '✗'}
+                        </span>
+                      )}
+                      <span
+                        className={`font-bold text-sm ${
+                          r.degats === 0 ? 'text-emerald-300' : 'text-red-300'
+                        }`}
+                      >
+                        {r.degats === 0 ? 'Aucun dégât' : `-${r.degats} PV`}
+                      </span>
+                    </div>
                   ))}
                 </div>
-              </div>
-            ) : (
-              <p className="text-gray-800 italic text-sm">{tCombat('no_loot')}</p>
-            )}
+              )}
+            </div>
+
+            <div
+              className="px-5 py-3 border-t flex items-center justify-between gap-3"
+              style={{ borderColor: 'rgba(255,120,40,0.2)' }}
+            >
+              <button
+                type="button"
+                onClick={fermerAoe}
+                className="px-4 py-2 text-sm text-stone-400 hover:text-stone-200"
+              >
+                {aoeResults ? 'Fermer' : 'Annuler'}
+              </button>
+              {!aoeResults && (
+                <button
+                  type="button"
+                  onClick={resoudreAoe}
+                  disabled={aoeApplying || aoeTargets.size === 0}
+                  className="px-6 py-2 rounded-lg font-bold text-sm uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{
+                    background:
+                      'linear-gradient(135deg, #ea580c 0%, #7c2d12 100%)',
+                    color: '#fff',
+                    boxShadow: '0 4px 14px rgba(234,88,12,0.45)'
+                  }}
+                >
+                  {aoeApplying ? 'Application…' : '💥 Lancer'}
+                </button>
+              )}
+            </div>
           </div>
+        </div>
+      )}
+
+      {/* Modale Loot — après distribution XP */}
+      {lootOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+          <div
+            className="w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden border max-h-[90vh] flex flex-col"
+            style={{
+              background: 'linear-gradient(180deg, #1a1410 0%, #14110d 100%)',
+              borderColor: 'rgba(201,168,76,0.5)'
+            }}
+          >
+            <div
+              className="px-6 py-4 border-b text-center"
+              style={{
+                background:
+                  'linear-gradient(90deg, rgba(201,168,76,0.25), rgba(180,120,60,0.18), rgba(201,168,76,0.25))',
+                borderColor: 'rgba(201,168,76,0.4)'
+              }}
+            >
+              <h2 className="text-3xl font-serif font-bold text-amber-100">🎁 Butin</h2>
+              <p className="text-amber-300/80 text-sm">
+                Distribution des récompenses du combat
+              </p>
+            </div>
+
+            <div className="px-6 py-5 space-y-5 overflow-y-auto">
+              {!lootRecap ? (
+                <>
+                  {/* Items à donner */}
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-amber-400/80 mb-2">
+                      Items disponibles ({itemsDisponibles.length})
+                    </p>
+                    {itemsDisponibles.length === 0 ? (
+                      <p className="text-stone-500 text-xs italic">
+                        Aucun item disponible dans la bibliothèque du scénario.
+                        Crée-en depuis l'onglet Items.
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-44 overflow-y-auto">
+                        {itemsDisponibles.map((i) => {
+                          const sel = lootItemsSelected.has(i.id)
+                          return (
+                            <label
+                              key={i.id}
+                              className={`flex items-center gap-2 px-2 py-1.5 rounded border cursor-pointer text-xs ${
+                                sel
+                                  ? 'bg-amber-700/15 border-amber-600/50 text-amber-100'
+                                  : 'bg-stone-900 border-stone-700 text-stone-300 hover:border-amber-700/60'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={sel}
+                                onChange={() => toggleLootItem(i.id)}
+                                className="accent-amber-500"
+                              />
+                              <span className="truncate">
+                                ✨ {i.nom}{' '}
+                                <span className="text-stone-500">({i.rarete})</span>
+                              </span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Or */}
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-amber-400/80 mb-2">
+                      Pièces d'or
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <NumberInput
+                        min={0}
+                        value={lootGold}
+                        onChange={setLootGold}
+                        className="flex-1 bg-stone-900 border border-amber-800/40 rounded px-3 py-2 text-amber-100 outline-none focus:border-amber-600"
+                      />
+                      <span className="text-amber-300 font-bold">PO</span>
+                    </div>
+                  </div>
+
+                  {/* Mode de distribution */}
+                  {persosParticipants.length > 0 && (
+                    <div>
+                      <p className="text-[10px] uppercase tracking-widest text-amber-400/80 mb-2">
+                        Distribution
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setLootDistMode('split')}
+                          disabled={persosParticipants.length <= 1}
+                          className={`py-2 px-3 rounded border text-xs font-bold disabled:opacity-40 ${
+                            lootDistMode === 'split'
+                              ? 'bg-amber-700/30 border-amber-500 text-amber-100'
+                              : 'bg-stone-900 border-stone-700 text-stone-300 hover:border-amber-700/60'
+                          }`}
+                        >
+                          🤝 Partager équitablement
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setLootDistMode('single')}
+                          className={`py-2 px-3 rounded border text-xs font-bold ${
+                            lootDistMode === 'single'
+                              ? 'bg-amber-700/30 border-amber-500 text-amber-100'
+                              : 'bg-stone-900 border-stone-700 text-stone-300 hover:border-amber-700/60'
+                          }`}
+                        >
+                          🎯 Donner à un PJ
+                        </button>
+                      </div>
+                      {lootDistMode === 'single' && (
+                        <select
+                          value={lootTargetId}
+                          onChange={(e) => setLootTargetId(e.target.value)}
+                          className="mt-2 w-full bg-stone-900 border border-amber-800/40 rounded px-3 py-2 text-amber-100"
+                        >
+                          {persosParticipants.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.nom} — Niv. {p.niveau ?? 1} ({(p.pieces_or ?? 0)} PO)
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {lootDistMode === 'split' && lootGold > 0 && (
+                        <p className="text-[10px] text-amber-300/70 mt-1">
+                          Chaque PJ : +{Math.floor(lootGold / persosParticipants.length)} PO (reste {lootGold % persosParticipants.length})
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-widest text-amber-400/80">
+                    Récapitulatif
+                  </p>
+                  {lootRecap.length === 0 ? (
+                    <p className="text-stone-500 italic text-sm">Aucun butin distribué.</p>
+                  ) : (
+                    lootRecap.map((r, i) => (
+                      <div
+                        key={i}
+                        className="rounded p-3 border bg-stone-900/40"
+                        style={{ borderColor: 'rgba(201,168,76,0.3)' }}
+                      >
+                        <p className="text-amber-100 font-bold">{r.nom}</p>
+                        {r.or > 0 && (
+                          <p className="text-amber-300 text-xs">+{r.or} PO</p>
+                        )}
+                        {r.items.length > 0 && (
+                          <p className="text-emerald-300 text-xs">
+                            {r.items.map((n) => `✨ ${n}`).join(' · ')}
+                          </p>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div
+              className="px-6 py-4 border-t flex items-center justify-between gap-3"
+              style={{ borderColor: 'rgba(201,168,76,0.2)' }}
+            >
+              {!lootRecap ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={fermerLootEtTerminer}
+                    className="px-4 py-2 text-sm text-stone-400 hover:text-stone-200"
+                  >
+                    Aucun butin
+                  </button>
+                  <button
+                    type="button"
+                    onClick={distribuerLoot}
+                    disabled={
+                      lootApplying ||
+                      persosParticipants.length === 0 ||
+                      (lootItemsSelected.size === 0 && lootGold === 0)
+                    }
+                    className="px-6 py-2 rounded-lg font-bold text-sm uppercase tracking-wider disabled:opacity-40 disabled:cursor-not-allowed"
+                    style={{
+                      background:
+                        'linear-gradient(135deg, #C9A84C 0%, #8B5A2B 100%)',
+                      color: '#1a1410',
+                      boxShadow: '0 4px 14px rgba(201,168,76,0.4)'
+                    }}
+                  >
+                    {lootApplying ? 'Distribution…' : 'Distribuer'}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={fermerLootEtTerminer}
+                  className="ml-auto px-6 py-2 rounded-lg font-bold text-sm uppercase tracking-wider"
+                  style={{
+                    background:
+                      'linear-gradient(135deg, #C9A84C 0%, #8B5A2B 100%)',
+                    color: '#1a1410',
+                    boxShadow: '0 4px 14px rgba(201,168,76,0.4)'
+                  }}
+                >
+                  ✓ Terminé
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast combat (jets de mort, etc.) */}
+      {combatToast && (
+        <div
+          className="fixed top-6 left-1/2 -translate-x-1/2 z-[105] px-4 py-2 rounded-lg shadow-2xl border"
+          style={{
+            background:
+              'linear-gradient(135deg, rgba(28,20,15,0.95), rgba(14,11,8,0.95))',
+            borderColor: 'rgba(201,168,76,0.5)',
+            color: '#fef08a'
+          }}
+        >
+          <p className="text-sm font-bold">{combatToast}</p>
+        </div>
+      )}
+
+      {/* Toasts de level-up disponibles (cliquables → fiche du perso) */}
+      {levelUpToasts.length > 0 && (
+        <div className="fixed top-6 right-6 z-[100] space-y-2 max-w-xs">
+          {levelUpToasts.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => {
+                router.push(`/dashboard/personnages/${t.id}`)
+                setLevelUpToasts((arr) => arr.filter((x) => x.id !== t.id))
+              }}
+              className="w-full text-left rounded-lg p-3 shadow-2xl border block transition-transform hover:scale-[1.02]"
+              style={{
+                background:
+                  'linear-gradient(135deg, rgba(201,168,76,0.95), rgba(180,120,60,0.95))',
+                borderColor: 'rgba(255,220,140,0.6)',
+                color: '#1a1410'
+              }}
+            >
+              <p className="font-bold text-sm">⬆ {t.nom} peut monter de niveau !</p>
+              <p className="text-xs opacity-80">
+                Cliquer pour ouvrir sa fiche (Niv. {t.nouveauNiveauPossible})
+              </p>
+            </button>
+          ))}
         </div>
       )}
     </main>

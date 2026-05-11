@@ -100,7 +100,7 @@ export function validerEnveloppe<TData>(
 ): Enveloppe<TData> {
   if (!raw || typeof raw !== 'object') throw new Error('Fichier JSON invalide.')
   const obj = raw as Partial<Enveloppe<TData>>
-  if (obj.app !== APP_TAG) throw new Error("Ce fichier n'a pas été exporté depuis D&D Manager.")
+  if (obj.app !== APP_TAG) throw new Error("Ce fichier n'a pas été exporté depuis Codex.")
   if (typeof obj.version !== 'number') throw new Error('Version manquante.')
   if (obj.version > EXPORT_VERSION) {
     throw new Error(

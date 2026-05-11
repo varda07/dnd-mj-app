@@ -2319,6 +2319,682 @@ export const BESTIAIRE_DND5E: Monstre[] = [
     force: 11, dexterite: 12, constitution: 11, intelligence: 12, sagesse: 14, charisme: 16,
     attaques: [{ nom: 'Rapière', bonus_attaque: 3, degats: '1d8+1', type_degats: 'perforant', portee: '1,50 m' }],
     description: "Aristocrate à la cour ou en voyage. Habille de soie, voyage avec gardes."
+  },
+
+  // ============== DRAGONNETS (wyrmlings) ==============
+  {
+    nom: 'Dragon rouge (wyrmling)', nomEn: 'Red Dragon Wyrmling', type: 'Dragon', taille: 'M', alignement: 'Chaotique Mauvais',
+    cd: 4, hp_max: 75, hp_formule: '10d8+30', ca: 17, vitesse: 9, vitesses_extra: 'Escalade 9 m, vol 18 m',
+    force: 19, dexterite: 10, constitution: 17, intelligence: 12, sagesse: 11, charisme: 13,
+    immunites: ['feu'],
+    attaques: [{ nom: 'Morsure', bonus_attaque: 6, degats: '1d10+4 + 1d6 feu', type_degats: 'perforant', portee: '1,50 m' }],
+    capacites_speciales: ['Souffle de feu (recharge 5-6) : cône de 4,50 m, jet Dex DD 13, 7d6 feu (moitié si réussi).'],
+    description: "Jeune dragon chromatique d'une cruauté précoce. Hoarde déjà des trophées."
+  },
+  {
+    nom: 'Dragon bleu (wyrmling)', nomEn: 'Blue Dragon Wyrmling', type: 'Dragon', taille: 'M', alignement: 'Loyal Mauvais',
+    cd: 3, hp_max: 52, hp_formule: '8d8+16', ca: 17, vitesse: 9, vitesses_extra: 'Fouisseur 4,50 m, vol 18 m',
+    force: 17, dexterite: 10, constitution: 15, intelligence: 12, sagesse: 11, charisme: 15,
+    immunites: ['foudre'],
+    attaques: [{ nom: 'Morsure', bonus_attaque: 5, degats: '1d10+3 + 1d10 foudre', type_degats: 'perforant', portee: '1,50 m' }],
+    capacites_speciales: ['Souffle d\'éclair (recharge 5-6) : ligne 9 m × 1,50 m, jet Dex DD 12, 4d10 foudre.'],
+    description: "Jeune wyrm du désert au museau orné d'une corne naissante."
+  },
+  {
+    nom: 'Dragon vert (wyrmling)', nomEn: 'Green Dragon Wyrmling', type: 'Dragon', taille: 'M', alignement: 'Loyal Mauvais',
+    cd: 2, hp_max: 38, hp_formule: '7d8+7', ca: 17, vitesse: 9, vitesses_extra: 'Vol 18 m, nage 9 m',
+    force: 15, dexterite: 12, constitution: 13, intelligence: 14, sagesse: 11, charisme: 13,
+    immunites: ['poison'],
+    attaques: [{ nom: 'Morsure', bonus_attaque: 4, degats: '1d10+2 + 1d6 poison', type_degats: 'perforant', portee: '1,50 m' }],
+    capacites_speciales: ['Souffle de gaz toxique (recharge 5-6) : cône 4,50 m, jet Con DD 11, 6d6 poison.'],
+    description: "Wyrmling sournois, déjà capable de manipulation et d'enquête."
+  },
+  {
+    nom: 'Dragon blanc (wyrmling)', nomEn: 'White Dragon Wyrmling', type: 'Dragon', taille: 'M', alignement: 'Chaotique Mauvais',
+    cd: 2, hp_max: 32, hp_formule: '5d8+10', ca: 16, vitesse: 9, vitesses_extra: 'Fouisseur 4,50 m, vol 18 m, nage 9 m',
+    force: 14, dexterite: 10, constitution: 14, intelligence: 5, sagesse: 10, charisme: 11,
+    immunites: ['froid'],
+    attaques: [{ nom: 'Morsure', bonus_attaque: 4, degats: '1d10+2 + 1d4 froid', type_degats: 'perforant', portee: '1,50 m' }],
+    capacites_speciales: ['Souffle glacial (recharge 5-6) : cône 4,50 m, jet Con DD 12, 5d8 froid.'],
+    description: "Le plus animal des wyrmlings chromatiques — instinctif, glouton, rancunier."
+  },
+  {
+    nom: 'Dragon noir (wyrmling)', nomEn: 'Black Dragon Wyrmling', type: 'Dragon', taille: 'M', alignement: 'Chaotique Mauvais',
+    cd: 2, hp_max: 33, hp_formule: '6d8+6', ca: 17, vitesse: 9, vitesses_extra: 'Vol 18 m, nage 9 m',
+    force: 15, dexterite: 14, constitution: 13, intelligence: 10, sagesse: 11, charisme: 13,
+    immunites: ['acide'],
+    attaques: [{ nom: 'Morsure', bonus_attaque: 4, degats: '1d10+2 + 1d4 acide', type_degats: 'perforant', portee: '1,50 m' }],
+    capacites_speciales: ['Souffle acide (recharge 5-6) : ligne 9 m × 1,50 m, jet Dex DD 11, 5d8 acide.'],
+    description: "Wyrmling des marais, déjà fourbe et capable d'embuscades aquatiques."
+  },
+  {
+    nom: 'Dragon d\'or (wyrmling)', nomEn: 'Gold Dragon Wyrmling', type: 'Dragon', taille: 'M', alignement: 'Loyal Bon',
+    cd: 3, hp_max: 60, hp_formule: '8d8+24', ca: 17, vitesse: 9, vitesses_extra: 'Vol 18 m, nage 9 m',
+    force: 19, dexterite: 14, constitution: 17, intelligence: 14, sagesse: 11, charisme: 16,
+    immunites: ['feu'],
+    attaques: [{ nom: 'Morsure', bonus_attaque: 6, degats: '1d10+4 + 1d6 feu', type_degats: 'perforant', portee: '1,50 m' }],
+    capacites_speciales: ['Deux souffles (rech. 5-6) : feu (cône 4,50 m, Dex DD 13, 4d10 feu) ou affaiblissement (cône 4,50 m, Force DD 13, désavantage Force 1 min).'],
+    description: "Wyrmling métallique noble qui rend déjà la justice à son humble échelle."
+  },
+  {
+    nom: 'Dragon d\'argent (wyrmling)', nomEn: 'Silver Dragon Wyrmling', type: 'Dragon', taille: 'M', alignement: 'Loyal Bon',
+    cd: 2, hp_max: 45, hp_formule: '6d8+18', ca: 17, vitesse: 9, vitesses_extra: 'Vol 18 m',
+    force: 19, dexterite: 10, constitution: 17, intelligence: 12, sagesse: 11, charisme: 15,
+    immunites: ['froid'],
+    attaques: [{ nom: 'Morsure', bonus_attaque: 6, degats: '1d10+4 + 1d4 froid', type_degats: 'perforant', portee: '1,50 m' }],
+    capacites_speciales: ['Deux souffles (rech. 5-6) : froid (cône 4,50 m, Con DD 13, 4d8 froid) ou paralysie (cône 4,50 m, Con DD 13, paralysé 1 min).'],
+    description: "Wyrmling protecteur des montagnes, curieux des sociétés humaines."
+  },
+  {
+    nom: 'Dragon de bronze (wyrmling)', nomEn: 'Bronze Dragon Wyrmling', type: 'Dragon', taille: 'M', alignement: 'Loyal Bon',
+    cd: 2, hp_max: 32, hp_formule: '5d8+10', ca: 17, vitesse: 9, vitesses_extra: 'Vol 18 m, nage 9 m',
+    force: 17, dexterite: 10, constitution: 15, intelligence: 12, sagesse: 11, charisme: 15,
+    immunites: ['foudre'],
+    attaques: [{ nom: 'Morsure', bonus_attaque: 5, degats: '1d10+3 + 1d4 foudre', type_degats: 'perforant', portee: '1,50 m' }],
+    capacites_speciales: ['Deux souffles (rech. 5-6) : foudre (ligne 12 m, Dex DD 12, 3d10 foudre) ou répulsion (cône 9 m, Force DD 12, repoussé 9 m).'],
+    description: "Wyrmling des côtes, joueur, transforme volontiers les querelles maritimes en duel honorable."
+  },
+  {
+    nom: 'Dragon de cuivre (wyrmling)', nomEn: 'Copper Dragon Wyrmling', type: 'Dragon', taille: 'M', alignement: 'Chaotique Bon',
+    cd: 1, hp_max: 22, hp_formule: '4d8+4', ca: 16, vitesse: 9, vitesses_extra: 'Escalade 9 m, vol 18 m',
+    force: 15, dexterite: 12, constitution: 13, intelligence: 14, sagesse: 11, charisme: 13,
+    immunites: ['acide'],
+    attaques: [{ nom: 'Morsure', bonus_attaque: 4, degats: '1d10+2 + 1d4 acide', type_degats: 'perforant', portee: '1,50 m' }],
+    capacites_speciales: ['Deux souffles (rech. 5-6) : acide (ligne 12 m, Dex DD 11, 4d8 acide) ou ralentissement (cône 4,50 m, Con DD 11, vitesse / 2).'],
+    description: "Wyrmling farceur des collines arides, plus enclin aux énigmes qu'aux combats."
+  },
+
+  // ============== DRAGONS ANCIENS ==============
+  {
+    nom: 'Dragon rouge ancien', nomEn: 'Ancient Red Dragon', type: 'Dragon', taille: 'Gig', alignement: 'Chaotique Mauvais',
+    cd: 24, hp_max: 546, hp_formule: '28d20+252', ca: 22, vitesse: 12, vitesses_extra: 'Escalade 12 m, vol 24 m',
+    force: 30, dexterite: 10, constitution: 29, intelligence: 18, sagesse: 15, charisme: 23,
+    immunites: ['feu'],
+    attaques: [
+      { nom: 'Morsure', bonus_attaque: 17, degats: '2d10+10 + 4d6 feu', type_degats: 'perforant', portee: '4,50 m' },
+      { nom: 'Griffe', bonus_attaque: 17, degats: '2d6+10', type_degats: 'tranchant', portee: '3 m' },
+      { nom: 'Queue', bonus_attaque: 17, degats: '2d8+10', type_degats: 'contondant', portee: '6 m' }
+    ],
+    capacites_speciales: [
+      'Souffle de feu (recharge 5-6) : cône 27 m, jet Dex DD 24, 26d6 feu (moitié si réussi).',
+      'Présence terrifiante : créatures à 36 m, jet Sag DD 21 ou effrayé 1 min.',
+      'Résistance légendaire (3/jour) : peut transformer un échec à un jet de sauvegarde en réussite.'
+    ],
+    description: "Tyran ailé des montagnes volcaniques, accumule des trésors mythiques depuis des millénaires."
+  },
+  {
+    nom: 'Dragon bleu ancien', nomEn: 'Ancient Blue Dragon', type: 'Dragon', taille: 'Gig', alignement: 'Loyal Mauvais',
+    cd: 23, hp_max: 481, hp_formule: '26d20+208', ca: 22, vitesse: 12, vitesses_extra: 'Fouisseur 12 m, vol 24 m',
+    force: 29, dexterite: 10, constitution: 27, intelligence: 18, sagesse: 17, charisme: 21,
+    immunites: ['foudre'],
+    attaques: [
+      { nom: 'Morsure', bonus_attaque: 16, degats: '2d10+9 + 5d10 foudre', type_degats: 'perforant', portee: '4,50 m' },
+      { nom: 'Griffe', bonus_attaque: 16, degats: '2d6+9', type_degats: 'tranchant', portee: '3 m' }
+    ],
+    capacites_speciales: [
+      'Souffle d\'éclair (recharge 5-6) : ligne 36 m, jet Dex DD 23, 16d10 foudre.',
+      'Présence terrifiante : 36 m, jet Sag DD 19.',
+      'Résistance légendaire (3/jour).'
+    ],
+    description: "Souverain des déserts, calculateur, exige tribut des cités caravanières."
+  },
+
+  // ============== FIÉLONS — DIABLES ==============
+  {
+    nom: 'Lemure', nomEn: 'Lemure', type: 'Fiélon', taille: 'M', alignement: 'Loyal Mauvais',
+    cd: 0, hp_max: 13, hp_formule: '3d8', ca: 7, vitesse: 4.5,
+    force: 10, dexterite: 5, constitution: 11, intelligence: 1, sagesse: 11, charisme: 3,
+    resistances: ['froid'], immunites: ['feu', 'poison'],
+    attaques: [{ nom: 'Poing', bonus_attaque: 3, degats: '1d4+1', type_degats: 'contondant', portee: '1,50 m' }],
+    capacites_speciales: ['Régénération diabolique : se reforme en lemure 1d10 jours après sa mort, sauf détruit aux Neuf Enfers.'],
+    description: "Âme damnée en gestation, masse de chair pleurant éternellement dans les rivières infernales."
+  },
+  {
+    nom: 'Diable barbu', nomEn: 'Bearded Devil', type: 'Fiélon', taille: 'M', alignement: 'Loyal Mauvais',
+    cd: 3, hp_max: 52, hp_formule: '8d8+16', ca: 13, vitesse: 9,
+    force: 16, dexterite: 15, constitution: 15, intelligence: 9, sagesse: 11, charisme: 11,
+    resistances: ['froid', 'tranchant/perforant/contondant non-magiques'], immunites: ['feu', 'poison'],
+    attaques: [
+      { nom: 'Barbe', bonus_attaque: 5, degats: '1d8+3', type_degats: 'perforant', portee: '1,50 m', description: "Sur touche : Con DD 12 ou empoisonné 1 min." },
+      { nom: 'Glaive', bonus_attaque: 5, degats: '1d10+3', type_degats: 'tranchant', portee: '3 m', description: "Plaie infernale : 1d10 saignement/tour jusqu'à action de soin." }
+    ],
+    description: "Diable barbu de lances, garde-frontière des Neuf Enfers, marqué de plaies suintantes."
+  },
+  {
+    nom: 'Diable osseux', nomEn: 'Bone Devil', type: 'Fiélon', taille: 'G', alignement: 'Loyal Mauvais',
+    cd: 9, hp_max: 142, hp_formule: '15d10+60', ca: 19, vitesse: 12, vitesses_extra: 'Vol 12 m',
+    force: 18, dexterite: 16, constitution: 18, intelligence: 13, sagesse: 14, charisme: 16,
+    resistances: ['froid', 'tranchant/perforant/contondant non-magiques'], immunites: ['feu', 'poison'],
+    attaques: [
+      { nom: 'Griffe', bonus_attaque: 8, degats: '1d8+4', type_degats: 'tranchant', portee: '3 m' },
+      { nom: 'Dard de queue', bonus_attaque: 8, degats: '2d8+4 + 5d6 poison', type_degats: 'perforant', portee: '3 m' }
+    ],
+    description: "Bureaucrate ailé des armées infernales, expert tortionnaire."
+  },
+  {
+    nom: 'Diable des chaînes', nomEn: 'Chain Devil', type: 'Fiélon', taille: 'M', alignement: 'Loyal Mauvais',
+    cd: 8, hp_max: 85, hp_formule: '10d8+40', ca: 16, vitesse: 9,
+    force: 18, dexterite: 15, constitution: 18, intelligence: 11, sagesse: 12, charisme: 14,
+    resistances: ['froid'], immunites: ['feu', 'poison'],
+    attaques: [{ nom: 'Chaînes (×2)', bonus_attaque: 8, degats: '2d6+4', type_degats: 'tranchant', portee: '3 m', description: 'Sur touche : Force DD 14 ou agrippé.' }],
+    capacites_speciales: ['Animation des chaînes (recharge 5-6) : anime jusqu\'à 4 chaînes inertes (CA 20, 20 PV).'],
+    description: "Bourreau des Enfers, drapé de chaînes vivantes qu'il fait danser pour torturer ses victimes."
+  },
+  {
+    nom: 'Diable cornu', nomEn: 'Horned Devil', type: 'Fiélon', taille: 'G', alignement: 'Loyal Mauvais',
+    cd: 11, hp_max: 178, hp_formule: '17d10+85', ca: 18, vitesse: 6, vitesses_extra: 'Vol 18 m',
+    force: 22, dexterite: 17, constitution: 21, intelligence: 12, sagesse: 16, charisme: 17,
+    resistances: ['froid', 'tranchant/perforant/contondant non-magiques'], immunites: ['feu', 'poison'],
+    attaques: [
+      { nom: 'Fourche', bonus_attaque: 10, degats: '2d8+6', type_degats: 'perforant', portee: '3 m' },
+      { nom: 'Queue', bonus_attaque: 10, degats: '1d8+6 + saignement', type_degats: 'perforant', portee: '3 m' },
+      { nom: 'Boule de feu hurlante', bonus_attaque: 7, degats: '6d6 feu', type_degats: 'feu', portee: '45 m' }
+    ],
+    description: "Bataillon ailé des Enfers, charge et fond du ciel sur sa proie."
+  },
+  {
+    nom: 'Diable de glace', nomEn: 'Ice Devil (Gelugon)', type: 'Fiélon', taille: 'G', alignement: 'Loyal Mauvais',
+    cd: 14, hp_max: 180, hp_formule: '19d10+76', ca: 18, vitesse: 12,
+    force: 21, dexterite: 14, constitution: 18, intelligence: 18, sagesse: 15, charisme: 18,
+    resistances: ['tranchant/perforant/contondant non-magiques'], immunites: ['feu', 'froid', 'poison'],
+    attaques: [
+      { nom: 'Morsure', bonus_attaque: 10, degats: '2d6+5 + 3d6 froid', type_degats: 'perforant', portee: '1,50 m' },
+      { nom: 'Griffes', bonus_attaque: 10, degats: '2d4+5 + 3d6 froid', type_degats: 'tranchant', portee: '1,50 m' },
+      { nom: 'Queue', bonus_attaque: 10, degats: '2d6+5 + 3d6 froid', type_degats: 'contondant', portee: '3 m' }
+    ],
+    description: "Général de la huitième couche, sa lance gelée transperce l'âme."
+  },
+
+  // ============== FIÉLONS — DÉMONS ==============
+  {
+    nom: 'Manes', nomEn: 'Manes', type: 'Fiélon', taille: 'P', alignement: 'Chaotique Mauvais',
+    cd: 0.125, hp_max: 9, hp_formule: '2d6+2', ca: 9, vitesse: 6,
+    force: 10, dexterite: 9, constitution: 13, intelligence: 3, sagesse: 8, charisme: 4,
+    resistances: ['froid', 'feu', 'foudre'], immunites: ['poison'],
+    attaques: [{ nom: 'Griffes', bonus_attaque: 2, degats: '1d4', type_degats: 'tranchant', portee: '1,50 m' }],
+    description: "Âme corrompue de l'Abysse, hordes grouillantes formant la chair à canon démoniaque."
+  },
+  {
+    nom: 'Dretch', nomEn: 'Dretch', type: 'Fiélon', taille: 'P', alignement: 'Chaotique Mauvais',
+    cd: 0.25, hp_max: 18, hp_formule: '4d6+4', ca: 11, vitesse: 6,
+    force: 11, dexterite: 11, constitution: 12, intelligence: 5, sagesse: 8, charisme: 3,
+    resistances: ['froid', 'feu', 'foudre'], immunites: ['poison'],
+    attaques: [
+      { nom: 'Morsure', bonus_attaque: 2, degats: '1d6', type_degats: 'perforant', portee: '1,50 m' },
+      { nom: 'Griffes', bonus_attaque: 2, degats: '2d4', type_degats: 'tranchant', portee: '1,50 m' }
+    ],
+    capacites_speciales: ['Nuage de puanteur (1/jour) : 3 m de rayon, Con DD 11 ou empoisonné 1 round.'],
+    description: "Démon mineur, lâche et stupide, sert les puissants de l'Abysse comme garde-chiourme."
+  },
+  {
+    nom: 'Démon des ombres', nomEn: 'Shadow Demon', type: 'Fiélon', taille: 'M', alignement: 'Chaotique Mauvais',
+    cd: 4, hp_max: 66, hp_formule: '12d8+12', ca: 13, vitesse: 9, vitesses_extra: 'Vol 9 m',
+    force: 1, dexterite: 17, constitution: 12, intelligence: 14, sagesse: 13, charisme: 14,
+    resistances: ['acide', 'feu', 'froid', 'foudre', 'tonnerre', 'tranchant/perforant/contondant non-magiques'],
+    immunites: ['poison', 'nécrotique'], vulnerabilites: ['radiant'],
+    attaques: [{ nom: 'Griffes', bonus_attaque: 5, degats: '2d6+3 psychique', type_degats: 'psychique', portee: '1,50 m', description: 'Avantage en zone faiblement éclairée ou obscure.' }],
+    capacites_speciales: ['Furtivité ombrale : action de Cacher dans la pénombre.', 'Sensibilité à la lumière : désavantage à toute action en lumière vive.'],
+    description: "Démon incorporel, glisse de pénombre en pénombre pour ronger l'esprit de ses proies."
+  },
+  {
+    nom: 'Goristro', nomEn: 'Goristro', type: 'Fiélon', taille: 'Gig', alignement: 'Chaotique Mauvais',
+    cd: 17, hp_max: 310, hp_formule: '23d12+161', ca: 19, vitesse: 12,
+    force: 25, dexterite: 11, constitution: 25, intelligence: 6, sagesse: 13, charisme: 14,
+    resistances: ['froid', 'feu', 'foudre', 'tranchant/perforant/contondant non-magiques'], immunites: ['poison'],
+    attaques: [
+      { nom: 'Morsure', bonus_attaque: 13, degats: '3d10+7', type_degats: 'perforant', portee: '1,50 m' },
+      { nom: 'Coup de poing', bonus_attaque: 13, degats: '2d8+7', type_degats: 'contondant', portee: '3 m' },
+      { nom: 'Coup de corne (charge)', bonus_attaque: 13, degats: '6d10+7', type_degats: 'perforant', portee: '4,50 m' }
+    ],
+    description: "Démon-taureau colossal, bélier vivant des armées abyssales."
+  },
+  {
+    nom: 'Yochlol', nomEn: 'Yochlol', type: 'Fiélon', taille: 'M', alignement: 'Chaotique Mauvais',
+    cd: 10, hp_max: 136, hp_formule: '16d8+64', ca: 15, vitesse: 9, vitesses_extra: 'Escalade 9 m',
+    force: 15, dexterite: 14, constitution: 18, intelligence: 11, sagesse: 17, charisme: 16,
+    resistances: ['froid', 'feu', 'foudre'], immunites: ['poison'],
+    attaques: [
+      { nom: 'Pseudopode', bonus_attaque: 7, degats: '2d6+2 + 4d6 poison', type_degats: 'contondant', portee: '1,50 m' }
+    ],
+    capacites_speciales: [
+      'Métamorphose : araignée géante, drow ou forme hybride.',
+      'Dominer humanoïde (DC 15 Sag, 1/jour).'
+    ],
+    description: "Servante d'Araignée de Lolth, prend forme de drow ou d'araignée géante selon la mission."
+  },
+
+  // ============== GÉANTS ==============
+  {
+    nom: 'Géant des tempêtes', nomEn: 'Storm Giant', type: 'Géant', taille: 'Gig', alignement: 'Chaotique Bon',
+    cd: 13, hp_max: 230, hp_formule: '20d12+100', ca: 16, vitesse: 15, vitesses_extra: 'Nage 15 m',
+    force: 29, dexterite: 14, constitution: 20, intelligence: 16, sagesse: 18, charisme: 18,
+    resistances: ['froid'], immunites: ['foudre', 'tonnerre'],
+    attaques: [
+      { nom: 'Grande épée', bonus_attaque: 14, degats: '6d6+9', type_degats: 'tranchant', portee: '3 m' },
+      { nom: 'Rocher', bonus_attaque: 14, degats: '4d12+9', type_degats: 'contondant', portee: '18/72 m' }
+    ],
+    capacites_speciales: ['Éclair (1/jour) : ligne 36 m, Dex DD 17, 12d8 foudre (moitié si réussi).'],
+    description: "Plus noble des géants, vit dans des forteresses des nuages ou sous les vagues, prophète des tempêtes."
+  },
+  {
+    nom: 'Ettin', nomEn: 'Ettin', type: 'Géant', taille: 'G', alignement: 'Chaotique Mauvais',
+    cd: 4, hp_max: 85, hp_formule: '10d10+30', ca: 12, vitesse: 12,
+    force: 21, dexterite: 8, constitution: 17, intelligence: 6, sagesse: 10, charisme: 8,
+    attaques: [
+      { nom: 'Morgenstern (tête 1)', bonus_attaque: 7, degats: '2d8+5', type_degats: 'perforant', portee: '3 m' },
+      { nom: 'Hache de bataille (tête 2)', bonus_attaque: 7, degats: '2d10+5', type_degats: 'tranchant', portee: '3 m' }
+    ],
+    capacites_speciales: ['Deux têtes : avantage aux sauvegardes contre aveugle, charme, effrayé, étourdi, assommé.'],
+    description: "Géant à deux têtes qui se chamaillent sans cesse, frappe deux fois par tour."
+  },
+  {
+    nom: 'Cyclope', nomEn: 'Cyclops', type: 'Géant', taille: 'Gig', alignement: 'Chaotique Neutre',
+    cd: 6, hp_max: 138, hp_formule: '12d12+60', ca: 14, vitesse: 12,
+    force: 22, dexterite: 11, constitution: 20, intelligence: 8, sagesse: 6, charisme: 10,
+    attaques: [
+      { nom: 'Massue gigantesque', bonus_attaque: 9, degats: '3d8+6', type_degats: 'contondant', portee: '3 m' },
+      { nom: 'Rocher', bonus_attaque: 9, degats: '4d10+6', type_degats: 'contondant', portee: '18/72 m' }
+    ],
+    capacites_speciales: ['Mauvaise profondeur : désavantage aux attaques contre cibles à 9+ m.'],
+    description: "Géant solitaire à œil unique, vit dans les caves volcaniques, élève des moutons."
+  },
+
+  // ============== MORTS-VIVANTS ==============
+  {
+    nom: 'Will-o\'-Wisp', nomEn: 'Will-o\'-Wisp', type: 'Mort-vivant', taille: 'P', alignement: 'Chaotique Mauvais',
+    cd: 2, hp_max: 22, hp_formule: '9d4', ca: 19, vitesse: 0, vitesses_extra: 'Vol 15 m (stationnaire possible)',
+    force: 1, dexterite: 28, constitution: 10, intelligence: 13, sagesse: 14, charisme: 11,
+    resistances: ['acide', 'froid', 'feu', 'nécrotique', 'tonnerre', 'tranchant/perforant/contondant non-magiques'],
+    immunites: ['foudre', 'poison'],
+    attaques: [{ nom: 'Choc', bonus_attaque: 4, degats: '2d8 foudre', type_degats: 'foudre', portee: '1,50 m' }],
+    capacites_speciales: ['Incorporel : traverse créatures et objets ; 1d10 force s\'il sort d\'une créature.', 'Consommation d\'âme : draine PV des mourants.'],
+    description: "Esprit lumineux de mort tragique, mène les voyageurs égarés vers des marais mortels."
+  },
+  {
+    nom: 'Squelette archer', nomEn: 'Skeleton Archer', type: 'Mort-vivant', taille: 'M', alignement: 'Loyal Mauvais',
+    cd: 0.5, hp_max: 13, hp_formule: '2d8+4', ca: 13, vitesse: 9,
+    force: 10, dexterite: 16, constitution: 15, intelligence: 6, sagesse: 8, charisme: 5,
+    vulnerabilites: ['contondant'], immunites: ['poison'],
+    attaques: [
+      { nom: 'Arc court', bonus_attaque: 5, degats: '1d6+3', type_degats: 'perforant', portee: '24/96 m' },
+      { nom: 'Dague rouillée', bonus_attaque: 4, degats: '1d4+2', type_degats: 'perforant', portee: '1,50 m' }
+    ],
+    description: "Garde-frontière mort-vivant, vide ses carquois sans relâche."
+  },
+  {
+    nom: 'Squelette mage', nomEn: 'Skeletal Mage', type: 'Mort-vivant', taille: 'M', alignement: 'Loyal Mauvais',
+    cd: 6, hp_max: 67, hp_formule: '15d8', ca: 12, vitesse: 9,
+    force: 10, dexterite: 14, constitution: 11, intelligence: 17, sagesse: 12, charisme: 11,
+    vulnerabilites: ['contondant'], immunites: ['poison'],
+    attaques: [{ nom: 'Bâton', bonus_attaque: 2, degats: '1d6', type_degats: 'contondant', portee: '1,50 m' }],
+    capacites_speciales: [
+      'Sorts (magicien niv. 9) : Projectile magique, Charme-personne, Image miroir, Boule de feu, Mur de glace, Foudre, Soufflé glacé.'
+    ],
+    description: "Reliquaire d'un sorcier ayant maudit sa propre mort, continue de lancer ses sortilèges."
+  },
+  {
+    nom: 'Dragon mort-vivant (dracoliche)', nomEn: 'Dracolich', type: 'Mort-vivant', taille: 'TG', alignement: 'Neutre Mauvais',
+    cd: 17, hp_max: 256, hp_formule: '19d12+133', ca: 19, vitesse: 12, vitesses_extra: 'Vol 24 m',
+    force: 27, dexterite: 10, constitution: 25, intelligence: 16, sagesse: 13, charisme: 21,
+    resistances: ['nécrotique'], immunites: ['poison', 'élément correspondant à l\'ancien dragon'],
+    attaques: [
+      { nom: 'Morsure spectrale', bonus_attaque: 14, degats: '2d10+8 + 4d6 nécrotique', type_degats: 'perforant', portee: '4,50 m' },
+      { nom: 'Griffe', bonus_attaque: 14, degats: '2d6+8', type_degats: 'tranchant', portee: '3 m' }
+    ],
+    capacites_speciales: [
+      'Phylactère : tant qu\'il existe, le dracoliche se reforme en 1d10 jours.',
+      'Présence terrifiante et résistance légendaire (3/jour).'
+    ],
+    description: "Dragon ancien transformé en mort-vivant par un rituel de lichelichification. Carcasse drapée de lambeaux."
+  },
+
+  // ============== HUMANOÏDES — VILLE & ARMÉE ==============
+  {
+    nom: 'Capitaine de la garde', nomEn: 'Guard Captain', type: 'Humanoïde', taille: 'M', alignement: 'Loyal Neutre',
+    cd: 4, hp_max: 65, hp_formule: '10d8+20', ca: 18, vitesse: 9,
+    force: 16, dexterite: 13, constitution: 14, intelligence: 12, sagesse: 13, charisme: 13,
+    attaques: [
+      { nom: 'Épée longue', bonus_attaque: 5, degats: '1d8+3', type_degats: 'tranchant', portee: '1,50 m' },
+      { nom: 'Arbalète lourde', bonus_attaque: 3, degats: '1d10+1', type_degats: 'perforant', portee: '30/120 m' }
+    ],
+    capacites_speciales: ['Cri de ralliement : un allié à 9 m récupère 1d8+3 PV (1/jour).'],
+    description: "Vétéran promu, commande une compagnie de gardes en cuirasse."
+  },
+  {
+    nom: 'Archimage', nomEn: 'Archmage', type: 'Humanoïde', taille: 'M', alignement: 'Tout',
+    cd: 12, hp_max: 99, hp_formule: '18d8+18', ca: 12, vitesse: 9,
+    force: 10, dexterite: 14, constitution: 12, intelligence: 20, sagesse: 15, charisme: 16,
+    resistances: ['dégâts de sorts (Mage Armor)'],
+    attaques: [{ nom: 'Dague', bonus_attaque: 6, degats: '1d4+2', type_degats: 'perforant', portee: '1,50 m' }],
+    capacites_speciales: [
+      'Sorts (magicien niv. 18) : Bouclier, Détection de la magie, Projectile magique, Image miroir, Suggestion, Foudre, Contresort, Dissipation, Boule de feu, Vol, Téléportation, Cône de froid, Désintégration, Globe d\'invulnérabilité, Tempête de météores.',
+      'Résistance magique : avantage aux sauvegardes contre les sorts.'
+    ],
+    description: "Sorcier accompli, conseiller des rois ou tyran de tour d'ivoire."
+  },
+
+  // ============== BÊTES ==============
+  {
+    nom: 'Loup-garou', nomEn: 'Werewolf', type: 'Humanoïde', taille: 'M', alignement: 'Chaotique Mauvais',
+    cd: 3, hp_max: 58, hp_formule: '9d8+18', ca: 11, vitesse: 9,
+    force: 15, dexterite: 13, constitution: 14, intelligence: 10, sagesse: 11, charisme: 10,
+    immunites: ['tranchant/perforant/contondant non-magiques (sauf argent)'],
+    attaques: [
+      { nom: 'Morsure (forme loup/hybride)', bonus_attaque: 4, degats: '1d8+2', type_degats: 'perforant', portee: '1,50 m', description: 'Si humanoïde touché : Con DD 12 ou maudit (lycanthropie).' },
+      { nom: 'Griffes (hybride)', bonus_attaque: 4, degats: '2d4+2', type_degats: 'tranchant', portee: '1,50 m' }
+    ],
+    capacites_speciales: ['Métamorphose : humain, loup, hybride.', 'Odorat aiguisé.'],
+    description: "Maudit lycanthrope, change de forme sous la pleine lune ou en colère."
+  },
+  {
+    nom: 'Ours-garou', nomEn: 'Werebear', type: 'Humanoïde', taille: 'M', alignement: 'Neutre Bon',
+    cd: 5, hp_max: 135, hp_formule: '18d8+54', ca: 10, vitesse: 9, vitesses_extra: 'Forme ours : escalade 9 m',
+    force: 19, dexterite: 10, constitution: 17, intelligence: 11, sagesse: 12, charisme: 12,
+    immunites: ['tranchant/perforant/contondant non-magiques (sauf argent)'],
+    attaques: [
+      { nom: 'Griffe (ours/hybride)', bonus_attaque: 7, degats: '2d8+4', type_degats: 'tranchant', portee: '1,50 m' },
+      { nom: 'Morsure', bonus_attaque: 7, degats: '2d10+4', type_degats: 'perforant', portee: '1,50 m', description: 'Si humanoïde : Con DD 14 ou lycanthropie.' }
+    ],
+    capacites_speciales: ['Métamorphose en ours ou hybride.', 'Odorat aiguisé.'],
+    description: "Lycanthrope bénin, gardien des forêts. Ne perd pas la raison sous sa forme animale."
+  },
+  {
+    nom: 'Tigre à dents de sabre', nomEn: 'Saber-Toothed Tiger', type: 'Bête', taille: 'G', alignement: 'Sans alignement',
+    cd: 2, hp_max: 52, hp_formule: '7d10+14', ca: 12, vitesse: 12,
+    force: 18, dexterite: 14, constitution: 15, intelligence: 3, sagesse: 12, charisme: 8,
+    attaques: [
+      { nom: 'Morsure', bonus_attaque: 6, degats: '1d10+4', type_degats: 'perforant', portee: '1,50 m' },
+      { nom: 'Griffe', bonus_attaque: 6, degats: '2d6+4', type_degats: 'tranchant', portee: '1,50 m' }
+    ],
+    capacites_speciales: ['Bondissement : si charge 6+ m, la cible touchée fait Force DD 14 ou à terre.'],
+    description: "Prédateur préhistorique aux crocs incurvés, hante les hautes plaines glaciales."
+  },
+  {
+    nom: 'Mammouth', nomEn: 'Mammoth', type: 'Bête', taille: 'Gig', alignement: 'Sans alignement',
+    cd: 6, hp_max: 126, hp_formule: '11d12+55', ca: 13, vitesse: 12,
+    force: 24, dexterite: 9, constitution: 21, intelligence: 3, sagesse: 11, charisme: 6,
+    attaques: [
+      { nom: 'Défenses', bonus_attaque: 10, degats: '4d8+7', type_degats: 'perforant', portee: '3 m' },
+      { nom: 'Piétinement', bonus_attaque: 10, degats: '4d10+7', type_degats: 'contondant', portee: '1,50 m', description: 'Cible doit être à terre.' }
+    ],
+    capacites_speciales: ['Charge : si avance 6+ m puis touche aux défenses, +3d8 perforant et Force DD 18 ou à terre.'],
+    description: "Mastodonte des steppes glacées, troupeau redouté des barbares."
+  },
+  {
+    nom: 'Rhinocéros', nomEn: 'Rhinoceros', type: 'Bête', taille: 'G', alignement: 'Sans alignement',
+    cd: 2, hp_max: 45, hp_formule: '6d10+12', ca: 11, vitesse: 12,
+    force: 21, dexterite: 8, constitution: 15, intelligence: 2, sagesse: 12, charisme: 6,
+    attaques: [{ nom: 'Charge à corne', bonus_attaque: 7, degats: '2d8+5', type_degats: 'contondant', portee: '1,50 m', description: 'Si avance 6+ m : +2d8 et Force DD 15 ou à terre.' }],
+    description: "Pachyderme massif et myope, charge tout ce qui bouge dans son angle de vue."
+  },
+  {
+    nom: 'Hyène', nomEn: 'Hyena', type: 'Bête', taille: 'M', alignement: 'Sans alignement',
+    cd: 0, hp_max: 5, hp_formule: '1d8+1', ca: 11, vitesse: 15,
+    force: 11, dexterite: 13, constitution: 12, intelligence: 2, sagesse: 12, charisme: 5,
+    attaques: [{ nom: 'Morsure', bonus_attaque: 2, degats: '1d6', type_degats: 'perforant', portee: '1,50 m' }],
+    capacites_speciales: ['Tactique de meute : avantage si un allié à 1,50 m de la cible.'],
+    description: "Charognard ricaneur des savanes, chasse en meute opportuniste."
+  },
+  {
+    nom: 'Singe géant', nomEn: 'Giant Ape', type: 'Bête', taille: 'TG', alignement: 'Sans alignement',
+    cd: 7, hp_max: 157, hp_formule: '15d12+60', ca: 12, vitesse: 12, vitesses_extra: 'Escalade 9 m',
+    force: 23, dexterite: 14, constitution: 18, intelligence: 7, sagesse: 12, charisme: 7,
+    attaques: [
+      { nom: 'Coup de poing (×2)', bonus_attaque: 9, degats: '3d10+6', type_degats: 'contondant', portee: '3 m' },
+      { nom: 'Rocher', bonus_attaque: 9, degats: '7d6+6', type_degats: 'contondant', portee: '15/45 m' }
+    ],
+    description: "Primate colossal des jungles perdues, roi indiscuté de sa canopée."
+  },
+  {
+    nom: 'Faucon', nomEn: 'Hawk', type: 'Bête', taille: 'TP', alignement: 'Sans alignement',
+    cd: 0, hp_max: 1, hp_formule: '1d4-1', ca: 13, vitesse: 3, vitesses_extra: 'Vol 18 m',
+    force: 5, dexterite: 16, constitution: 8, intelligence: 2, sagesse: 14, charisme: 6,
+    attaques: [{ nom: 'Serres', bonus_attaque: 5, degats: '1', type_degats: 'tranchant', portee: '1,50 m' }],
+    capacites_speciales: ['Vue perçante : avantage à la Perception (vue).'],
+    description: "Rapace diurne aux yeux d'or, plonge sur sa proie comme une flèche."
+  },
+
+  // ============== CRÉATURES MARINES ==============
+  {
+    nom: 'Calmar géant', nomEn: 'Giant Squid', type: 'Bête', taille: 'TG', alignement: 'Sans alignement',
+    cd: 1, hp_max: 26, hp_formule: '4d12', ca: 13, vitesse: 0, vitesses_extra: 'Nage 18 m',
+    force: 17, dexterite: 13, constitution: 11, intelligence: 3, sagesse: 12, charisme: 4,
+    attaques: [
+      { nom: 'Tentacules', bonus_attaque: 5, degats: '3d6+3', type_degats: 'contondant', portee: '4,50 m', description: 'Cible Force DD 16 ou agrippée.' },
+      { nom: 'Bec', bonus_attaque: 5, degats: '3d6+3', type_degats: 'perforant', portee: '1,50 m' }
+    ],
+    capacites_speciales: ['Nuage d\'encre (1/repos court) : cube de 6 m sous l\'eau, zone fortement obscurcie.'],
+    description: "Céphalopode abyssal aux tentacules de 9 mètres."
+  },
+  {
+    nom: 'Kraken', nomEn: 'Kraken', type: 'Monstruosité', taille: 'Gig', alignement: 'Chaotique Mauvais',
+    cd: 23, hp_max: 472, hp_formule: '27d20+189', ca: 18, vitesse: 6, vitesses_extra: 'Nage 18 m',
+    force: 30, dexterite: 11, constitution: 25, intelligence: 22, sagesse: 18, charisme: 20,
+    immunites: ['foudre', 'tranchant/perforant/contondant non-magiques'],
+    attaques: [
+      { nom: 'Morsure', bonus_attaque: 17, degats: '3d8+10', type_degats: 'perforant', portee: '1,50 m' },
+      { nom: 'Tentacule (×3)', bonus_attaque: 17, degats: '3d6+10', type_degats: 'contondant', portee: '9 m', description: 'Cible Force DD 18 ou agrippée et entravée.' }
+    ],
+    capacites_speciales: [
+      'Tempête d\'éclairs (recharge 5-6) : 3 cibles dans 36 m, Dex DD 23, 22 foudre.',
+      'Avalage : cible agrippée et de taille G ou moins peut être avalée.',
+      'Résistance légendaire (3/jour).'
+    ],
+    description: "Léviathan des abysses, son réveil prédit la chute des cités côtières."
+  },
+  {
+    nom: 'Requin de récif', nomEn: 'Reef Shark', type: 'Bête', taille: 'M', alignement: 'Sans alignement',
+    cd: 0.5, hp_max: 22, hp_formule: '4d8+4', ca: 12, vitesse: 0, vitesses_extra: 'Nage 12 m',
+    force: 14, dexterite: 13, constitution: 13, intelligence: 1, sagesse: 10, charisme: 4,
+    attaques: [{ nom: 'Morsure', bonus_attaque: 4, degats: '1d8+2', type_degats: 'perforant', portee: '1,50 m' }],
+    capacites_speciales: ['Tactique de meute : avantage si un allié à 1,50 m de la cible.'],
+    description: "Prédateur agile des récifs coralliens, attaque en banc."
+  },
+  {
+    nom: 'Mégalodon', nomEn: 'Megalodon (Giant Shark)', type: 'Bête', taille: 'Gig', alignement: 'Sans alignement',
+    cd: 5, hp_max: 126, hp_formule: '11d20+11', ca: 13, vitesse: 0, vitesses_extra: 'Nage 18 m',
+    force: 23, dexterite: 11, constitution: 21, intelligence: 1, sagesse: 10, charisme: 5,
+    attaques: [{ nom: 'Morsure', bonus_attaque: 9, degats: '5d10+6', type_degats: 'perforant', portee: '1,50 m', description: 'Avantage si cible blessée. Cible peut être agrippée (Force DD 16).' }],
+    description: "Requin abyssal de l'âge préhistorique, ressurgi à la faveur d'une faille temporelle."
+  },
+  {
+    nom: 'Sahuagin', nomEn: 'Sahuagin', type: 'Humanoïde', taille: 'M', alignement: 'Loyal Mauvais',
+    cd: 0.5, hp_max: 22, hp_formule: '4d8+4', ca: 12, vitesse: 9, vitesses_extra: 'Nage 12 m',
+    force: 13, dexterite: 11, constitution: 12, intelligence: 12, sagesse: 13, charisme: 9,
+    attaques: [
+      { nom: 'Trident', bonus_attaque: 3, degats: '1d6+1', type_degats: 'perforant', portee: '1,50 m / 6 m lancé' },
+      { nom: 'Morsure', bonus_attaque: 3, degats: '1d4+1', type_degats: 'perforant', portee: '1,50 m' }
+    ],
+    capacites_speciales: ['Sang frénésie : avantage à la morsure contre cible blessée.', 'Télépathie limitée avec requins.'],
+    description: "Poisson-homme cruel des grands fonds, sert des prêtresses-baronnes en cités-récifs."
+  },
+
+  // ============== ABERRATIONS ==============
+  {
+    nom: 'Doppelganger', nomEn: 'Doppelganger', type: 'Monstruosité', taille: 'M', alignement: 'Neutre',
+    cd: 3, hp_max: 52, hp_formule: '8d8+16', ca: 14, vitesse: 9,
+    force: 11, dexterite: 18, constitution: 14, intelligence: 11, sagesse: 12, charisme: 14,
+    attaques: [{ nom: 'Coup', bonus_attaque: 6, degats: '1d6+4', type_degats: 'contondant', portee: '1,50 m' }],
+    capacites_speciales: [
+      'Métamorphose : prend l\'apparence d\'un humanoïde vu.',
+      'Lecture des pensées (DC 11 Sag).',
+      'Attaque sournoise (3d6) si avantage ou allié à 1,50 m.'
+    ],
+    description: "Métamorphe espion, infiltre les cours en remplaçant ses cibles."
+  },
+  {
+    nom: 'Slaad rouge', nomEn: 'Red Slaad', type: 'Aberration', taille: 'G', alignement: 'Chaotique Neutre',
+    cd: 5, hp_max: 93, hp_formule: '11d10+33', ca: 14, vitesse: 9,
+    force: 16, dexterite: 12, constitution: 16, intelligence: 6, sagesse: 6, charisme: 7,
+    resistances: ['acide', 'froid', 'feu', 'foudre', 'tonnerre'],
+    attaques: [
+      { nom: 'Morsure', bonus_attaque: 7, degats: '2d4+3', type_degats: 'perforant', portee: '1,50 m', description: 'Cible Con DD 14 ou infectée (transformation en slaad).' },
+      { nom: 'Griffes', bonus_attaque: 7, degats: '2d6+3', type_degats: 'tranchant', portee: '1,50 m' }
+    ],
+    description: "Crapaud-grenouille du Chaos écumant, infecte ses proies pour les transformer."
+  },
+  {
+    nom: 'Slaad bleu', nomEn: 'Blue Slaad', type: 'Aberration', taille: 'G', alignement: 'Chaotique Neutre',
+    cd: 7, hp_max: 123, hp_formule: '13d10+52', ca: 15, vitesse: 9,
+    force: 20, dexterite: 15, constitution: 18, intelligence: 7, sagesse: 7, charisme: 9,
+    resistances: ['acide', 'froid', 'feu', 'foudre', 'tonnerre'],
+    attaques: [
+      { nom: 'Griffes (×2)', bonus_attaque: 8, degats: '2d6+5', type_degats: 'tranchant', portee: '1,50 m', description: 'Cible Con DD 15 ou maladie pourrissante.' },
+      { nom: 'Morsure', bonus_attaque: 8, degats: '2d8+5', type_degats: 'perforant', portee: '1,50 m' }
+    ],
+    description: "Slaad guerrier, sa peau bleue est hérissée de crochets osseux."
+  },
+  {
+    nom: 'Slaad vert', nomEn: 'Green Slaad', type: 'Aberration', taille: 'G', alignement: 'Chaotique Neutre',
+    cd: 8, hp_max: 127, hp_formule: '15d10+45', ca: 16, vitesse: 9,
+    force: 18, dexterite: 14, constitution: 16, intelligence: 13, sagesse: 13, charisme: 13,
+    resistances: ['acide', 'froid', 'feu', 'foudre', 'tonnerre'],
+    attaques: [
+      { nom: 'Bâton de combat', bonus_attaque: 7, degats: '2d6+4', type_degats: 'contondant', portee: '1,50 m' },
+      { nom: 'Morsure', bonus_attaque: 7, degats: '2d8+4', type_degats: 'perforant', portee: '1,50 m' }
+    ],
+    capacites_speciales: ['Sorts (innés) : Détection des pensées, Image miroir, Invisibilité, Explosion radiante.'],
+    description: "Mage-slaad, manipulateur, son éclat verdâtre annonce des sortilèges chaotiques."
+  },
+  {
+    nom: 'Otyugh', nomEn: 'Otyugh', type: 'Aberration', taille: 'G', alignement: 'Neutre',
+    cd: 5, hp_max: 114, hp_formule: '12d10+48', ca: 14, vitesse: 9,
+    force: 16, dexterite: 11, constitution: 19, intelligence: 6, sagesse: 13, charisme: 6,
+    attaques: [
+      { nom: 'Morsure', bonus_attaque: 6, degats: '2d8+3', type_degats: 'perforant', portee: '1,50 m', description: 'Cible Con DD 15 ou maladie 24 h.' },
+      { nom: 'Tentacule (×2)', bonus_attaque: 6, degats: '1d8+3', type_degats: 'contondant', portee: '3 m', description: 'Cible Force DD 14 ou agrippée.' }
+    ],
+    description: "Charognard tentaculaire des égouts, dévore tout ce qui pourrit."
+  },
+
+  // ============== FÉES ==============
+  {
+    nom: 'Pixie', nomEn: 'Pixie', type: 'Fée', taille: 'TP', alignement: 'Neutre Bon',
+    cd: 0.25, hp_max: 1, hp_formule: '1d4-1', ca: 15, vitesse: 3, vitesses_extra: 'Vol 9 m',
+    force: 2, dexterite: 20, constitution: 8, intelligence: 10, sagesse: 14, charisme: 15,
+    attaques: [],
+    capacites_speciales: [
+      'Sorts innés (1/jour) : Confusion, Danse irrésistible, Détection des pensées, Dissipation de la magie, Polymorphe, Vol, Sommeil.',
+      'Furtivité supérieure.'
+    ],
+    description: "Petite fée espiègle aux ailes de libellule, vole une miette puis offre un sort."
+  },
+  {
+    nom: 'Sprite', nomEn: 'Sprite', type: 'Fée', taille: 'TP', alignement: 'Neutre Bon',
+    cd: 0.25, hp_max: 2, hp_formule: '1d4', ca: 15, vitesse: 3, vitesses_extra: 'Vol 12 m',
+    force: 3, dexterite: 18, constitution: 10, intelligence: 14, sagesse: 13, charisme: 11,
+    attaques: [
+      { nom: 'Épée courte', bonus_attaque: 6, degats: '1', type_degats: 'perforant', portee: '1,50 m' },
+      { nom: 'Arc court', bonus_attaque: 6, degats: '1', type_degats: 'perforant', portee: '12/24 m', description: 'Con DD 10 ou empoisonné 1 min (KO si <5 PV).' }
+    ],
+    capacites_speciales: ['Lecture du cœur : voit l\'alignement d\'une cible vue.'],
+    description: "Fée gardienne des forêts, juge silencieuse au regard inflexible."
+  },
+  {
+    nom: 'Nymphe', nomEn: 'Nymph', type: 'Fée', taille: 'M', alignement: 'Chaotique Bon',
+    cd: 2, hp_max: 31, hp_formule: '7d8', ca: 12, vitesse: 9, vitesses_extra: 'Nage 9 m',
+    force: 11, dexterite: 14, constitution: 11, intelligence: 14, sagesse: 16, charisme: 19,
+    attaques: [],
+    capacites_speciales: [
+      'Beauté éblouissante : créatures à 9 m, Sag DD 14 ou aveuglées 1 min (Sag à la fin de chaque tour).',
+      'Sorts innés : Charme-personne, Sommeil, Suggestion, Soins, Communication avec les bêtes.'
+    ],
+    description: "Esprit d'une source ou d'un bosquet, beauté divine qui terrasse les mortels."
+  },
+
+  // ============== PLANTES ==============
+  {
+    nom: 'Arbre éveillé', nomEn: 'Awakened Tree', type: 'Plante', taille: 'TG', alignement: 'Tout',
+    cd: 2, hp_max: 59, hp_formule: '7d12+14', ca: 13, vitesse: 6,
+    force: 19, dexterite: 6, constitution: 15, intelligence: 10, sagesse: 10, charisme: 7,
+    vulnerabilites: ['feu'], resistances: ['contondant', 'perforant'],
+    attaques: [{ nom: 'Coup', bonus_attaque: 6, degats: '3d6+4', type_degats: 'contondant', portee: '3 m' }],
+    capacites_speciales: ['Apparence : indiscernable d\'un arbre normal au repos.'],
+    description: "Arbre antique éveillé par un sort, parle un langage lent et sage."
+  },
+  {
+    nom: 'Tas grondant', nomEn: 'Shambling Mound', type: 'Plante', taille: 'G', alignement: 'Sans alignement',
+    cd: 5, hp_max: 136, hp_formule: '16d10+48', ca: 15, vitesse: 6, vitesses_extra: 'Nage 6 m',
+    force: 18, dexterite: 8, constitution: 16, intelligence: 5, sagesse: 10, charisme: 5,
+    resistances: ['froid', 'feu'], immunites: ['foudre'],
+    attaques: [{ nom: 'Coup de fouet (×2)', bonus_attaque: 7, degats: '2d8+4', type_degats: 'contondant', portee: '3 m', description: 'Cible Force DD 14 ou agrippée et étreinte.' }],
+    capacites_speciales: ['Absorption d\'éclair : les éclairs le soignent au lieu de blesser.'],
+    description: "Monticule de racines et de feuilles pourries, étouffe ses victimes en silence."
+  },
+  {
+    nom: 'Lierre maudit', nomEn: 'Vine Blight', type: 'Plante', taille: 'M', alignement: 'Neutre Mauvais',
+    cd: 0.5, hp_max: 26, hp_formule: '4d8+8', ca: 12, vitesse: 3,
+    force: 15, dexterite: 8, constitution: 14, intelligence: 5, sagesse: 7, charisme: 3,
+    attaques: [{ nom: 'Constriction', bonus_attaque: 4, degats: '2d6+2', type_degats: 'contondant', portee: '3 m', description: 'Cible Force DD 12 ou agrippée et entravée.' }],
+    capacites_speciales: ['Faux feuillage : indiscernable d\'un buisson sec.', 'Animer plantes : 4 plantes ordinaires deviennent hostiles.'],
+    description: "Vigne torturée par la corruption Gulthias, étrangle voyageurs imprudents."
+  },
+  {
+    nom: 'Brindille maudite', nomEn: 'Twig Blight', type: 'Plante', taille: 'P', alignement: 'Neutre Mauvais',
+    cd: 0.125, hp_max: 4, hp_formule: '1d6+1', ca: 13, vitesse: 6,
+    force: 6, dexterite: 13, constitution: 12, intelligence: 4, sagesse: 8, charisme: 3,
+    vulnerabilites: ['feu'],
+    attaques: [{ nom: 'Griffes', bonus_attaque: 3, degats: '1d4+1', type_degats: 'perforant', portee: '1,50 m' }],
+    capacites_speciales: ['Faux feuillage : indiscernable d\'un buisson sec.'],
+    description: "Petite plante carnivore, attend immobile sa victime."
+  },
+
+  // ============== CONSTRUCTS ==============
+  {
+    nom: 'Armure animée', nomEn: 'Animated Armor', type: 'Construction', taille: 'M', alignement: 'Sans alignement',
+    cd: 1, hp_max: 33, hp_formule: '6d8+6', ca: 18, vitesse: 7.5,
+    force: 14, dexterite: 11, constitution: 13, intelligence: 1, sagesse: 3, charisme: 1,
+    immunites: ['poison', 'psychique', 'charmé', 'effrayé', 'paralysé', 'pétrifié', 'empoisonné'],
+    attaques: [{ nom: 'Coup', bonus_attaque: 4, degats: '1d6+2', type_degats: 'contondant', portee: '1,50 m' }],
+    capacites_speciales: ['Apparence inerte : indiscernable d\'une armure normale tant qu\'elle ne bouge pas.'],
+    description: "Plate animée par un sortilège, garde fidèle d'un mage."
+  },
+  {
+    nom: 'Épée volante', nomEn: 'Flying Sword', type: 'Construction', taille: 'P', alignement: 'Sans alignement',
+    cd: 0.25, hp_max: 17, hp_formule: '5d6', ca: 17, vitesse: 0, vitesses_extra: 'Vol 15 m (stationnaire)',
+    force: 12, dexterite: 15, constitution: 11, intelligence: 1, sagesse: 5, charisme: 1,
+    immunites: ['poison', 'psychique', 'charmé', 'effrayé', 'paralysé', 'pétrifié', 'empoisonné'],
+    attaques: [{ nom: 'Épée longue', bonus_attaque: 3, degats: '1d8+1', type_degats: 'tranchant', portee: '1,50 m' }],
+    description: "Lame magique flottante, garde silencieuse des chambres au trésor."
+  },
+  {
+    nom: 'Golem de chair', nomEn: 'Flesh Golem', type: 'Construction', taille: 'M', alignement: 'Neutre',
+    cd: 5, hp_max: 93, hp_formule: '11d8+44', ca: 9, vitesse: 9,
+    force: 19, dexterite: 9, constitution: 18, intelligence: 6, sagesse: 10, charisme: 5,
+    immunites: ['foudre', 'poison', 'tranchant/perforant/contondant non-magiques (sauf adamantium)'],
+    attaques: [{ nom: 'Coup (×2)', bonus_attaque: 7, degats: '2d8+4', type_degats: 'contondant', portee: '1,50 m' }],
+    capacites_speciales: ['Absorption d\'éclair : se soigne aux dégâts de foudre.', 'Rage mortelle : si HP < 40, rage 1 min.'],
+    description: "Cadavres recousus animés par alchimie nécromantique. Le retour de Frankenstein."
+  },
+  {
+    nom: 'Golem d\'argile', nomEn: 'Clay Golem', type: 'Construction', taille: 'G', alignement: 'Neutre',
+    cd: 9, hp_max: 133, hp_formule: '14d10+56', ca: 14, vitesse: 6,
+    force: 20, dexterite: 9, constitution: 18, intelligence: 3, sagesse: 8, charisme: 1,
+    immunites: ['acide', 'poison', 'psychique', 'tranchant/perforant/contondant non-magiques (sauf adamantium)'],
+    attaques: [{ nom: 'Coup (×2)', bonus_attaque: 8, degats: '2d10+5', type_degats: 'contondant', portee: '1,50 m', description: 'Touche : Con DD 15 ou max HP -1d6.' }],
+    capacites_speciales: ['Forme molle : peut traverser un trou de 1 cm sans pénalité.'],
+    description: "Géant d'argile servile, mais sa rage incontrôlable peut le faire retourner contre son créateur."
+  },
+  {
+    nom: 'Golem de pierre', nomEn: 'Stone Golem', type: 'Construction', taille: 'G', alignement: 'Neutre',
+    cd: 10, hp_max: 178, hp_formule: '17d10+85', ca: 17, vitesse: 6,
+    force: 22, dexterite: 9, constitution: 20, intelligence: 3, sagesse: 11, charisme: 1,
+    immunites: ['poison', 'psychique', 'tranchant/perforant/contondant non-magiques (sauf adamantium)'],
+    attaques: [{ nom: 'Coup (×2)', bonus_attaque: 10, degats: '3d8+6', type_degats: 'contondant', portee: '1,50 m' }],
+    capacites_speciales: ['Ralentissement (recharge 5-6) : créatures à 3 m, Sag DD 17 ou vitesse / 2 et 1 attaque/tour.'],
+    description: "Statue monumentale animée, gardienne d'un sanctuaire ou d'une tombe royale."
+  },
+  {
+    nom: 'Golem de fer', nomEn: 'Iron Golem', type: 'Construction', taille: 'G', alignement: 'Neutre',
+    cd: 16, hp_max: 210, hp_formule: '20d10+100', ca: 20, vitesse: 7.5,
+    force: 24, dexterite: 9, constitution: 20, intelligence: 3, sagesse: 11, charisme: 1,
+    immunites: ['feu', 'poison', 'psychique', 'tranchant/perforant/contondant non-magiques (sauf adamantium)'],
+    attaques: [
+      { nom: 'Coup (×2)', bonus_attaque: 13, degats: '3d10+7', type_degats: 'contondant', portee: '1,50 m' },
+      { nom: 'Épée énorme', bonus_attaque: 13, degats: '3d12+7', type_degats: 'tranchant', portee: '3 m' }
+    ],
+    capacites_speciales: ['Souffle empoisonné (recharge 5-6) : cône 4,50 m, Con DD 19, 10d8 poison (moitié si réussi).'],
+    description: "Colosse d'acier forgé, gardien indestructible d'antiques forteresses."
   }
 ]
 

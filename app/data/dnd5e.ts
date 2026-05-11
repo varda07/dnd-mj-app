@@ -844,3 +844,203 @@ export const appliquerBonusRace = (
   sag: stats.sag + (race.bonusStats.sag ?? 0),
   cha: stats.cha + (race.bonusStats.cha ?? 0)
 })
+
+// ------------------------- MONTÉE DE NIVEAU -------------------------
+// Table d'XP du PHB. XP_THRESHOLDS[i] = seuil pour atteindre le niveau i+1.
+// XP_THRESHOLDS[0] = 0 (niv 1), XP_THRESHOLDS[1] = 300 (niv 2), etc.
+export const XP_THRESHOLDS: readonly number[] = [
+  0,       // niv 1
+  300,     // niv 2
+  900,     // niv 3
+  2700,    // niv 4
+  6500,    // niv 5
+  14000,   // niv 6
+  23000,   // niv 7
+  34000,   // niv 8
+  48000,   // niv 9
+  64000,   // niv 10
+  85000,   // niv 11
+  100000,  // niv 12
+  120000,  // niv 13
+  140000,  // niv 14
+  165000,  // niv 15
+  195000,  // niv 16
+  225000,  // niv 17
+  265000,  // niv 18
+  305000,  // niv 19
+  355000   // niv 20
+]
+
+// XP requis pour atteindre le niveau suivant. null si niveau max.
+export const xpRequisProchainNiveau = (niveauActuel: number): number | null => {
+  if (niveauActuel >= 20) return null
+  return XP_THRESHOLDS[niveauActuel] ?? null
+}
+
+// Niveau "théorique" si on respectait simplement la table d'XP.
+export const niveauPourXp = (xp: number): number => {
+  let n = 1
+  for (let i = 1; i < XP_THRESHOLDS.length; i++) {
+    if (xp >= XP_THRESHOLDS[i]) n = i + 1
+  }
+  return n
+}
+
+// Valeur moyenne d'un dé de vie pour la prise de HP par défaut (PHB) :
+// d6 → 4, d8 → 5, d10 → 6, d12 → 7. (= floor(faces/2) + 1)
+export const moyenneDeVie = (deVie: string | null | undefined): number => {
+  if (!deVie) return 5
+  const m = deVie.match(/d(\d+)/i)
+  if (!m) return 5
+  const faces = parseInt(m[1], 10)
+  return Math.floor(faces / 2) + 1
+}
+
+// Nombre de faces du dé de vie. Sert pour le "Lancer le dé".
+export const facesDeVie = (deVie: string | null | undefined): number => {
+  if (!deVie) return 8
+  const m = deVie.match(/d(\d+)/i)
+  if (!m) return 8
+  return parseInt(m[1], 10)
+}
+
+// Niveau auquel chaque classe accède à sa sous-classe (PHB / SCAG / Tasha's).
+export const NIVEAU_SOUS_CLASSE: Record<string, number> = {
+  Clerc: 1,
+  Ensorceleur: 1,
+  Sorcier: 1,
+  Druide: 2,
+  Magicien: 2,
+  Barbare: 3,
+  Barde: 3,
+  Guerrier: 3,
+  Moine: 3,
+  Paladin: 3,
+  'Rôdeur': 3,
+  Roublard: 3,
+  Artificier: 3,
+  'Sang-de-dragon': 3
+}
+
+// Niveaux où la classe gagne une augmentation de caractéristique (ASI).
+// Le Guerrier en a 7, le Roublard en a 6, les autres 5.
+const ASI_DEFAULT: readonly number[] = [4, 8, 12, 16, 19]
+export const NIVEAUX_ASI: Record<string, readonly number[]> = {
+  Guerrier: [4, 6, 8, 12, 14, 16, 19],
+  Roublard: [4, 8, 10, 12, 16, 19]
+}
+export const getNiveauxASI = (classe: string | null | undefined): readonly number[] =>
+  (classe && NIVEAUX_ASI[classe]) || ASI_DEFAULT
+
+export const estNiveauASI = (classe: string | null | undefined, niveau: number): boolean =>
+  getNiveauxASI(classe).includes(niveau)
+
+// Prérequis pour multiclasser dans une classe (stat ≥ 13).
+// On ne modélise pas les "ou" complexes (ex. Guerrier = For OU Dex) → on prend
+// la plus accessible (Dex pour Guerrier) et on documente. À ajuster si besoin.
+export const PREREQUIS_MULTICLASSE: Record<string, StatKey[]> = {
+  Barbare: ['for'],
+  Barde: ['cha'],
+  Clerc: ['sag'],
+  Druide: ['sag'],
+  Ensorceleur: ['cha'],
+  Guerrier: ['for'],
+  Magicien: ['int'],
+  Moine: ['dex', 'sag'],
+  Paladin: ['for', 'cha'],
+  'Rôdeur': ['dex', 'sag'],
+  Roublard: ['dex'],
+  Sorcier: ['cha'],
+  Artificier: ['int'],
+  'Sang-de-dragon': ['cha']
+}
+
+// Renvoie la liste des stats < 13 qui empêchent de multiclasser. Vide = OK.
+export const prerequisManquants = (
+  classe: string,
+  stats: { for: number; dex: number; con: number; int: number; sag: number; cha: number }
+): StatKey[] => {
+  const requis = PREREQUIS_MULTICLASSE[classe]
+  if (!requis) return []
+  return requis.filter((s) => stats[s] < 13)
+}
+
+// Classes considérées comme "lanceurs de sorts connus" — le joueur choisit
+// explicitement ses sorts (vs Clerc/Druide qui préparent dans toute la liste).
+export const CLASSES_SORTS_CONNUS: readonly string[] = [
+  'Barde',
+  'Ensorceleur',
+  'Sorcier',
+  'Magicien',
+  'Rôdeur',
+  'Paladin'
+]
+export const apprendSorts = (classe: string | null | undefined): boolean =>
+  !!classe && CLASSES_SORTS_CONNUS.includes(classe)
+
+// Une entrée dans l'historique multiclasse.
+export type ClasseMultiple = {
+  classe: string
+  sous_classe?: string
+  niveau: number
+}
+
+// Calcule le niveau total à partir de l'historique multiclasse (ou retourne
+// le niveau passé en argument si l'historique est vide).
+export const niveauTotal = (classes: ClasseMultiple[], fallback: number): number => {
+  if (!classes || classes.length === 0) return fallback
+  return classes.reduce((sum, c) => sum + (c.niveau || 0), 0)
+}
+
+// ------------------------- XP PAR DÉFI (CD/CR) -------------------------
+// Table PHB / DMG p.275 — XP attribué par créature en fonction de son CD.
+// Les fractions 1/8, 1/4, 1/2 sont stockées en numérique (0.125, 0.25, 0.5).
+export const XP_PAR_CD: Record<string, number> = {
+  '0':     10,
+  '0.125': 25,    // 1/8
+  '0.25':  50,    // 1/4
+  '0.5':   100,   // 1/2
+  '1':     200,
+  '2':     450,
+  '3':     700,
+  '4':     1100,
+  '5':     1800,
+  '6':     2300,
+  '7':     2900,
+  '8':     3900,
+  '9':     5000,
+  '10':    5900,
+  '11':    7200,
+  '12':    8400,
+  '13':    10000,
+  '14':    11500,
+  '15':    13000,
+  '16':    15000,
+  '17':    18000,
+  '18':    20000,
+  '19':    22000,
+  '20':    25000
+}
+
+export const xpPourCD = (cd: number | string | null | undefined): number => {
+  if (cd === null || cd === undefined || cd === '') return 0
+  const num = typeof cd === 'string' ? parseFloat(cd) : cd
+  if (!isFinite(num)) return 0
+  // Lookup direct via le format string normalisé (gère 0.125 / 0.25 / 0.5).
+  const direct = XP_PAR_CD[String(num)]
+  if (direct !== undefined) return direct
+  // Pour les CD entiers > 20, on plafonne à 25000 ; en-dessous on retourne 0.
+  if (num > 20) return 25000
+  return 0
+}
+
+// Label affichable d'un CD (1/8, 1/4, 1/2 ou entier).
+export const labelCD = (cd: number | string | null | undefined): string => {
+  if (cd === null || cd === undefined || cd === '') return '—'
+  const num = typeof cd === 'string' ? parseFloat(cd) : cd
+  if (!isFinite(num)) return '—'
+  if (num === 0.125) return '1/8'
+  if (num === 0.25) return '1/4'
+  if (num === 0.5) return '1/2'
+  return String(num)
+}

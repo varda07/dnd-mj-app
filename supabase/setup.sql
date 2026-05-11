@@ -32,7 +32,8 @@ alter table public.scenarios
 
 -- Colonnes image_url pour ennemis et items (personnages et maps l'ont déjà)
 alter table public.ennemis
-  add column if not exists image_url text;
+  add column if not exists image_url text,
+  add column if not exists cd numeric default 0;
 
 alter table public.items
   add column if not exists image_url text;
@@ -61,6 +62,56 @@ alter table public.personnages
   add column if not exists exploits text default '',
   add column if not exists langues text default '',
   add column if not exists autres_maitrises text default '';
+
+-- Sorts : champs complets (composantes, concentration, rituel, action_type…)
+-- nécessaires à l'import depuis la bibliothèque D&D SRD.
+alter table public.sorts
+  add column if not exists action_type text default 'action',
+  add column if not exists composantes_verbal boolean default false,
+  add column if not exists composantes_somatique boolean default false,
+  add column if not exists composantes_materiel text default '',
+  add column if not exists concentration boolean default false,
+  add column if not exists rituel boolean default false,
+  add column if not exists classes_compatibles text[] default '{}';
+
+-- Slots de sorts par niveau (1..9) stockés en JSONB sur le personnage.
+alter table public.personnages
+  add column if not exists sorts_slots_max jsonb default '{}'::jsonb,
+  add column if not exists sorts_slots_used jsonb default '{}'::jsonb;
+
+-- Junction perso ↔ sort : flag "préparé" (toggle distinct de "disponible").
+alter table public.personnage_sorts
+  add column if not exists prepare boolean default false;
+
+-- Historique de classes pour le multiclasse. Format JSONB :
+--   [{ "classe": "Guerrier", "sous_classe": "Champion", "niveau": 3 },
+--    { "classe": "Roublard", "niveau": 2 }]
+-- Le niveau total est la somme. La colonne `niveau` reste authoritative pour
+-- les personnages mono-classe (= classes_multiples vide ou null).
+alter table public.personnages
+  add column if not exists classes_multiples jsonb default '[]'::jsonb;
+
+-- Jets contre la mort (death saves). Compteurs 0..3. NB : les colonnes
+-- existantes `death_success` et `death_fail` couvrent déjà ce besoin et sont
+-- toujours utilisées par le code. Les colonnes ci-dessous sont ajoutées par
+-- conformité avec la convention de nommage demandée mais restent inutilisées
+-- pour l'instant — laisse-les en place, le code peut basculer dessus
+-- ultérieurement sans nouvelle migration.
+alter table public.personnages
+  add column if not exists death_saves_success int default 0,
+  add column if not exists death_saves_fail int default 0;
+
+-- Pièces d'or — fortune du personnage. On utilise `pieces_or` (et NON `or`)
+-- car `or` est un mot réservé PostgreSQL ET entre en conflit avec le paramètre
+-- de filtre logique `?or=…` de PostgREST côté API Supabase. La distribution
+-- post-combat dépose le loot en or ici.
+alter table public.personnages
+  add column if not exists pieces_or int not null default 0;
+
+-- Mode d'un jet de dés (normal / avantage / désavantage). Sert au lanceur
+-- de dés et à l'historique pour distinguer les jets de d20 avec av./désav.
+alter table public.jets_de_des
+  add column if not exists mode text default 'normal';
 
 
 -- ----------------------------------------------------------------------------
@@ -193,41 +244,32 @@ drop policy if exists "codes_invitation_update" on public.codes_invitation;
 create policy "codes_invitation_update" on public.codes_invitation
   for update using (auth.uid() is not null);
 
--- scenarios_joueurs : le joueur voit ses propres liens ; le MJ voit ceux de ses scénarios
+-- ⚠ scenarios_joueurs : policies SIMPLES sans jointure sur scenarios.
+-- NE JAMAIS ajouter d'EXISTS sur public.scenarios ici — cf. fix_rls_recursion.sql
+-- (incident "infinite recursion detected in policy" résolu le 2026-05-11).
 drop policy if exists "scenarios_joueurs_select_own" on public.scenarios_joueurs;
-create policy "scenarios_joueurs_select_own" on public.scenarios_joueurs
-  for select using (
-    auth.uid() = joueur_id
-    or exists (
-      select 1 from public.scenarios s
-      where s.id = scenario_id and s.mj_id = auth.uid()
-    )
-  );
+drop policy if exists "scenarios_joueurs_select" on public.scenarios_joueurs;
+create policy "scenarios_joueurs_select" on public.scenarios_joueurs
+  for select using (joueur_id = auth.uid());
 
 drop policy if exists "scenarios_joueurs_insert_self" on public.scenarios_joueurs;
-create policy "scenarios_joueurs_insert_self" on public.scenarios_joueurs
-  for insert with check (auth.uid() = joueur_id);
+drop policy if exists "scenarios_joueurs_insert" on public.scenarios_joueurs;
+create policy "scenarios_joueurs_insert" on public.scenarios_joueurs
+  for insert with check (joueur_id = auth.uid());
 
 drop policy if exists "scenarios_joueurs_delete_self" on public.scenarios_joueurs;
-create policy "scenarios_joueurs_delete_self" on public.scenarios_joueurs
-  for delete using (
-    auth.uid() = joueur_id
-    or exists (
-      select 1 from public.scenarios s
-      where s.id = scenario_id and s.mj_id = auth.uid()
-    )
-  );
+drop policy if exists "scenarios_joueurs_delete" on public.scenarios_joueurs;
+create policy "scenarios_joueurs_delete" on public.scenarios_joueurs
+  for delete using (joueur_id = auth.uid());
 
--- scenarios : le MJ voit/modifie ses scénarios ; les joueurs qui ont rejoint voient en lecture
+-- ⚠ scenarios : policies SIMPLES sans jointure sur scenarios_joueurs.
+-- NE JAMAIS ajouter d'EXISTS sur public.scenarios_joueurs ici — récursion infinie.
+-- Pour exposer un scénario aux joueurs qui l'ont rejoint, utiliser le flag
+-- `public = true` (bibliothèque communautaire) ou une RPC dédiée.
 drop policy if exists "scenarios_select" on public.scenarios;
-create policy "scenarios_select" on public.scenarios
-  for select using (
-    auth.uid() = mj_id
-    or exists (
-      select 1 from public.scenarios_joueurs sj
-      where sj.scenario_id = scenarios.id and sj.joueur_id = auth.uid()
-    )
-  );
+drop policy if exists "scenarios_select_mj" on public.scenarios;
+create policy "scenarios_select_mj" on public.scenarios
+  for select using (mj_id = auth.uid() or public = true);
 
 drop policy if exists "scenarios_insert" on public.scenarios;
 create policy "scenarios_insert" on public.scenarios

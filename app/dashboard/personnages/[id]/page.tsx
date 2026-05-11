@@ -13,6 +13,11 @@ import {
   extraireDes,
   type DiceExpr
 } from '@/app/data/sorts_dnd5e'
+import { xpRequisProchainNiveau, type ClasseMultiple } from '@/app/data/dnd5e'
+import ModaleMonteeNiveau, {
+  type MonteeResult
+} from './ModaleMonteeNiveau'
+import NumberInput from '@/app/components/NumberInput'
 
 type StatKey = 'force' | 'dexterite' | 'constitution' | 'intelligence' | 'sagesse' | 'charisme'
 
@@ -57,6 +62,7 @@ type Personnage = {
   conditions: ConditionKey[]
   sorts_slots_max: Record<string, number>
   sorts_slots_used: Record<string, number>
+  classes_multiples: ClasseMultiple[]
 }
 
 type Sort = {
@@ -141,7 +147,8 @@ const FICHE_COLUMNS = [
   'langues',
   'autres_maitrises',
   'sorts_slots_max',
-  'sorts_slots_used'
+  'sorts_slots_used',
+  'classes_multiples'
 ] as const
 
 const modifier = (v: number) => Math.floor((v - 10) / 2)
@@ -176,7 +183,10 @@ const normalize = (row: Record<string, unknown>): Personnage => ({
   sorts_slots_max:
     (row.sorts_slots_max as Record<string, number>) ?? {},
   sorts_slots_used:
-    (row.sorts_slots_used as Record<string, number>) ?? {}
+    (row.sorts_slots_used as Record<string, number>) ?? {},
+  classes_multiples: Array.isArray(row.classes_multiples)
+    ? (row.classes_multiples as ClasseMultiple[])
+    : []
 })
 
 export default function FichePersonnage() {
@@ -201,6 +211,21 @@ export default function FichePersonnage() {
   const [nouvArmeNom, setNouvArmeNom] = useState('')
   const [nouvArmeBonus, setNouvArmeBonus] = useState('')
   const [nouvArmeDegats, setNouvArmeDegats] = useState('')
+
+  const [levelUpOpen, setLevelUpOpen] = useState(false)
+  const [xpAddOpen, setXpAddOpen] = useState(false)
+  const [xpAddValue, setXpAddValue] = useState('')
+
+  // Repos
+  type ReposPrompt = { kind: 'long' | 'short' } | null
+  const [reposPrompt, setReposPrompt] = useState<ReposPrompt>(null)
+  const [reposGlow, setReposGlow] = useState(false)
+  const [reposResume, setReposResume] = useState<string | null>(null)
+  // Repos court : log des HD dépensés en cours de repos
+  const [shortRestLog, setShortRestLog] = useState<
+    { roll: number; conMod: number; gained: number }[]
+  >([])
+  const [shortRestSlotsRestores, setShortRestSlotsRestores] = useState(false)
 
   const loadedRef = useRef(false)
   const colonnesDispoRef = useRef<Set<string>>(new Set())
@@ -332,17 +357,36 @@ export default function FichePersonnage() {
         .eq('id', perso.id)
         .select('id')
       if (error) {
-        console.error('[fiche] erreur sauvegarde Supabase :', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
+        // Sortie verbeuse : Supabase peut renvoyer un objet d'erreur dont les
+        // champs `message`/`details` sont vides sur certaines violations (ex.
+        // colonne inexistante, contrainte RLS). On loggue tout pour debug.
+        console.error('[fiche] erreur sauvegarde Supabase — détail brut :', error)
+        console.error('[fiche] erreur sauvegarde Supabase — propriétés :', {
+          code: (error as { code?: string }).code,
+          message: (error as { message?: string }).message,
+          details: (error as { details?: string }).details,
+          hint: (error as { hint?: string }).hint,
           status,
-          statusText,
-          payload
+          statusText
         })
+        try {
+          console.error(
+            '[fiche] erreur sauvegarde Supabase — JSON.stringify :',
+            JSON.stringify(error, Object.getOwnPropertyNames(error))
+          )
+        } catch (stringifyErr) {
+          console.error('[fiche] JSON.stringify a échoué :', stringifyErr)
+        }
+        console.error('[fiche] payload envoyé :', payload)
+        console.error('[fiche] colonnes payload :', Object.keys(payload))
         setSaveState('error')
-        setSaveError(error.message || 'Erreur inconnue')
+        setSaveError(
+          (error as { message?: string }).message ||
+            (error as { details?: string }).details ||
+            (error as { hint?: string }).hint ||
+            (error as { code?: string }).code ||
+            `Erreur inconnue (HTTP ${status} ${statusText})`
+        )
         return
       }
       if (!data || data.length === 0) {
@@ -390,9 +434,72 @@ export default function FichePersonnage() {
 
   const majHp = (delta: number) => {
     if (!perso) return
-    const nouv = Math.max(0, Math.min(perso.hp_max, perso.hp_actuel + delta))
-    if (nouv === perso.hp_actuel) return
+    const ancien = perso.hp_actuel
+    // Déjà à 0 PV + dégâts → échec automatique de jet de mort
+    if (ancien === 0 && delta < 0) {
+      const nouvFail = Math.min(3, perso.death_fail + 1)
+      setPerso({ ...perso, death_fail: nouvFail })
+      if (nouvFail >= 3) toast(`✝ ${perso.nom} est mort.`)
+      else toast(`⚠ Dégâts à 0 PV — 1 échec (${nouvFail}/3)`)
+      return
+    }
+    // Déjà à 0 PV + soin → relève et reset des death saves
+    if (ancien === 0 && delta > 0) {
+      const nouv = Math.min(perso.hp_max, ancien + delta)
+      setPerso({
+        ...perso,
+        hp_actuel: nouv,
+        death_success: 0,
+        death_fail: 0
+      })
+      toast(`💚 ${perso.nom} se relève à ${nouv} PV.`)
+      return
+    }
+    const nouv = Math.max(0, Math.min(perso.hp_max, ancien + delta))
+    if (nouv === ancien) return
+    if (nouv === 0) {
+      // Tombe à 0 — death saves repartent à zéro
+      setPerso({ ...perso, hp_actuel: 0, death_success: 0, death_fail: 0 })
+      toast(`💀 ${perso.nom} tombe à 0 PV — jets contre la mort commencent.`)
+      return
+    }
     update('hp_actuel', nouv)
+  }
+
+  const lancerJetDeMort = () => {
+    if (!perso) return
+    if (perso.death_success >= 3 || perso.death_fail >= 3) return
+    const d20 = Math.floor(Math.random() * 20) + 1
+    if (d20 === 20) {
+      // Réveil : 1 PV, reset
+      setPerso({
+        ...perso,
+        hp_actuel: 1,
+        death_success: 0,
+        death_fail: 0
+      })
+      toast(`🎲 20 — ${perso.nom} se relève avec 1 PV !`)
+      return
+    }
+    if (d20 === 1) {
+      const nouvFail = Math.min(3, perso.death_fail + 2)
+      setPerso({ ...perso, death_fail: nouvFail })
+      if (nouvFail >= 3) toast(`🎲 1 — Échec critique. ✝ ${perso.nom} est mort.`)
+      else toast(`🎲 1 — Échec critique : 2 échecs (${nouvFail}/3)`)
+      return
+    }
+    if (d20 >= 10) {
+      const nouvSucc = Math.min(3, perso.death_success + 1)
+      setPerso({ ...perso, death_success: nouvSucc })
+      if (nouvSucc >= 3) toast(`🎲 ${d20} — Succès. ✨ ${perso.nom} est stabilisé !`)
+      else toast(`🎲 ${d20} — Succès (${nouvSucc}/3)`)
+      return
+    }
+    // 2..9
+    const nouvFail = Math.min(3, perso.death_fail + 1)
+    setPerso({ ...perso, death_fail: nouvFail })
+    if (nouvFail >= 3) toast(`🎲 ${d20} — Échec. ✝ ${perso.nom} est mort.`)
+    else toast(`🎲 ${d20} — Échec (${nouvFail}/3)`)
   }
 
   const majTempHp = (delta: number) => {
@@ -648,10 +755,27 @@ export default function FichePersonnage() {
     })
   }
 
-  const reposLong = () => {
+  // ============== Repos ==============
+  // Repos long : full heal, slots restaurés, dés de vie + death saves remis à
+  // zéro, sorts à charge remis disponibles, PV temporaires remis à 0.
+  const appliquerReposLong = () => {
     if (!perso) return
-    setPerso({ ...perso, sorts_slots_used: {} })
-    // Restaurer aussi tous les sorts marqués utilisés (junction.disponible).
+    setReposGlow(true)
+    const hpRestaures = perso.hp_max - perso.hp_actuel
+    const slotsRestaures = Object.values(perso.sorts_slots_used).reduce(
+      (a, b) => a + (b || 0),
+      0
+    )
+    const desRestaures = perso.de_vie_utilises
+    setPerso({
+      ...perso,
+      hp_actuel: perso.hp_max,
+      temp_hp: 0,
+      death_success: 0,
+      death_fail: 0,
+      de_vie_utilises: 0,
+      sorts_slots_used: {}
+    })
     void supabase
       .from('personnage_sorts')
       .update({ disponible: true })
@@ -659,13 +783,63 @@ export default function FichePersonnage() {
       .then(() => {
         setSorts((prev) => prev.map((x) => ({ ...x, disponible: true })))
       })
+    setReposResume(
+      `🛏 Repos long terminé : +${hpRestaures} PV, ${slotsRestaures} emplacement${slotsRestaures > 1 ? 's' : ''} restauré${slotsRestaures > 1 ? 's' : ''}, ${desRestaures} dé${desRestaures > 1 ? 's' : ''} de vie récupéré${desRestaures > 1 ? 's' : ''}.`
+    )
+    setReposPrompt(null)
+    setTimeout(() => setReposGlow(false), 1500)
   }
 
-  const reposCourt = () => {
+  // Repos court : dépense un dé de vie pour récupérer (1d{deVie} + mod Con) PV.
+  // Pour le Sorcier, restaure aussi les emplacements (Pacte Magique).
+  const depenserDeVie = () => {
     if (!perso) return
-    // Pour Sorcier (Pacte Magique), repos court restaure les emplacements.
-    if (!usesShortRest(perso.classe)) return
-    setPerso({ ...perso, sorts_slots_used: {} })
+    if (perso.de_vie_utilises >= niveau) {
+      return // plus de dés à dépenser
+    }
+    const faces = perso.de_vie?.match(/d(\d+)/i)?.[1]
+    const facesNum = faces ? parseInt(faces, 10) : 8
+    const roll = Math.floor(Math.random() * facesNum) + 1
+    const conMod = modStat('constitution')
+    const gained = Math.max(1, roll + conMod)
+    const nouvHp = Math.min(perso.hp_max, perso.hp_actuel + gained)
+    setPerso({
+      ...perso,
+      hp_actuel: nouvHp,
+      de_vie_utilises: perso.de_vie_utilises + 1
+    })
+    setShortRestLog((prev) => [...prev, { roll, conMod, gained }])
+  }
+
+  const terminerReposCourt = () => {
+    if (!perso) return
+    setReposGlow(true)
+    const totalHp = shortRestLog.reduce((s, e) => s + e.gained, 0)
+    let resume = `🌙 Repos court : +${totalHp} PV (${shortRestLog.length} dé${shortRestLog.length > 1 ? 's' : ''} de vie dépensé${shortRestLog.length > 1 ? 's' : ''}).`
+    if (usesShortRest(perso.classe)) {
+      // Sorcier : restaure tous les emplacements
+      const restauresSorcier = Object.values(perso.sorts_slots_used).reduce(
+        (a, b) => a + (b || 0),
+        0
+      )
+      setPerso({ ...perso, sorts_slots_used: {} })
+      if (restauresSorcier > 0) {
+        resume += ` Pacte Magique : ${restauresSorcier} emplacement${restauresSorcier > 1 ? 's' : ''} restauré${restauresSorcier > 1 ? 's' : ''}.`
+      }
+      setShortRestSlotsRestores(true)
+    }
+    setReposResume(resume)
+    setReposPrompt(null)
+    setShortRestLog([])
+    setTimeout(() => {
+      setReposGlow(false)
+      setShortRestSlotsRestores(false)
+    }, 1500)
+  }
+
+  const annulerReposCourt = () => {
+    setReposPrompt(null)
+    setShortRestLog([])
   }
 
   const appliquerSlotsRecommandes = () => {
@@ -733,6 +907,43 @@ export default function FichePersonnage() {
       new CustomEvent('dice:open', { detail: { dice: `d${d.faces}` } })
     )
     setDiceProposal(null)
+  }
+
+  // ============== Montée de niveau ==============
+
+  const appliquerMonteeNiveau = async (result: MonteeResult) => {
+    if (!perso) return
+    const payload: Record<string, unknown> = {
+      niveau: result.niveau,
+      hp_max: result.hp_max,
+      hp_actuel: result.hp_actuel,
+      classes_multiples: result.classes_multiples
+    }
+    if (result.sous_classe !== undefined) payload.sous_classe = result.sous_classe
+    if (result.sorts_slots_max !== undefined)
+      payload.sorts_slots_max = result.sorts_slots_max
+    for (const k of ['force', 'dexterite', 'constitution', 'intelligence', 'sagesse', 'charisme'] as const) {
+      if (result[k] !== undefined) payload[k] = result[k]
+    }
+
+    const { error } = await supabase
+      .from('personnages')
+      .update(payload)
+      .eq('id', perso.id)
+    if (error) {
+      console.error('[fiche] montée de niveau :', error)
+      toast(`⚠ Erreur sauvegarde : ${error.message}`)
+      return
+    }
+
+    // Patch local sans rechargement complet
+    setPerso((p) => {
+      if (!p) return p
+      const next = { ...p, ...payload } as Personnage
+      return next
+    })
+    setLevelUpOpen(false)
+    toast(`✨ Niveau ${result.niveau} atteint ! +${result.resume.hpGagnes} PV`)
   }
 
   const retirerSort = async (s: Sort) => {
@@ -928,12 +1139,111 @@ export default function FichePersonnage() {
               </Champ>
               <Champ label="Niveau" value={String(perso.niveau)} />
               <Champ label="XP">
-                <input
-                  type="number"
-                  value={perso.xp}
-                  onChange={(e) => update('xp', parseInt(e.target.value) || 0)}
-                  className="w-full bg-transparent border-b border-yellow-700/40 text-yellow-100 outline-none text-sm"
-                />
+                <div className="relative flex items-center gap-1">
+                  <NumberInput
+                    value={perso.xp}
+                    onChange={(n) => update('xp', n)}
+                    min={0}
+                    className="flex-1 bg-transparent border-b border-yellow-700/40 text-yellow-100 outline-none text-sm min-w-0"
+                  />
+                  {isOwner && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setXpAddOpen((v) => !v)
+                        setXpAddValue('')
+                      }}
+                      title="Ajouter de l'XP"
+                      className="px-1.5 py-0.5 rounded text-xs font-bold border transition-all"
+                      style={{
+                        background: 'rgba(201,168,76,0.15)',
+                        borderColor: 'rgba(201,168,76,0.5)',
+                        color: '#C9A84C'
+                      }}
+                    >
+                      ➕ XP
+                    </button>
+                  )}
+                  {xpAddOpen && (
+                    <div
+                      className="absolute top-full left-0 right-0 mt-1 z-30 rounded-lg shadow-2xl p-3 border"
+                      style={{
+                        background: '#1a1410',
+                        borderColor: 'rgba(201,168,76,0.5)',
+                        minWidth: 220
+                      }}
+                    >
+                      <p className="text-[10px] uppercase tracking-widest text-amber-400/80 mb-2">
+                        Ajouter de l'XP
+                      </p>
+                      <div className="flex gap-1 mb-2">
+                        {[10, 50, 100, 500].map((preset) => (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => setXpAddValue(String(preset))}
+                            className="flex-1 px-1.5 py-1 text-xs rounded border border-stone-700 bg-stone-900/60 text-amber-200 hover:border-amber-700"
+                          >
+                            +{preset}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex gap-1">
+                        <input
+                          type="number"
+                          min={1}
+                          value={xpAddValue}
+                          onChange={(e) => setXpAddValue(e.target.value)}
+                          placeholder="Montant"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              const n = parseInt(xpAddValue)
+                              if (n > 0) {
+                                const ancienXp = perso.xp
+                                const seuil = xpRequisProchainNiveau(perso.niveau)
+                                update('xp', ancienXp + n)
+                                setXpAddOpen(false)
+                                setXpAddValue('')
+                                if (seuil !== null && ancienXp < seuil && ancienXp + n >= seuil) {
+                                  toast(`⬆ ${perso.nom} peut monter de niveau !`)
+                                } else {
+                                  toast(`+${n} XP`)
+                                }
+                              }
+                            }
+                            if (e.key === 'Escape') setXpAddOpen(false)
+                          }}
+                          className="flex-1 bg-stone-900 border border-stone-700 rounded px-2 py-1 text-sm text-amber-100 outline-none focus:border-amber-700"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const n = parseInt(xpAddValue)
+                            if (!(n > 0)) return
+                            const ancienXp = perso.xp
+                            const seuil = xpRequisProchainNiveau(perso.niveau)
+                            update('xp', ancienXp + n)
+                            setXpAddOpen(false)
+                            setXpAddValue('')
+                            if (seuil !== null && ancienXp < seuil && ancienXp + n >= seuil) {
+                              toast(`⬆ ${perso.nom} peut monter de niveau !`)
+                            } else {
+                              toast(`+${n} XP`)
+                            }
+                          }}
+                          className="px-2 py-1 rounded text-xs font-bold"
+                          style={{
+                            background: 'linear-gradient(135deg, #C9A84C 0%, #8B5A2B 100%)',
+                            color: '#1a1410'
+                          }}
+                        >
+                          ✓
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </Champ>
               <Champ label="Bonus maîtrise" value={formatMod(bm)} />
               <Champ label="Inspiration">
@@ -947,6 +1257,68 @@ export default function FichePersonnage() {
                   }`}
                 />
               </Champ>
+              {isOwner && (() => {
+                const xpRequis = xpRequisProchainNiveau(perso.niveau)
+                const peutMonter = xpRequis !== null && perso.xp >= xpRequis
+                const niveauMax = xpRequis === null
+                return (
+                  <div className="col-span-2 md:col-span-3 mt-1">
+                    <div
+                      className="rounded-lg p-3 flex items-center justify-between gap-3 flex-wrap border"
+                      style={{
+                        background: peutMonter
+                          ? 'linear-gradient(90deg, rgba(201,168,76,0.22), rgba(180,120,60,0.15))'
+                          : 'rgba(30,25,20,0.5)',
+                        borderColor: peutMonter
+                          ? 'rgba(201,168,76,0.5)'
+                          : 'rgba(120,100,60,0.25)'
+                      }}
+                    >
+                      <div className="flex-1 min-w-[180px]">
+                        <p className="text-[10px] uppercase tracking-[0.2em] text-yellow-500/80">
+                          {niveauMax ? 'Niveau maximum' : `Prochain niveau (${perso.niveau + 1})`}
+                        </p>
+                        {niveauMax ? (
+                          <p className="text-yellow-200 text-sm">Niveau 20 atteint — légende.</p>
+                        ) : (
+                          <>
+                            <p className="text-yellow-100 text-sm font-mono">
+                              {perso.xp.toLocaleString('fr-FR')} / {xpRequis!.toLocaleString('fr-FR')} XP
+                            </p>
+                            <div className="mt-1 h-1.5 rounded-full bg-stone-800 overflow-hidden">
+                              <div
+                                className="h-full transition-all"
+                                style={{
+                                  width: `${Math.min(100, (perso.xp / xpRequis!) * 100)}%`,
+                                  background:
+                                    'linear-gradient(90deg, #C9A84C, #E6C870)'
+                                }}
+                              />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        disabled={!peutMonter}
+                        onClick={() => setLevelUpOpen(true)}
+                        className="px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-wider transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                        style={{
+                          background: peutMonter
+                            ? 'linear-gradient(135deg, #C9A84C 0%, #8B5A2B 100%)'
+                            : 'rgba(60,50,40,0.6)',
+                          color: peutMonter ? '#1a1410' : '#8a7a5c',
+                          boxShadow: peutMonter
+                            ? '0 4px 14px rgba(201,168,76,0.4)'
+                            : 'none'
+                        }}
+                      >
+                        ⬆ Monter de niveau
+                      </button>
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           </div>
         </div>
@@ -1062,10 +1434,11 @@ export default function FichePersonnage() {
             <Panel title="Combat">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                 <Stat box label="CA">
-                  <input
-                    type="number"
+                  <NumberInput
                     value={perso.ca}
-                    onChange={(e) => update('ca', parseInt(e.target.value) || 0)}
+                    onChange={(n) => update('ca', n)}
+                    min={0}
+                    fallback={10}
                     className="w-full bg-transparent text-2xl font-bold text-yellow-100 font-serif text-center outline-none"
                   />
                 </Stat>
@@ -1080,10 +1453,11 @@ export default function FichePersonnage() {
                 </Stat>
                 <Stat box label="Vitesse">
                   <div className="flex items-center justify-center gap-1">
-                    <input
-                      type="number"
+                    <NumberInput
                       value={perso.vitesse}
-                      onChange={(e) => update('vitesse', parseInt(e.target.value) || 0)}
+                      onChange={(n) => update('vitesse', n)}
+                      min={0}
+                      fallback={9}
                       className="w-12 bg-transparent text-2xl font-bold text-yellow-100 font-serif text-center outline-none"
                     />
                     <span className="text-gray-400 text-xs">m</span>
@@ -1190,48 +1564,118 @@ export default function FichePersonnage() {
                     </div>
                   </div>
 
-                  <p className="text-xs uppercase text-yellow-600 tracking-widest mb-2">
-                    Jets contre la mort
-                  </p>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-green-400 text-xs w-16">Succès</span>
-                      {[0, 1, 2].map((i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          onClick={() => toggleDeath('success', i)}
-                          className={`w-5 h-5 rounded-full border-2 ${
-                            perso.death_success > i
-                              ? 'bg-green-500 border-green-300'
-                              : 'border-green-700/60 hover:border-green-500'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-red-400 text-xs w-16">Échecs</span>
-                      {[0, 1, 2].map((i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          onClick={() => toggleDeath('fail', i)}
-                          className={`w-5 h-5 rounded-full border-2 ${
-                            perso.death_fail > i
-                              ? 'bg-red-500 border-red-300'
-                              : 'border-red-700/60 hover:border-red-500'
-                          }`}
-                        />
-                      ))}
-                      <button
-                        type="button"
-                        onClick={resetDeath}
-                        className="ml-auto text-xs text-gray-500 hover:text-white"
-                      >
-                        Réinitialiser
-                      </button>
-                    </div>
-                  </div>
+                  {perso.hp_actuel === 0 && (
+                    <>
+                      <p className="text-xs uppercase text-yellow-600 tracking-widest mb-2">
+                        Jets contre la mort
+                      </p>
+                      {perso.death_success >= 3 ? (
+                        <div
+                          className="rounded-lg p-3 text-center border animate-pulse"
+                          style={{
+                            background:
+                              'linear-gradient(135deg, rgba(34,197,94,0.25), rgba(22,163,74,0.12))',
+                            borderColor: 'rgba(74,222,128,0.6)',
+                            boxShadow: '0 0 24px rgba(74,222,128,0.4)'
+                          }}
+                        >
+                          <p className="text-emerald-300 text-2xl font-serif font-bold">✨ Stabilisé !</p>
+                          <p className="text-emerald-200/80 text-xs mt-1">
+                            Plus de jets contre la mort. Le PJ reste inconscient à 0 PV.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={resetDeath}
+                            className="mt-2 text-xs text-emerald-200 hover:text-white underline"
+                          >
+                            Réinitialiser
+                          </button>
+                        </div>
+                      ) : perso.death_fail >= 3 ? (
+                        <div
+                          className="rounded-lg p-3 text-center border"
+                          style={{
+                            background:
+                              'linear-gradient(135deg, rgba(127,29,29,0.7), rgba(0,0,0,0.85))',
+                            borderColor: 'rgba(220,38,38,0.7)',
+                            boxShadow: '0 0 32px rgba(127,29,29,0.7)'
+                          }}
+                        >
+                          <p className="text-red-300 text-3xl font-serif font-bold tracking-widest">✝ MORT</p>
+                          <p className="text-red-200/70 text-xs mt-1">
+                            3 échecs cumulés. Une résurrection est nécessaire.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={resetDeath}
+                            className="mt-2 text-xs text-red-200 hover:text-white underline"
+                          >
+                            Réinitialiser
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-green-400 text-xs w-16">Succès</span>
+                            {[0, 1, 2].map((i) => (
+                              <button
+                                key={i}
+                                type="button"
+                                onClick={() => toggleDeath('success', i)}
+                                className={`w-5 h-5 rounded-full border-2 transition-all ${
+                                  perso.death_success > i
+                                    ? 'bg-green-500 border-green-300 shadow-[0_0_6px_rgba(74,222,128,0.6)]'
+                                    : 'border-green-700/60 hover:border-green-500'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-red-400 text-xs w-16">Échecs</span>
+                            {[0, 1, 2].map((i) => (
+                              <button
+                                key={i}
+                                type="button"
+                                onClick={() => toggleDeath('fail', i)}
+                                className={`w-5 h-5 rounded-sm border-2 transition-all ${
+                                  perso.death_fail > i
+                                    ? 'bg-red-500 border-red-300 shadow-[0_0_6px_rgba(248,113,113,0.6)]'
+                                    : 'border-red-700/60 hover:border-red-500'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={lancerJetDeMort}
+                              className="flex-1 px-3 py-2 rounded text-sm font-bold transition border"
+                              style={{
+                                background:
+                                  'linear-gradient(135deg, rgba(201,168,76,0.25), rgba(180,120,60,0.15))',
+                                borderColor: 'rgba(201,168,76,0.55)',
+                                color: '#fef08a'
+                              }}
+                            >
+                              🎲 Jet de mort
+                            </button>
+                            <button
+                              type="button"
+                              onClick={resetDeath}
+                              className="text-xs text-gray-500 hover:text-white"
+                            >
+                              Reset
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {perso.hp_actuel > 0 && (
+                    <p className="text-stone-500 text-xs italic">
+                      Jets contre la mort déclenchés à 0 PV.
+                    </p>
+                  )}
                 </div>
               </div>
             </Panel>
@@ -1353,22 +1797,20 @@ export default function FichePersonnage() {
                     >
                       📜 Auto (PHB)
                     </button>
-                    {usesShortRest(perso.classe) && (
-                      <button
-                        type="button"
-                        onClick={reposCourt}
-                        className="px-3 py-1.5 rounded text-xs font-bold bg-amber-700/30 hover:bg-amber-700/50 text-amber-200 border border-amber-700/50"
-                        title="Sorcier : repos court restaure tous les emplacements du Pacte."
-                      >
-                        ☕ Repos court
-                      </button>
-                    )}
                     <button
                       type="button"
-                      onClick={reposLong}
+                      onClick={() => setReposPrompt({ kind: 'short' })}
+                      className="px-3 py-1.5 rounded text-xs font-bold bg-amber-700/30 hover:bg-amber-700/50 text-amber-200 border border-amber-700/50"
+                      title="Repos court : dépense des dés de vie pour récupérer des PV."
+                    >
+                      🌙 Repos court
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReposPrompt({ kind: 'long' })}
                       className="px-3 py-1.5 rounded text-xs font-bold bg-yellow-600 hover:bg-yellow-500 text-gray-900"
                     >
-                      🌙 Repos long
+                      🛏 Repos long
                     </button>
                   </div>
                 )}
@@ -1753,6 +2195,211 @@ export default function FichePersonnage() {
           </div>
         </div>
       )}
+
+      {/* Glow doré pulsant : 1.5s pendant la récupération */}
+      {reposGlow && (
+        <div
+          aria-hidden="true"
+          className="fixed inset-0 pointer-events-none z-[115]"
+          style={{
+            animation: 'repos-glow 1.5s ease-out forwards',
+            background:
+              'radial-gradient(circle at 50% 40%, rgba(254,240,138,0.55) 0%, rgba(201,168,76,0.35) 30%, rgba(0,0,0,0) 70%)'
+          }}
+        />
+      )}
+      <style>{`
+        @keyframes repos-glow {
+          0%   { opacity: 0; }
+          25%  { opacity: 1; }
+          70%  { opacity: 0.8; }
+          100% { opacity: 0; }
+        }
+      `}</style>
+
+      {/* Modale de confirmation / déroulé du repos */}
+      {reposPrompt && (
+        <div className="fixed inset-0 z-[125] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div
+            className="w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border"
+            style={{
+              background:
+                'linear-gradient(180deg, #1a1410 0%, #14110d 100%)',
+              borderColor: 'rgba(201,168,76,0.45)'
+            }}
+          >
+            <div
+              className="px-5 py-3 border-b text-center"
+              style={{
+                background:
+                  'linear-gradient(90deg, rgba(201,168,76,0.2), rgba(180,120,60,0.12), rgba(201,168,76,0.2))',
+                borderColor: 'rgba(201,168,76,0.4)'
+              }}
+            >
+              <h2 className="text-xl font-serif font-bold text-amber-100">
+                {reposPrompt.kind === 'long' ? '🛏 Repos long' : '🌙 Repos court'}
+              </h2>
+            </div>
+
+            <div className="p-5 space-y-4 text-sm">
+              {reposPrompt.kind === 'long' ? (
+                <>
+                  <p className="text-stone-300">
+                    Un repos long restaure :
+                  </p>
+                  <ul className="text-stone-200 text-sm list-disc list-inside space-y-0.5">
+                    <li>Points de vie au maximum</li>
+                    <li>Tous les emplacements de sorts</li>
+                    <li>Tous les dés de vie utilisés</li>
+                    <li>Jets contre la mort (succès / échecs) remis à zéro</li>
+                    <li>Sorts à charge marqués utilisés redeviennent disponibles</li>
+                    <li>PV temporaires remis à 0</li>
+                  </ul>
+                  <p className="text-stone-500 text-xs italic">
+                    Niveau d'épuisement à ajuster manuellement (non géré ici).
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-stone-300">
+                    Dépense des dés de vie ({perso.de_vie ?? '—'}) pour récupérer des PV.
+                  </p>
+                  <p className="text-amber-300/80 text-xs">
+                    Dés restants : <span className="font-bold">{niveau - perso.de_vie_utilises}</span> / {niveau}
+                    {' · '}Mod Con : <span className="font-bold">{formatMod(modStat('constitution'))}</span>
+                  </p>
+                  {shortRestLog.length > 0 && (
+                    <div className="bg-stone-900/50 border border-amber-800/40 rounded p-2 space-y-1">
+                      {shortRestLog.map((e, i) => (
+                        <p key={i} className="text-xs text-amber-100">
+                          🎲 {e.roll}{' '}
+                          <span className="text-stone-400">
+                            {e.conMod >= 0 ? '+' : ''}
+                            {e.conMod} Con
+                          </span>{' '}
+                          ={' '}
+                          <span className="text-emerald-400 font-bold">
+                            +{e.gained} PV
+                          </span>
+                        </p>
+                      ))}
+                      <p className="text-[10px] uppercase tracking-widest text-amber-400/80 pt-1 border-t border-amber-800/30">
+                        Total :{' '}
+                        <span className="text-emerald-300 font-bold">
+                          +{shortRestLog.reduce((s, e) => s + e.gained, 0)} PV
+                        </span>
+                      </p>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    disabled={perso.de_vie_utilises >= niveau}
+                    onClick={depenserDeVie}
+                    className="w-full px-4 py-2 rounded text-sm font-bold transition disabled:opacity-40 disabled:cursor-not-allowed"
+                    style={{
+                      background: 'rgba(201,168,76,0.18)',
+                      borderColor: 'rgba(201,168,76,0.5)',
+                      border: '1px solid rgba(201,168,76,0.5)',
+                      color: '#fef08a'
+                    }}
+                  >
+                    🎲 Dépenser un dé de vie ({perso.de_vie ?? '—'})
+                  </button>
+                  {usesShortRest(perso.classe) && (
+                    <p className="text-amber-200/70 text-xs">
+                      ✨ Sorcier : terminer le repos court restaurera aussi tous tes emplacements (Pacte Magique).
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div
+              className="px-5 py-3 border-t flex items-center justify-between gap-3"
+              style={{ borderColor: 'rgba(201,168,76,0.2)' }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  if (reposPrompt.kind === 'short') annulerReposCourt()
+                  else setReposPrompt(null)
+                }}
+                className="px-4 py-2 text-sm text-stone-400 hover:text-stone-200"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (reposPrompt.kind === 'long') appliquerReposLong()
+                  else terminerReposCourt()
+                }}
+                disabled={
+                  reposPrompt.kind === 'short' &&
+                  shortRestLog.length === 0 &&
+                  !usesShortRest(perso.classe)
+                }
+                className="px-6 py-2 rounded-lg font-bold text-sm uppercase tracking-wider disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{
+                  background:
+                    'linear-gradient(135deg, #C9A84C 0%, #8B5A2B 100%)',
+                  color: '#1a1410',
+                  boxShadow: '0 4px 14px rgba(201,168,76,0.4)'
+                }}
+              >
+                {reposPrompt.kind === 'long' ? 'Confirmer le repos' : 'Terminer le repos'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bandeau résumé du repos (3s) */}
+      {reposResume && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[118] px-5 py-3 rounded-lg shadow-2xl border max-w-md"
+          style={{
+            background:
+              'linear-gradient(135deg, rgba(201,168,76,0.95), rgba(180,120,60,0.95))',
+            borderColor: 'rgba(255,220,140,0.6)',
+            color: '#1a1410',
+            animation: 'fadeInOut 4s ease-out forwards'
+          }}
+          onAnimationEnd={() => setReposResume(null)}
+        >
+          <p className="text-sm font-bold">{reposResume}</p>
+          <style>{`
+            @keyframes fadeInOut {
+              0%   { opacity: 0; transform: translate(-50%, 10px); }
+              15%  { opacity: 1; transform: translate(-50%, 0); }
+              80%  { opacity: 1; transform: translate(-50%, 0); }
+              100% { opacity: 0; transform: translate(-50%, -10px); }
+            }
+          `}</style>
+        </div>
+      )}
+
+      <ModaleMonteeNiveau
+        open={levelUpOpen}
+        perso={{
+          classe: perso.classe,
+          sous_classe: perso.sous_classe,
+          niveau: perso.niveau,
+          hp_max: perso.hp_max,
+          hp_actuel: perso.hp_actuel,
+          de_vie: perso.de_vie,
+          force: perso.force,
+          dexterite: perso.dexterite,
+          constitution: perso.constitution,
+          intelligence: perso.intelligence,
+          sagesse: perso.sagesse,
+          charisme: perso.charisme,
+          sorts_slots_max: perso.sorts_slots_max,
+          classes_multiples: perso.classes_multiples
+        }}
+        onClose={() => setLevelUpOpen(false)}
+        onApply={appliquerMonteeNiveau}
+      />
 
       {diceProposal && (
         <div
