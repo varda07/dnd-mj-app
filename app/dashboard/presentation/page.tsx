@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
@@ -68,7 +68,18 @@ type Ennemi = {
 
 // ----------------------------------------------------------------------------
 
-export default function PresentationPage() {
+// useSearchParams exige un <Suspense> parent pour que la page compile au
+// build Vercel (même en force-dynamic). On garde un wrapper Presentation
+// minimal exporté par défaut et toute la logique reste dans PresentationInner.
+export default function Presentation() {
+  return (
+    <Suspense fallback={null}>
+      <PresentationInner />
+    </Suspense>
+  )
+}
+
+function PresentationInner() {
   const router = useRouter()
   const params = useSearchParams()
   const isDisplayView = params?.get('display') === '1'
