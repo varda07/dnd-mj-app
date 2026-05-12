@@ -2450,17 +2450,6 @@ export const BESTIAIRE_DND5E: Monstre[] = [
     description: "Âme damnée en gestation, masse de chair pleurant éternellement dans les rivières infernales."
   },
   {
-    nom: 'Diable barbu', nomEn: 'Bearded Devil', type: 'Fiélon', taille: 'M', alignement: 'Loyal Mauvais',
-    cd: 3, hp_max: 52, hp_formule: '8d8+16', ca: 13, vitesse: 9,
-    force: 16, dexterite: 15, constitution: 15, intelligence: 9, sagesse: 11, charisme: 11,
-    resistances: ['froid', 'tranchant/perforant/contondant non-magiques'], immunites: ['feu', 'poison'],
-    attaques: [
-      { nom: 'Barbe', bonus_attaque: 5, degats: '1d8+3', type_degats: 'perforant', portee: '1,50 m', description: "Sur touche : Con DD 12 ou empoisonné 1 min." },
-      { nom: 'Glaive', bonus_attaque: 5, degats: '1d10+3', type_degats: 'tranchant', portee: '3 m', description: "Plaie infernale : 1d10 saignement/tour jusqu'à action de soin." }
-    ],
-    description: "Diable barbu de lances, garde-frontière des Neuf Enfers, marqué de plaies suintantes."
-  },
-  {
     nom: 'Diable osseux', nomEn: 'Bone Devil', type: 'Fiélon', taille: 'G', alignement: 'Loyal Mauvais',
     cd: 9, hp_max: 142, hp_formule: '15d10+60', ca: 19, vitesse: 12, vitesses_extra: 'Vol 12 m',
     force: 18, dexterite: 16, constitution: 18, intelligence: 13, sagesse: 14, charisme: 16,

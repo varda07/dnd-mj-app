@@ -4,6 +4,18 @@ import { useState, useEffect, useRef, CSSProperties } from 'react'
 import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabase'
 import type { DiceBoxHandle } from './Dice3DBoxScene'
+import {
+  playSound,
+  getSoundsEnabled,
+  setSoundsEnabled,
+  getVolume,
+  setVolume,
+  getUrl,
+  setUrl,
+  resetUrl,
+  SOUND_DEFAULT_URLS,
+  type SoundKey
+} from '@/app/lib/dice-sounds'
 
 // @3d-dice/dice-box est strictement client-side (Babylon.js + AmmoJS via
 // web worker). On charge le wrapper dynamiquement, ssr désactivé.
@@ -385,6 +397,7 @@ type JetRow = {
 
 export default function DiceLauncher() {
   const [open, setOpen] = useState(false)
+  const [shake, setShake] = useState(false)
   const [selectedDice, setSelectedDice] = useState<DiceType>(DICE[5])
   const [count, setCount] = useState(1)
   const [share, setShare] = useState(false)
@@ -392,7 +405,20 @@ export default function DiceLauncher() {
   const [results, setResults] = useState<number[]>([])
   const [showParticles, setShowParticles] = useState(false)
   const [critEffect, setCritEffect] = useState<'success' | 'fail' | null>(null)
-  const [activeTab, setActiveTab] = useState<'lancer' | 'historique'>('lancer')
+  const [activeTab, setActiveTab] = useState<'lancer' | 'historique' | 'params'>('lancer')
+  // Settings audio — initialisé depuis localStorage côté client uniquement.
+  const [soundsOn, setSoundsOn] = useState(true)
+  const [volume, setVol] = useState(70)
+  const [soundUrls, setSoundUrls] = useState<Record<SoundKey, string>>(SOUND_DEFAULT_URLS)
+  useEffect(() => {
+    setSoundsOn(getSoundsEnabled())
+    setVol(getVolume())
+    setSoundUrls({
+      'dice-roll': getUrl('dice-roll'),
+      'crit-success': getUrl('crit-success'),
+      'crit-fail': getUrl('crit-fail')
+    })
+  }, [])
   // Avantage / désavantage — uniquement applicable au d20.
   const [advantage, setAdvantage] = useState(false)
   const [disadvantage, setDisadvantage] = useState(false)
@@ -455,7 +481,6 @@ export default function DiceLauncher() {
     if (error) {
       console.error('[dice] historique : select error :', error)
     } else {
-      console.log('[dice] historique : récupéré', data?.length ?? 0, 'jet(s)')
     }
     setHistorique((data ?? []) as JetRow[])
     setHistoriqueLoading(false)
@@ -500,6 +525,7 @@ export default function DiceLauncher() {
     : 'normal'
 
   const lancer = async () => {
+    playSound('dice-roll')
     setRolling(true)
     setShowParticles(false)
     setResults([])
@@ -541,7 +567,6 @@ export default function DiceLauncher() {
     } else {
       setKeptIndex(null)
     }
-    console.log('[dice] roll result:', jets)
     setResults(jets)
     setRolling(false)
     setShowParticles(true)
@@ -560,9 +585,11 @@ export default function DiceLauncher() {
             ]
       if (valeursPourCrit.includes(20)) {
         setCritEffect('success')
+        playSound('crit-success')
         setTimeout(() => setCritEffect(null), 2000)
       } else if (valeursPourCrit.includes(1)) {
         setCritEffect('fail')
+        playSound('crit-fail')
         setTimeout(() => setCritEffect(null), 2000)
       }
     }
@@ -576,7 +603,6 @@ export default function DiceLauncher() {
     } catch (err) {
       console.warn('[dice] getUser a planté (lock multi-onglet ?) :', err)
     }
-    console.log('[dice] before save, user:', user?.id ?? '(anonyme)')
     if (!user) {
       console.warn(
         '[dice] aucun user authentifié — jet non sauvegardé ; reconnecte-toi pour activer l’historique.'
@@ -595,13 +621,11 @@ export default function DiceLauncher() {
       partage: share,
       mode: rollMode
     }
-    console.log('[dice] supabase insert payload:', payload)
     const { data: inserted, error } = await supabase
       .from('jets_de_des')
       .insert(payload)
       .select('id, type_de, nombre, resultats, created_at, mode')
       .single()
-    console.log('[dice] supabase response:', { data: inserted, error })
     if (error) {
       // Détail complet pour diagnostiquer une RLS / contrainte / colonne :
       console.error('[dice] save error:', {
@@ -612,7 +636,6 @@ export default function DiceLauncher() {
       })
       return
     }
-    console.log('[dice] save ok, id:', inserted?.id)
     // Mise à jour optimiste — le nouveau jet apparaît instantanément dans
     // l'onglet Historique sans attendre le round-trip d'un re-fetch.
     if (inserted) {
@@ -889,15 +912,46 @@ export default function DiceLauncher() {
 
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="fixed right-4 md:right-6 w-14 h-14 rounded-full bg-yellow-500 text-gray-900 text-2xl font-bold shadow-2xl hover:scale-110 hover:bg-yellow-400 transition-transform z-[70] flex items-center justify-center bottom-[calc(64px+env(safe-area-inset-bottom)+0.75rem)] md:bottom-[max(1.5rem,env(safe-area-inset-bottom))]"
-        style={{
-          right: 'max(1rem, env(safe-area-inset-right))'
+        onClick={() => {
+          // « Secousse » brève au clic avant l'ouverture du panneau.
+          setShake(true)
+          window.setTimeout(() => setShake(false), 550)
+          setOpen((v) => !v)
         }}
-        aria-label="Lanceur de dés"
+        className={`dice-fab ${shake ? 'dice-fab-shaking' : ''} fixed z-[70] flex items-center justify-center rounded-full`}
+        style={{
+          width: 60,
+          height: 60,
+          right: 'max(24px, env(safe-area-inset-right))',
+          // Mobile : laisse de la place à la bottom bar (56px + 24px de marge).
+          bottom: `calc(56px + env(safe-area-inset-bottom) + 24px)`
+        }}
+        aria-label={open ? 'Fermer le lanceur de dés' : 'Ouvrir le lanceur de dés'}
+        aria-pressed={open}
       >
-        {open ? '×' : '🎲'}
+        {open ? (
+          <span
+            style={{
+              fontSize: 24,
+              lineHeight: 1,
+              fontWeight: 600,
+              color: 'var(--theme-accent, #C9A84C)'
+            }}
+          >
+            ×
+          </span>
+        ) : (
+          <DiceFabIcon />
+        )}
       </button>
+      <style>{`
+        /* Desktop ≥ md : pas de bottom bar, ancre simple à 24px du bord. */
+        @media (min-width: 768px) {
+          .dice-fab {
+            bottom: max(24px, env(safe-area-inset-bottom)) !important;
+          }
+        }
+      `}</style>
 
       {open && (
         <div
@@ -942,6 +996,17 @@ export default function DiceLauncher() {
               }`}
             >
               📜 Historique
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('params')}
+              className={`flex-1 py-2 text-sm font-bold transition ${
+                activeTab === 'params'
+                  ? 'text-yellow-500 border-b-2 border-yellow-500'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              ⚙️ Sons
             </button>
           </div>
 
@@ -1044,6 +1109,67 @@ export default function DiceLauncher() {
                     </div>
                   )
                 })}
+            </div>
+          ) : activeTab === 'params' ? (
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="flex items-center gap-2 text-gray-200 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={soundsOn}
+                    onChange={(e) => {
+                      setSoundsOn(e.target.checked)
+                      setSoundsEnabled(e.target.checked)
+                    }}
+                    className="w-4 h-4 accent-yellow-500"
+                  />
+                  <span className="text-sm font-bold">🔊 Sons activés</span>
+                </label>
+                <p className="text-gray-500 text-xs mt-1">
+                  Joue un son au lancer, et un son spécial sur crit (20 ou 1 naturel sur d20).
+                </p>
+              </div>
+
+              <div>
+                <label className="text-gray-400 text-sm flex justify-between">
+                  <span>Volume</span>
+                  <span className="text-gray-300">{volume}%</span>
+                </label>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={volume}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value)
+                    setVol(v)
+                    setVolume(v)
+                  }}
+                  className="w-full accent-yellow-500"
+                />
+              </div>
+
+              <div className="border-t border-gray-700 pt-3 space-y-3">
+                <p className="text-gray-400 text-xs italic">
+                  Dépose tes MP3 dans <code className="px-1 py-0.5 bg-gray-900 rounded text-yellow-400">public/sounds/</code> ou colle une URL custom (Supabase Storage bucket <em>sounds</em>, CDN, etc.).
+                </p>
+                {(['dice-roll', 'crit-success', 'crit-fail'] as SoundKey[]).map((k) => (
+                  <SoundField
+                    key={k}
+                    soundKey={k}
+                    url={soundUrls[k]}
+                    onChange={(v) => {
+                      setUrl(k, v)
+                      setSoundUrls((s) => ({ ...s, [k]: v }))
+                    }}
+                    onReset={() => {
+                      resetUrl(k)
+                      setSoundUrls((s) => ({ ...s, [k]: SOUND_DEFAULT_URLS[k] }))
+                    }}
+                    onTest={() => playSound(k)}
+                  />
+                ))}
+              </div>
             </div>
           ) : (
           <div className="p-4 space-y-3">
@@ -1243,10 +1369,7 @@ export default function DiceLauncher() {
                   // la variante du matériau qui rend les chiffres en clair
                   // (luminance < 175 → suffixe _light → numbers blancs).
                   themeColor="#1a1f3a"
-                  onReady={() => {
-                    console.log('[dice-launcher] box prête')
-                    setBoxStatus('ready')
-                  }}
+                  onReady={() => setBoxStatus('ready')}
                   onError={(err) => {
                     console.error('[dice-launcher] init box échouée :', err)
                     setBoxStatus('failed')
@@ -1271,11 +1394,7 @@ export default function DiceLauncher() {
                 {boxStatus === 'failed' && (
                   <button
                     type="button"
-                    onClick={() => {
-                      // L'utilisateur peut retenter une init manuelle
-                      console.log('[dice] retry init manuel')
-                      setBoxStatus('init')
-                    }}
+                    onClick={() => setBoxStatus('init')}
                     className="pointer-events-auto mb-2 px-3 py-1 text-[10px] uppercase tracking-wider rounded bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700"
                     title="Relancer l'initialisation du moteur 3D"
                   >
@@ -1354,5 +1473,185 @@ export default function DiceLauncher() {
         </div>
       )}
     </>
+  )
+}
+
+// ----------------------------------------------------------------------------
+// SoundField — input URL + boutons Réinitialiser / Tester pour un son donné.
+// ----------------------------------------------------------------------------
+const SOUND_LABELS: Record<SoundKey, string> = {
+  'dice-roll': '🎲 Son du lancer',
+  'crit-success': '✨ Crit succès (nat 20)',
+  'crit-fail': '💀 Crit échec (nat 1)'
+}
+
+function SoundField({
+  soundKey,
+  url,
+  onChange,
+  onReset,
+  onTest
+}: {
+  soundKey: SoundKey
+  url: string
+  onChange: (v: string) => void
+  onReset: () => void
+  onTest: () => void
+}) {
+  return (
+    <div>
+      <label className="text-[11px] uppercase tracking-wider text-gray-400">
+        {SOUND_LABELS[soundKey]}
+      </label>
+      <div className="flex gap-1 mt-1">
+        <input
+          type="text"
+          value={url}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="/sounds/…mp3 ou https://…"
+          className="flex-1 p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none text-xs focus:border-yellow-500"
+        />
+        <button
+          type="button"
+          onClick={onTest}
+          className="px-2 py-1.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs"
+          title="Tester ce son"
+        >
+          ▶
+        </button>
+        <button
+          type="button"
+          onClick={onReset}
+          className="px-2 py-1.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs"
+          title="Réinitialiser à la valeur par défaut"
+        >
+          ↺
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ----------------------------------------------------------------------------
+// DiceFabIcon — silhouette d20 pentagonale + chiffre "20" centré. Toutes les
+// couleurs sont relatives au thème via var(--theme-accent) et
+// var(--theme-bg-primary), pour que le bouton s'accorde automatiquement à
+// eclipsed / runique / parchemin / lave / necromancien / royal.
+// ----------------------------------------------------------------------------
+function DiceFabIcon() {
+  // d20 façon @3d-dice/dice-box : icosaèdre vu de face, base bleu cobalt
+  // éclairci pour ressortir sur le fond sombre du FAB. Relief par facettes
+  // (mêmes points que DICE_ART.d20 plus haut dans ce fichier). Le chiffre
+  // "20" est doré pour évoquer la gravure du dé 3D. Couleurs hardcodées
+  // pour rester cohérent avec le canvas Babylon.
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      width={38}
+      height={38}
+      aria-hidden="true"
+      style={{ display: 'block' }}
+    >
+      <defs>
+        {/* Gradient principal — bleu plus clair en haut, plus sombre en
+            bas, façon métal éclairé par le dessus. */}
+        <linearGradient id="d20-face-front" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#5b6dc4" />
+          <stop offset="100%" stopColor="#2d3a6b" />
+        </linearGradient>
+        {/* Highlight métallique très subtil sur la face haute-gauche. */}
+        <linearGradient id="d20-highlight" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="rgba(255,255,255,0.35)" />
+          <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+        </linearGradient>
+      </defs>
+
+      {/* Silhouette extérieure */}
+      <polygon
+        points="50,5 88,28 88,72 50,95 12,72 12,28"
+        fill="#2d3a6b"
+        stroke="#1a2148"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+
+      {/* Facettes périphériques — du plus clair (faces tournées vers la
+          lumière) au plus sombre (faces fuyantes). Structure DICE_ART.d20. */}
+      <polygon
+        points="50,5 88,28 75,55 50,30"
+        fill="#4a5aa6"
+        stroke="#1a2148"
+        strokeWidth="0.6"
+        strokeLinejoin="round"
+      />
+      <polygon
+        points="12,28 50,5 50,30 25,55"
+        fill="#4554a0"
+        stroke="#1a2148"
+        strokeWidth="0.6"
+        strokeLinejoin="round"
+      />
+      <polygon
+        points="88,28 88,72 75,55"
+        fill="#283265"
+        stroke="#1a2148"
+        strokeWidth="0.6"
+        strokeLinejoin="round"
+      />
+      <polygon
+        points="12,28 12,72 25,55"
+        fill="#34418a"
+        stroke="#1a2148"
+        strokeWidth="0.6"
+        strokeLinejoin="round"
+      />
+      <polygon
+        points="88,72 50,95 75,55"
+        fill="#1f2752"
+        stroke="#1a2148"
+        strokeWidth="0.6"
+        strokeLinejoin="round"
+      />
+      <polygon
+        points="50,95 12,72 25,55"
+        fill="#222a5b"
+        stroke="#1a2148"
+        strokeWidth="0.6"
+        strokeLinejoin="round"
+      />
+
+      {/* Face avant — la plus claire, avec gradient haut→bas */}
+      <polygon
+        points="50,30 75,55 25,55"
+        fill="url(#d20-face-front)"
+        stroke="#1a2148"
+        strokeWidth="0.8"
+        strokeLinejoin="round"
+      />
+
+      {/* Reflet métallique subtil sur la facette haute-gauche */}
+      <polygon
+        points="12,28 50,5 50,30 25,55"
+        fill="url(#d20-highlight)"
+        pointerEvents="none"
+      />
+
+      {/* "20" gravé en or sur la face avant */}
+      <text
+        x="50"
+        y="46"
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fontSize="18"
+        fontWeight="700"
+        fill="#C9A84C"
+        style={{
+          fontFamily: 'Georgia, "Times New Roman", serif',
+          letterSpacing: '-0.04em'
+        }}
+      >
+        20
+      </text>
+    </svg>
   )
 }

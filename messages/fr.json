@@ -127,6 +127,12 @@
     "section_forge": "Forge",
     "section_aventure": "Aventure",
     "section_outils": "Outils",
+    "section_params": "Paramètres",
+    "params_theme": "Thème",
+    "params_language": "Langue",
+    "params_tutorial": "Refaire le tutoriel",
+    "params_join": "Rejoindre un scénario",
+    "params_logout": "Déconnexion",
     "forge_scenarios": "Scénarios",
     "forge_personnages": "Personnages",
     "forge_ennemis": "Ennemis",
@@ -137,7 +143,8 @@
     "adv_combat": "Combat",
     "adv_exploration": "Exploration",
     "tools_library": "Bibliothèque",
-    "tools_community": "Communauté"
+    "tools_community": "Communauté",
+    "tools_soundbox": "Sound Box"
   },
   "palette": {
     "placeholder": "Rechercher ou exécuter une action…",

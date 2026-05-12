@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import ImageCropper from '@/app/components/ImageCropper'
+import StarFavori from '@/app/components/StarFavori'
+import { useFavoris } from '@/app/lib/favoris'
 import {
   construireEnveloppe,
   lireFichierJSON,
@@ -61,6 +63,8 @@ export default function Items() {
   const [imageActuelle, setImageActuelle] = useState('')
   const [cropperKey, setCropperKey] = useState(0)
   const [importerOuvert, setImporterOuvert] = useState(false)
+  const [favorisOnly, setFavorisOnly] = useState(false)
+  const { est: estFavori } = useFavoris()
   const t = useTranslations('items')
   const tc = useTranslations('common')
 
@@ -295,7 +299,18 @@ export default function Items() {
             </div>
           </div>
           {items.length === 0 && <p className="text-gray-400">{t('empty')}</p>}
-          {items.map((item) => (
+          <label className="inline-flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={favorisOnly}
+              onChange={(e) => setFavorisOnly(e.target.checked)}
+              className="accent-yellow-500"
+            />
+            ⭐ Afficher uniquement les favoris
+          </label>
+          {items
+            .filter((it) => !favorisOnly || estFavori('items', it.id))
+            .map((item) => (
             <div key={item.id} className="bg-gray-800 p-4 rounded-lg">
               <div className="flex gap-4">
                 {item.image_url && (
@@ -308,7 +323,10 @@ export default function Items() {
                 )}
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-                    <h3 className="text-lg font-bold text-white">{item.nom}</h3>
+                    <div className="flex items-center gap-2">
+                      <StarFavori type="items" id={item.id} />
+                      <h3 className="text-lg font-bold text-white">{item.nom}</h3>
+                    </div>
                     <div className="flex gap-3 flex-wrap">
                       <button
                         type="button"
@@ -510,11 +528,11 @@ function ItemsMagiquesImporter({
             </p>
           ) : (
             <ul className="space-y-1">
-              {filtres.map((it) => {
+              {filtres.map((it, idx) => {
                 const selected = selection.has(it.nom)
                 const dejaPossede = existingNames.has(it.nom)
                 return (
-                  <li key={it.nom}>
+                  <li key={`${it.nom}-${idx}`}>
                     <label
                       className={`flex items-start gap-3 p-2 rounded cursor-pointer border transition ${
                         selected

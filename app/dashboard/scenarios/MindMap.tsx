@@ -3,6 +3,7 @@
 import {
   useState,
   useEffect,
+  useMemo,
   useRef,
   useCallback,
   memo,
@@ -130,6 +131,20 @@ const isColorKey = (v: string | null | undefined): v is ColorKey =>
 const MIN_SCALE = 0.1
 const MAX_SCALE = 5
 
+// Couleurs des liens automatiques pour l'overlay « relations PNJ ».
+// Aligné sur le mapping de la fiche PNJ (/dashboard/pnj/[id]).
+const PNJ_RELATION_COLORS: Record<string, string> = {
+  ami: '#22c55e',
+  allie: '#3b82f6',
+  amoureux: '#ec4899',
+  famille: '#a855f7',
+  mentor: '#06b6d4',
+  rival: '#f97316',
+  ennemi: '#ef4444',
+  contact: '#eab308',
+  neutre: '#6b7280'
+}
+
 export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
   const router = useRouter()
   const [scenarioId, setScenarioId] = useState<string>(scenarios[0]?.id ?? '')
@@ -145,6 +160,20 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
   const [notesOpen, setNotesOpen] = useState(false)
   const [notes, setNotes] = useState<NoteEntry[]>([])
   const [notesLoading, setNotesLoading] = useState(false)
+  // Overlay « relations PNJ » : lignes auto-calculées entre noeuds de type pnj
+  // qui correspondent (par nom, casse ignorée) à deux PNJ liés par une relation
+  // dans la table pnj_relations.
+  const [showPnjRelations, setShowPnjRelations] = useState(false)
+  const [pnjRelationsRaw, setPnjRelationsRaw] = useState<
+    Array<{
+      id: string
+      pnj_id: string
+      entite_type: 'personnage' | 'pnj' | 'ennemi'
+      entite_id: string
+      type_relation: string
+    }>
+  >([])
+  const [pnjByName, setPnjByName] = useState<Map<string, string>>(new Map())
   const [contextMenu, setContextMenu] = useState<
     | { kind: 'node'; x: number; y: number; nodeId: string }
     | { kind: 'link'; x: number; y: number; linkId: string }
@@ -340,6 +369,46 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
     if (notesOpen) fetchNotes()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notesOpen, scenarioId])
+
+  // Charge les relations PNJ + le mapping nom→id du MJ courant pour pouvoir
+  // tracer les liens automatiques entre noeuds 'pnj' qui matchent un PNJ.
+  useEffect(() => {
+    if (!showPnjRelations) return
+    let cancel = false
+    const charger = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const [relRes, pnjRes] = await Promise.all([
+        supabase
+          .from('pnj_relations')
+          .select('id, pnj_id, entite_type, entite_id, type_relation')
+          .eq('mj_id', user.id),
+        supabase
+          .from('pnj')
+          .select('id, nom')
+          .eq('mj_id', user.id)
+      ])
+      if (cancel) return
+      setPnjRelationsRaw(
+        (relRes.data ?? []) as Array<{
+          id: string
+          pnj_id: string
+          entite_type: 'personnage' | 'pnj' | 'ennemi'
+          entite_id: string
+          type_relation: string
+        }>
+      )
+      const map = new Map<string, string>()
+      ;((pnjRes.data ?? []) as Array<{ id: string; nom: string }>).forEach((p) => {
+        map.set(p.nom.trim().toLowerCase(), p.id)
+      })
+      setPnjByName(map)
+    }
+    charger()
+    return () => {
+      cancel = true
+    }
+  }, [showPnjRelations, scenarioId])
 
   useEffect(() => {
     const el = canvasRef.current
@@ -864,6 +933,42 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
   }
   const resetView = () => setView({ x: 0, y: 0, scale: 1 })
 
+  // Overlay relations PNJ : pour chaque relation (pnj→pnj), si les deux PNJ
+  // ont un noeud mindmap de type 'pnj' dont le titre matche le nom, on génère
+  // une ligne overlay. La couleur dépend du type de relation.
+  const pnjRelationOverlays = useMemo(() => {
+    if (!showPnjRelations || pnjRelationsRaw.length === 0) return []
+    // Index nodes par pnj_id (résolu via nom).
+    const nodeByPnjId = new Map<string, MindNode>()
+    nodes.forEach((n) => {
+      if (n.type !== 'pnj') return
+      const key = (n.titre ?? '').trim().toLowerCase()
+      const pid = pnjByName.get(key)
+      if (pid) nodeByPnjId.set(pid, n)
+    })
+    const out: Array<{
+      id: string
+      from: MindNode
+      to: MindNode
+      type: string
+      color: string
+    }> = []
+    pnjRelationsRaw.forEach((r) => {
+      if (r.entite_type !== 'pnj') return
+      const a = nodeByPnjId.get(r.pnj_id)
+      const b = nodeByPnjId.get(r.entite_id)
+      if (!a || !b || a.id === b.id) return
+      out.push({
+        id: r.id,
+        from: a,
+        to: b,
+        type: r.type_relation,
+        color: PNJ_RELATION_COLORS[r.type_relation] ?? '#9ca3af'
+      })
+    })
+    return out
+  }, [showPnjRelations, pnjRelationsRaw, pnjByName, nodes])
+
   return (
     <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
       <div className="p-3 border-b border-gray-700 flex flex-wrap items-center gap-2">
@@ -944,6 +1049,19 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
           title="Afficher les notes de session"
         >
           📝 Notes de session
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowPnjRelations((v) => !v)}
+          disabled={!scenarioId}
+          className={`px-3 py-2 rounded-full text-sm font-bold disabled:opacity-40 transition ${
+            showPnjRelations
+              ? 'bg-yellow-500 text-gray-900'
+              : 'bg-gray-700 text-yellow-400 hover:bg-gray-600'
+          }`}
+          title="Afficher les relations entre PNJ (matching par nom)"
+        >
+          🤝 Relations PNJ
         </button>
         <p className="text-gray-400 text-xs ml-auto">
           <span className="text-yellow-500">Shift + clic</span> sur 2 nœuds pour les relier ·
@@ -1066,6 +1184,40 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
                   onPointerDown={onLinkPointerDown}
                   onContextMenu={onLinkContextMenu}
                 />
+              )
+            })}
+            {pnjRelationOverlays.map((o) => {
+              const mx = (o.from.position_x + o.to.position_x) / 2
+              const my = (o.from.position_y + o.to.position_y) / 2
+              return (
+                <g key={`pnj-rel-${o.id}`} style={{ pointerEvents: 'none' }}>
+                  <line
+                    x1={o.from.position_x}
+                    y1={o.from.position_y}
+                    x2={o.to.position_x}
+                    y2={o.to.position_y}
+                    stroke={o.color}
+                    strokeWidth={2}
+                    strokeDasharray="6 4"
+                    strokeOpacity={0.85}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <text
+                    x={mx}
+                    y={my - 6}
+                    textAnchor="middle"
+                    fontSize={11}
+                    fill={o.color}
+                    style={{
+                      paintOrder: 'stroke',
+                      stroke: '#0a0b0d',
+                      strokeWidth: 3,
+                      fontWeight: 600
+                    }}
+                  >
+                    {o.type}
+                  </text>
+                </g>
               )
             })}
           </svg>

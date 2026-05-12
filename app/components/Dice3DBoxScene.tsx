@@ -84,9 +84,6 @@ const Dice3DBoxScene = forwardRef<DiceBoxHandle, Dice3DBoxSceneProps>(
             return
           }
           const rect = container.getBoundingClientRect()
-          console.log(
-            `[dice] container ${container.id} taille = ${rect.width}×${rect.height}`
-          )
           if (rect.width < 10 || rect.height < 10) {
             console.warn(
               '[dice] container quasi vide — le canvas risque de ne rien afficher tant que le parent est visible'
@@ -94,7 +91,6 @@ const Dice3DBoxScene = forwardRef<DiceBoxHandle, Dice3DBoxSceneProps>(
           }
           // Import dynamique : la lib touche à window/document au chargement
           // du module, on évite donc tout SSR / bundle initial.
-          console.log('[dice] import du module @3d-dice/dice-box')
           const mod = await import('@3d-dice/dice-box')
           if (cancelled) return
           type DiceBoxCtor = new (
@@ -124,11 +120,9 @@ const Dice3DBoxScene = forwardRef<DiceBoxHandle, Dice3DBoxSceneProps>(
             throwForce: 5
           }
           const selector = `#${containerId}`
-          console.log('[dice] init avec selector', selector, 'config', config)
           const instance = new DiceBox(selector, config)
           await instance.init()
           if (cancelled) {
-            console.log('[dice] init annulée (unmount avant fin)')
             try {
               instance.clear()
             } catch {
@@ -136,15 +130,11 @@ const Dice3DBoxScene = forwardRef<DiceBoxHandle, Dice3DBoxSceneProps>(
             }
             return
           }
-          // Un canvas avec class .dice-box-canvas a normalement été
-          // ajouté au container par la lib. On vérifie sa présence et
-          // ses dimensions pour aider le debug.
+          // Vérifie que le canvas a bien été monté par la lib — log uniquement
+          // l'anomalie pour pouvoir diagnostiquer si l'init paraît OK mais que
+          // l'écran reste vide.
           const canvas = container.querySelector('canvas')
-          if (canvas) {
-            console.log(
-              `[dice] init success, canvas ${canvas.width}×${canvas.height} (style ${canvas.style.width || 'default'}×${canvas.style.height || 'default'})`
-            )
-          } else {
+          if (!canvas) {
             console.warn('[dice] init success mais aucun canvas trouvé dans le container')
           }
           boxRef.current = instance
@@ -183,13 +173,11 @@ const Dice3DBoxScene = forwardRef<DiceBoxHandle, Dice3DBoxSceneProps>(
           } catch {
             /* ignore */
           }
-          console.log('[dice] roll demande', notation)
           const out = await box.roll(notation)
           const arr = Array.isArray(out) ? out : [out]
           const values = arr
             .filter((r): r is DiceBoxResult => !!r && typeof r.value === 'number')
             .map((r) => r.value)
-          console.log('[dice] roll resultat', values)
           return values
         },
         clear: () => {

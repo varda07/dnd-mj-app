@@ -20,6 +20,8 @@ import {
   type ClasseSort,
   type ActionType
 } from '@/app/data/sorts_dnd5e'
+import StarFavori from '@/app/components/StarFavori'
+import { useFavoris } from '@/app/lib/favoris'
 
 type Sort = {
   id: string
@@ -372,6 +374,8 @@ export default function Sorts() {
   const [message, setMessage] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [importerOuvert, setImporterOuvert] = useState(false)
+  const [favorisOnly, setFavorisOnly] = useState(false)
+  const { est: estFavori } = useFavoris()
   const ts = useTranslations('spells')
   const tc = useTranslations('common')
 
@@ -558,7 +562,9 @@ export default function Sorts() {
     else fetchSorts()
   }
 
-  const sortsAffiches = sorts
+  const sortsAffiches = favorisOnly
+    ? sorts.filter((s) => estFavori('sorts', s.id))
+    : sorts
 
   const inputCls =
     'w-full p-2.5 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm focus:border-yellow-600'
@@ -797,13 +803,25 @@ export default function Sorts() {
             </div>
           </div>
 
+          <label className="inline-flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none mb-2">
+            <input
+              type="checkbox"
+              checked={favorisOnly}
+              onChange={(e) => setFavorisOnly(e.target.checked)}
+              className="accent-yellow-500"
+            />
+            ⭐ Afficher uniquement les favoris
+          </label>
           {sortsAffiches.length === 0 && (
             <p className="text-gray-400 text-sm italic">{ts('empty')}</p>
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {sortsAffiches.map((sort) => (
-              <div key={sort.id} className="flex flex-col gap-2">
+              <div key={sort.id} className="flex flex-col gap-2 relative">
+                <div className="absolute top-1 left-1 z-10 bg-gray-900/80 rounded-full p-0.5">
+                  <StarFavori type="sorts" id={sort.id} />
+                </div>
                 <SpellCard
                   nom={sort.nom}
                   niveau={sort.niveau}
@@ -1047,11 +1065,11 @@ function SpellLibraryImporter({
             </p>
           ) : (
             <ul className="space-y-1">
-              {sortsFiltres.map((s) => {
+              {sortsFiltres.map((s, idx) => {
                 const selected = selection.has(s.nom)
                 const dejaPossede = existingNames.has(s.nom)
                 return (
-                  <li key={s.nom}>
+                  <li key={`${s.nom}-${idx}`}>
                     <label
                       className={`flex items-start gap-3 p-2 rounded cursor-pointer border transition ${
                         selected

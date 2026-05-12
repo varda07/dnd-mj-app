@@ -625,8 +625,8 @@ function EtapeClasse({
             <option value="">— Choisir une classe —</option>
             {CLASSES.filter(
               (c) => !classesActuelles.find((cc) => cc.classe === c.nom)
-            ).map((c) => (
-              <option key={c.nom} value={c.nom}>
+            ).map((c, idx) => (
+              <option key={`${c.nom}-${idx}`} value={c.nom}>
                 {c.nom} ({c.deVie})
               </option>
             ))}

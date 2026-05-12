@@ -702,7 +702,7 @@ export const PNJ_TEMPLATES: PnjTemplate[] = [
     hooks: ["Cherche à authentifier une gemme étrange ramenée d'un donjon.", "Soupçonne une cliente noble de blanchir des bijoux volés."]
   },
   {
-    nom: 'Apothicaire', nomEn: 'Herbalist', categorie: 'Commerce',
+    nom: 'Herboriste', nomEn: 'Herbalist', categorie: 'Commerce',
     description: "Vend onguents, baumes et tisanes. Échoppe odorante remplie de bocaux numérotés.",
     personnalite: "Curieux, érudit, soupçonneux des autorités. Préfère le secret du grimoire à la chaire universitaire.",
     hp_max: 13, ca: 11, force: 9, dexterite: 12, constitution: 11, intelligence: 16, sagesse: 14, charisme: 11,

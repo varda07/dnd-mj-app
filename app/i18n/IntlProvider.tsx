@@ -102,10 +102,13 @@ export default function IntlProvider({ children }: { children: ReactNode }) {
       .maybeSingle()
     const username = (existing?.username as string | undefined) ?? user.email ?? user.id
     const role = (existing?.role as string | undefined) ?? 'joueur'
-    const theme = (existing?.theme as string | undefined) ?? 'classique'
-    await supabase
+    // Default 'eclipsed' (vraie clé de THEMES) — 'classique' était une chaîne
+    // non valide qui se faisait corriger en silence par le fallback runtime.
+    const theme = (existing?.theme as string | undefined) ?? 'eclipsed'
+    const { error } = await supabase
       .from('profiles')
       .upsert({ id: user.id, username, role, theme, langue: l })
+    if (error) console.error('[locale] save échec :', error)
   }
 
   return (

@@ -171,27 +171,9 @@ export default function SoundBox() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="hidden md:flex fixed md:bottom-6 md:left-6 w-14 h-14 rounded-full bg-yellow-500 text-gray-900 text-2xl font-bold shadow-2xl hover:scale-110 hover:bg-yellow-400 transition-transform z-[70] items-center justify-center"
-        style={{
-          bottom: 'max(1rem, env(safe-area-inset-bottom))',
-          left: 'max(1rem, env(safe-area-inset-left))'
-        }}
-        aria-label="Ambiances sonores"
-      >
-        {open ? (
-          '×'
-        ) : playingId ? (
-          <span className="relative flex items-center justify-center">
-            🎵
-            <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-green-400 border-2 border-gray-900 animate-pulse" />
-          </span>
-        ) : (
-          '🎵'
-        )}
-      </button>
+      {/* Le bouton flottant a été retiré : l'ouverture passe désormais par la
+          sidebar (Outils → Sound Box) sur desktop et par la bottom bar mobile,
+          qui dispatchent toutes deux l'évènement `soundbox:open`. */}
 
       {open && (
         <div

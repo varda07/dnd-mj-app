@@ -131,10 +131,7 @@ export const THEME_KEYS: ThemeKey[] = [
 export const PREMIUM_THEMES: ThemeKey[] = ['royal']
 
 export const applyTheme = (key: ThemeKey | null | undefined) => {
-  if (typeof document === 'undefined') {
-    console.log('[theme] applyTheme appelé côté serveur, ignoré')
-    return
-  }
+  if (typeof document === 'undefined') return
   const effective: ThemeKey = key && key in THEMES ? key : DEFAULT_THEME
   const t = THEMES[effective]
   const root = document.documentElement
@@ -151,12 +148,4 @@ export const applyTheme = (key: ThemeKey | null | undefined) => {
     root.style.setProperty(k, v)
   }
   root.setAttribute('data-theme', effective)
-  console.log(
-    `[theme] applyTheme('${effective}') → <html data-theme="${effective}">`,
-    {
-      cible: root.tagName,
-      dataTheme: root.getAttribute('data-theme'),
-      variables: vars
-    }
-  )
 }

@@ -23,6 +23,8 @@ import {
   type CategoriePnj,
   type PnjTemplate
 } from '@/app/data/pnj_templates'
+import StarFavori from '@/app/components/StarFavori'
+import { useFavoris } from '@/app/lib/favoris'
 
 type Pnj = {
   id: string
@@ -73,6 +75,8 @@ export default function PnjPage() {
   const [imageActuelle, setImageActuelle] = useState('')
   const [cropperKey, setCropperKey] = useState(0)
   const [importerOuvert, setImporterOuvert] = useState(false)
+  const [favorisOnly, setFavorisOnly] = useState(false)
+  const { est: estFavori } = useFavoris()
   const t = useTranslations('pnj')
   const tc = useTranslations('common')
 
@@ -436,7 +440,18 @@ export default function PnjPage() {
             </div>
           </div>
           {pnjs.length === 0 && <p className="text-gray-400">{t('empty')}</p>}
-          {pnjs.map((p) => (
+          <label className="inline-flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={favorisOnly}
+              onChange={(e) => setFavorisOnly(e.target.checked)}
+              className="accent-yellow-500"
+            />
+            ⭐ Afficher uniquement les favoris
+          </label>
+          {pnjs
+            .filter((p) => !favorisOnly || estFavori('pnj', p.id))
+            .map((p) => (
             <div key={p.id} className="bg-gray-800 p-4 rounded-lg">
               <div className="flex gap-4">
                 {p.image_url ? (
@@ -454,7 +469,10 @@ export default function PnjPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                     <div className="min-w-0">
-                      <h3 className="text-lg font-bold text-white truncate">{p.nom}</h3>
+                      <div className="flex items-center gap-2">
+                        <StarFavori type="pnj" id={p.id} />
+                        <h3 className="text-lg font-bold text-white truncate">{p.nom}</h3>
+                      </div>
                       <p className="text-xs text-gray-400 truncate">
                         {[p.race, p.role].filter(Boolean).join(' · ') || '—'}
                       </p>
@@ -466,6 +484,14 @@ export default function PnjPage() {
                         className={`text-sm ${p.public ? 'text-green-400' : 'text-gray-400'}`}
                       >
                         {p.public ? `🌍 ${tc('public')} (${p.nb_copies})` : `🔒 ${tc('private')}`}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/dashboard/pnj/${p.id}`)}
+                        className="text-yellow-400 text-sm"
+                        title="Ouvrir la fiche (relations, détails)"
+                      >
+                        🤝 Fiche
                       </button>
                       <button type="button" onClick={() => commencerEdition(p)} className="text-blue-400 text-sm">
                         {tc('modify')}
@@ -659,11 +685,11 @@ function PnjTemplateImporter({
             </p>
           ) : (
             <ul className="space-y-1">
-              {filtres.map((tp) => {
+              {filtres.map((tp, idx) => {
                 const selected = selection.has(tp.nom)
                 const dejaPossede = existingNames.has(tp.nom)
                 return (
-                  <li key={tp.nom}>
+                  <li key={`${tp.nom}-${idx}`}>
                     <label
                       className={`flex items-start gap-3 p-2 rounded cursor-pointer border transition ${
                         selected

@@ -691,22 +691,80 @@ html[data-theme="eclipsed"] .bg-gray-900 {
   background-color: #0a0b0d !important;
 }
 
-/* Cartes : pas de pulse, pas d'ornements, pas de shadow lourde.
-   Bordure or 15% très discrète, radius 10px. */
+/* Cartes : surface élevée subtile, façon Linear / Notion.
+   - Repos    : bordure quasi-invisible (4% blanc), gradient vertical discret,
+                ombre douce sous la carte pour signaler l'élévation.
+   - Survol   : appliqué uniquement aux <button>.bg-gray-800 (les wrappers
+                statiques ne réagissent pas au pointeur).
+   - Actif    : effet enfoncé, bordure accent plus prononcée. */
 html[data-theme="eclipsed"] .bg-gray-800:not(.theme-no-deco),
 html[data-theme="eclipsed"] .bg-gray-800 {
   position: static;
   animation: none !important;
-  border: 1px solid rgba(201, 168, 76, 0.15) !important;
-  background-image: none !important;
-  box-shadow: none !important;
+  border: 1px solid rgba(255, 255, 255, 0.04) !important;
+  background-color: transparent !important;
+  background-image: linear-gradient(180deg, #0e1014 0%, #0a0c10 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.02),
+    0 1px 2px rgba(0, 0, 0, 0.30),
+    0 4px 12px rgba(0, 0, 0, 0.18) !important;
   border-radius: 10px;
+  transition: border-color 0.2s var(--codex-ease),
+              box-shadow 0.2s var(--codex-ease),
+              background 0.2s var(--codex-ease),
+              transform 0.2s var(--codex-ease);
 }
 
 html[data-theme="eclipsed"] .bg-gray-800::before,
 html[data-theme="eclipsed"] .bg-gray-800::after {
   content: none !important;
   display: none !important;
+}
+
+/* Hover et active : surfaces réellement interactives → effet complet avec
+   lift et glow accent prononcé. Le cursor passe en pointer. */
+html[data-theme="eclipsed"] button.bg-gray-800:not(:disabled):not(.theme-no-deco):hover,
+html[data-theme="eclipsed"] .bg-gray-800.codex-interactive:not(.theme-no-deco):hover {
+  border-color: color-mix(in srgb, var(--theme-accent) 35%, transparent) !important;
+  background-image: linear-gradient(180deg, #131620 0%, #0d1015 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 6px 20px rgba(0, 0, 0, 0.28),
+    0 0 20px color-mix(in srgb, var(--theme-accent) 15%, transparent) !important;
+  transform: translateY(-1px);
+  cursor: pointer;
+}
+
+/* Wrappers non-cliquables (les cartes des pages liste : scenarios, persos,
+   ennemis…) reçoivent un hover plus discret : juste la bordure accent qui
+   apparaît + un petit halo or, sans transform. Donne le "tilt vers l'or" sans
+   suggérer que le bloc entier est cliquable. */
+html[data-theme="eclipsed"] .bg-gray-800:not(button):not(.theme-no-deco):not(.codex-interactive):hover {
+  border-color: color-mix(in srgb, var(--theme-accent) 22%, transparent) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 1px 2px rgba(0, 0, 0, 0.30),
+    0 4px 14px rgba(0, 0, 0, 0.22),
+    0 0 14px color-mix(in srgb, var(--theme-accent) 10%, transparent) !important;
+}
+
+html[data-theme="eclipsed"] button.bg-gray-800:not(:disabled):not(.theme-no-deco):active,
+html[data-theme="eclipsed"] .bg-gray-800.codex-interactive:not(.theme-no-deco):active {
+  border-color: color-mix(in srgb, var(--theme-accent) 60%, transparent) !important;
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.3) !important;
+  transform: translateY(0);
+  transition-duration: 80ms;
+}
+
+/* Sections principales (Forge / Aventure cards) : si on leur applique la classe
+   `codex-surface`, on ajoute un gradient diagonal supplémentaire pour donner du
+   relief sur les blocs importants. */
+html[data-theme="eclipsed"] .codex-surface {
+  background-image:
+    linear-gradient(135deg, color-mix(in srgb, var(--theme-accent) 4%, transparent) 0%, transparent 60%),
+    linear-gradient(180deg, #0e1014 0%, #0a0c10 100%) !important;
 }
 
 /* Accent or : pas de text-shadow, lisible et net */
@@ -737,16 +795,26 @@ html[data-theme="eclipsed"] .border-gray-600 {
 html[data-theme="eclipsed"] input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
 html[data-theme="eclipsed"] textarea,
 html[data-theme="eclipsed"] select {
-  background-color: #0a0b0d !important;
-  border: 1px solid rgba(201, 168, 76, 0.15) !important;
+  background-color: #0a0c10 !important;
+  border: 1px solid rgba(255, 255, 255, 0.04) !important;
   color: #e8e8ec !important;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s var(--codex-ease),
+              box-shadow 0.15s var(--codex-ease),
+              background-color 0.15s var(--codex-ease);
+}
+html[data-theme="eclipsed"] input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):hover:not(:focus),
+html[data-theme="eclipsed"] textarea:hover:not(:focus),
+html[data-theme="eclipsed"] select:hover:not(:focus) {
+  border-color: rgba(255, 255, 255, 0.08) !important;
 }
 html[data-theme="eclipsed"] input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):focus,
 html[data-theme="eclipsed"] textarea:focus,
 html[data-theme="eclipsed"] select:focus {
-  border-color: rgba(201, 168, 76, 0.55) !important;
-  box-shadow: 0 0 0 1px rgba(201, 168, 76, 0.15) !important;
+  border-color: color-mix(in srgb, var(--theme-accent) 55%, transparent) !important;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--theme-accent) 15%, transparent),
+    0 0 12px color-mix(in srgb, var(--theme-accent) 14%, transparent) !important;
+  background-color: #0c0e12 !important;
   outline: none !important;
 }
 
@@ -777,6 +845,1195 @@ html[data-theme="eclipsed"] ::-webkit-scrollbar-thumb {
 }
 html[data-theme="eclipsed"] ::-webkit-scrollbar-thumb:hover {
   background: rgba(201, 168, 76, 0.35);
+}
+
+/* ============================================================================
+   POLISH GLOBAL — utilitaires pour passer de "fonctionnel" à "premium"
+   ============================================================================
+   Toutes les classes ci-dessous sont opt-in. Elles laissent les thèmes
+   existants intacts : pas d'override des classes Tailwind, juste de nouvelles
+   classes `.codex-*` à ajouter sur les éléments qui en ont besoin.
+*/
+
+/* ---- Variables globales ---- */
+:root {
+  --codex-gold: #C9A84C;
+  --codex-gold-soft: rgba(201, 168, 76, 0.15);
+  --codex-gold-strong: rgba(201, 168, 76, 0.4);
+  --codex-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --codex-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --codex-shadow-gold: 0 6px 22px rgba(201, 168, 76, 0.18);
+  --codex-ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+
+/* ---- Spinner doré — remplace "Chargement..." ---- */
+@keyframes codex-spin {
+  to { transform: rotate(360deg); }
+}
+
+.codex-spinner {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid rgba(201, 168, 76, 0.18);
+  border-top-color: var(--codex-gold);
+  animation: codex-spin 0.85s linear infinite;
+}
+.codex-spinner.codex-spinner-sm { width: 14px; height: 14px; border-width: 1.5px; }
+.codex-spinner.codex-spinner-lg { width: 36px; height: 36px; border-width: 3px; }
+
+.codex-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(232, 232, 236, 0.7);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+
+
+/* ---- Cartes premium — surface élevée subtile (Linear / Notion-like) ----
+        - Repos      : bordure quasi-invisible, gradient très doux, ombre douce
+        - Survol     : bordure accent 35%, lift -1px + scale 1.01, halo or
+        - Cliquée    : bordure accent 60%, inset shadow "enfoncé"
+*/
+.codex-card {
+  position: relative;
+  background:
+    linear-gradient(180deg, #0e1014 0%, #0a0c10 100%);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.02),
+    0 1px 2px rgba(0, 0, 0, 0.30),
+    0 4px 14px rgba(0, 0, 0, 0.18);
+  transition: border-color 0.2s var(--codex-ease),
+              transform 0.2s var(--codex-ease),
+              box-shadow 0.2s var(--codex-ease),
+              background 0.2s var(--codex-ease);
+}
+
+.codex-card.codex-interactive {
+  cursor: pointer;
+}
+.codex-card.codex-interactive:hover {
+  border-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 35%, transparent);
+  background: linear-gradient(180deg, #131620 0%, #0d1015 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 6px 22px rgba(0, 0, 0, 0.28),
+    0 0 22px color-mix(in srgb, var(--theme-accent, #C9A84C) 15%, transparent);
+  transform: translateY(-1px) scale(1.01);
+}
+.codex-card.codex-interactive:active {
+  border-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 60%, transparent);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+  transform: translateY(0) scale(0.995);
+  transition-duration: 80ms;
+}
+
+
+/* ---- Tuile dashboard : même grammaire que codex-card, plus compacte ---- */
+.codex-tile {
+  position: relative;
+  background: linear-gradient(180deg, #0e1014 0%, #0a0c10 100%);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.02),
+    0 1px 2px rgba(0, 0, 0, 0.30),
+    0 4px 12px rgba(0, 0, 0, 0.18);
+  transition: border-color 0.2s var(--codex-ease),
+              transform 0.2s var(--codex-ease),
+              box-shadow 0.2s var(--codex-ease),
+              background 0.2s var(--codex-ease);
+}
+.codex-tile:hover {
+  border-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 35%, transparent);
+  background: linear-gradient(180deg, #131620 0%, #0d1015 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 6px 20px rgba(0, 0, 0, 0.28),
+    0 0 20px color-mix(in srgb, var(--theme-accent, #C9A84C) 15%, transparent);
+  transform: translateY(-1px) scale(1.01);
+}
+.codex-tile:active {
+  border-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 60%, transparent);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+  transform: translateY(0) scale(0.995);
+  transition-duration: 80ms;
+}
+
+
+/* ---- Section title — label discret encadré de filets dégradés or ---- */
+.codex-section-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 8px 0 14px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--theme-text-secondary, #6a6a72);
+  white-space: nowrap;
+}
+.codex-section-title::before,
+.codex-section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    color-mix(in srgb, var(--theme-accent, #C9A84C) 22%, transparent) 50%,
+    transparent 100%
+  );
+}
+/* Variante alignée à gauche (filet uniquement à droite, plus court) */
+.codex-section-title.codex-section-title-left {
+  justify-content: flex-start;
+}
+.codex-section-title.codex-section-title-left::before { content: none; }
+.codex-section-title.codex-section-title-left::after {
+  max-width: 200px;
+}
+
+
+/* ---- Divider — filet dégradé pour séparer des blocs ---- */
+.codex-divider {
+  height: 1px;
+  margin: 14px 0;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    color-mix(in srgb, var(--theme-accent, #C9A84C) 22%, transparent) 50%,
+    transparent 100%
+  );
+}
+
+
+/* ---- Inputs : bordure quasi-invisible au repos, accent au focus ---- */
+.codex-input,
+.codex-input-wrap input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+.codex-input-wrap textarea,
+.codex-input-wrap select {
+  background: #0a0c10;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  color: var(--theme-text-primary, #e8e8ec);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 13px;
+  transition: border-color 0.15s var(--codex-ease),
+              box-shadow 0.15s var(--codex-ease),
+              background 0.15s var(--codex-ease);
+}
+.codex-input::placeholder,
+.codex-input-wrap input::placeholder,
+.codex-input-wrap textarea::placeholder {
+  color: rgba(232, 232, 236, 0.28);
+}
+.codex-input:hover,
+.codex-input-wrap input:hover,
+.codex-input-wrap textarea:hover,
+.codex-input-wrap select:hover {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.codex-input:focus,
+.codex-input-wrap input:focus,
+.codex-input-wrap textarea:focus,
+.codex-input-wrap select:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 55%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--theme-accent, #C9A84C) 15%, transparent),
+              0 0 12px color-mix(in srgb, var(--theme-accent, #C9A84C) 14%, transparent);
+  background: #0c0e12;
+}
+
+
+/* ---- Boutons : micro-scale au clic ---- */
+.codex-press {
+  transition: transform 0.12s var(--codex-ease), filter 0.15s var(--codex-ease), box-shadow 0.15s var(--codex-ease);
+}
+.codex-press:hover:not(:disabled) { filter: brightness(1.05); }
+.codex-press:active:not(:disabled) { transform: scale(0.97); }
+
+
+/* ---- Page fade-in (montage initial) ---- */
+@keyframes codex-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.codex-fade-in {
+  animation: codex-fade-in 0.28s var(--codex-ease) both;
+}
+
+
+/* ---- Focus ring uniforme ---- */
+.codex-focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(201, 168, 76, 0.45), 0 0 0 4px rgba(201, 168, 76, 0.12);
+}
+
+
+/* ---- Scrollbar discrète (WebKit) ---- */
+.codex-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.codex-scroll::-webkit-scrollbar-track { background: transparent; }
+.codex-scroll::-webkit-scrollbar-thumb {
+  background: rgba(201, 168, 76, 0.18);
+  border-radius: 4px;
+}
+.codex-scroll::-webkit-scrollbar-thumb:hover { background: rgba(201, 168, 76, 0.32); }
+
+
+/* ---- Bouton de dés flottant (FAB) — version minimaliste Linear/Notion ----
+        Cercle 60×60 thémé, ombre légère qui respire, hover scale 1.05.
+        Pas de halo or, pas de tremble, pas de rotation hover : sobre. */
+@keyframes dice-fab-idle-pulse {
+  0%, 100% {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  }
+  50% {
+    box-shadow: 0 5px 18px rgba(0, 0, 0, 0.45);
+  }
+}
+
+@keyframes dice-fab-shake {
+  0%   { transform: rotate(0)     scale(1); }
+  15%  { transform: rotate(-10deg) scale(1.05); }
+  30%  { transform: rotate(8deg)  scale(1.07); }
+  50%  { transform: rotate(-8deg) scale(1.04); }
+  70%  { transform: rotate(5deg); }
+  100% { transform: rotate(0)     scale(1); }
+}
+
+.dice-fab {
+  background: var(--theme-bg-secondary, #12141a);
+  color: var(--theme-accent, #C9A84C);
+  border: 1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 45%, transparent);
+  animation: dice-fab-idle-pulse 3s ease-in-out infinite;
+  transition: transform 0.2s var(--codex-ease),
+              border-color 0.2s var(--codex-ease),
+              background 0.2s var(--codex-ease);
+}
+.dice-fab:hover {
+  transform: scale(1.05);
+  border-color: var(--theme-accent, #C9A84C);
+  background: var(--theme-bg-card, #1a1d24);
+}
+.dice-fab:active {
+  transform: scale(0.97);
+  transition-duration: 80ms;
+}
+.dice-fab.dice-fab-shaking {
+  animation: dice-fab-shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+.dice-fab svg {
+  pointer-events: none;
+}
+
+
+/* ============================================================================
+   GRIMOIRE — dashboard d'accueil : titre central + autel scénario actif
+   ============================================================================ */
+
+/* Cadre extérieur : gradient radial or en haut + violet sombre en bas, fine
+   bordure intérieure à 12px des bords. */
+.grimoire-frame {
+  position: relative;
+  border-radius: 14px;
+  padding: 32px 28px 28px;
+  background:
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--theme-accent, #C9A84C) 12%, transparent) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 100%, rgba(64, 24, 92, 0.18) 0%, transparent 55%),
+    linear-gradient(180deg, #08090c 0%, #05060a 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 4px 18px rgba(0, 0, 0, 0.35);
+}
+@media (min-width: 768px) {
+  .grimoire-frame {
+    padding: 48px 40px 40px;
+  }
+}
+
+/* Bordure intérieure très fine à 12px des bords */
+.grimoire-frame::before {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 10%, transparent);
+  pointer-events: none;
+}
+
+/* Losange décoratif au-dessus du cadre */
+.grimoire-diamond-top {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 18px;
+  color: color-mix(in srgb, var(--theme-accent, #C9A84C) 45%, transparent);
+  background: var(--theme-bg-primary, #050608);
+  padding: 0 8px;
+  line-height: 1;
+  user-select: none;
+}
+
+.grimoire-inner {
+  position: relative;
+  text-align: center;
+}
+
+/* Titre CODEX */
+.grimoire-codex {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 300;
+  font-size: 32px;
+  letter-spacing: 0.22em;
+  color: var(--theme-accent, #C9A84C);
+  margin: 0 0 12px;
+  text-align: center;
+  text-shadow:
+    0 0 18px color-mix(in srgb, var(--theme-accent, #C9A84C) 35%, transparent),
+    0 0 36px color-mix(in srgb, var(--theme-accent, #C9A84C) 16%, transparent);
+}
+@media (min-width: 768px) {
+  .grimoire-codex {
+    font-size: 42px;
+    letter-spacing: 0.30em;
+  }
+}
+
+/* Slogan latin sous le titre */
+.grimoire-slogan {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 12px;
+  letter-spacing: 0.20em;
+  color: color-mix(in srgb, var(--theme-accent, #C9A84C) 65%, transparent);
+  margin: 0 0 18px;
+  text-transform: uppercase;
+}
+
+/* Filet séparateur dégradé */
+.grimoire-divider-line {
+  width: 80px;
+  height: 1px;
+  margin: 0 auto 24px;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    color-mix(in srgb, var(--theme-accent, #C9A84C) 70%, transparent) 50%,
+    transparent 100%
+  );
+}
+
+/* === Boutons "pill" du header (MJ / Joueur) === */
+.grimoire-pill-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(10, 12, 16, 0.6);
+  border: 1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 12%, transparent);
+}
+.grimoire-pill {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  padding: 6px 16px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  color: rgba(232, 232, 236, 0.55);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: color 0.18s var(--codex-ease),
+              background 0.18s var(--codex-ease),
+              border-color 0.18s var(--codex-ease);
+}
+.grimoire-pill:hover {
+  color: var(--theme-accent, #C9A84C);
+}
+.grimoire-pill.is-active {
+  color: var(--theme-accent, #C9A84C);
+  background: color-mix(in srgb, var(--theme-accent, #C9A84C) 10%, transparent);
+  border-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 35%, transparent);
+}
+@media (min-width: 640px) {
+  .grimoire-pill { font-size: 12px; padding: 7px 22px; }
+}
+
+
+/* === Onglets Forge / Aventure === */
+.grimoire-tab {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  padding: 7px 18px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  color: rgba(232, 232, 236, 0.5);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: color 0.18s var(--codex-ease),
+              background 0.18s var(--codex-ease),
+              border-color 0.18s var(--codex-ease);
+}
+.grimoire-tab:hover {
+  color: var(--theme-accent, #C9A84C);
+}
+.grimoire-tab.is-active {
+  color: var(--theme-accent, #C9A84C);
+  background: color-mix(in srgb, var(--theme-accent, #C9A84C) 8%, transparent);
+  border-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 30%, transparent);
+}
+@media (min-width: 768px) {
+  .grimoire-tab { font-size: 12px; padding: 8px 28px; }
+}
+
+
+/* === Autel : scénario actif === */
+.grimoire-altar {
+  position: relative;
+  margin: 0 auto 28px;
+  max-width: 560px;
+  padding: 16px 36px 18px;
+  border-radius: 6px;
+  background:
+    radial-gradient(ellipse at 50% 130%, rgba(150, 30, 30, 0.22) 0%, transparent 70%),
+    linear-gradient(180deg, rgba(20, 14, 8, 0.6) 0%, rgba(8, 5, 3, 0.5) 100%);
+  border: 1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 30%, transparent);
+  text-align: center;
+}
+.grimoire-altar-diamond {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: color-mix(in srgb, var(--theme-accent, #C9A84C) 55%, transparent);
+  font-size: 12px;
+  line-height: 1;
+  user-select: none;
+}
+.grimoire-altar-diamond.left { left: 12px; }
+.grimoire-altar-diamond.right { right: 12px; }
+
+.grimoire-altar-tag {
+  font-size: 9px;
+  letter-spacing: 0.3em;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--theme-accent, #C9A84C) 75%, transparent);
+  text-transform: uppercase;
+  margin: 0 0 6px;
+}
+.grimoire-altar-name {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+  font-size: 20px;
+  color: #f5f2e8;
+  margin: 0 0 6px;
+  line-height: 1.2;
+}
+.grimoire-altar-desc {
+  font-size: 11px;
+  font-style: italic;
+  color: rgba(232, 232, 236, 0.55);
+  margin: 0;
+  line-height: 1.55;
+}
+.grimoire-altar-empty {
+  margin: 0 auto 28px;
+  max-width: 560px;
+  padding: 14px;
+  font-size: 11px;
+  font-style: italic;
+  color: rgba(232, 232, 236, 0.4);
+  text-align: center;
+  border: 1px dashed rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+}
+
+/* Actions sous l'autel */
+.grimoire-altar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin: 0 auto 24px;
+  max-width: 560px;
+}
+.grimoire-altar-actions button {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  background: transparent;
+  color: color-mix(in srgb, var(--theme-accent, #C9A84C) 90%, transparent);
+  border: 1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 25%, transparent);
+  transition: border-color 0.18s var(--codex-ease),
+              background 0.18s var(--codex-ease),
+              color 0.18s var(--codex-ease);
+  cursor: pointer;
+}
+.grimoire-altar-actions button:hover {
+  background: color-mix(in srgb, var(--theme-accent, #C9A84C) 8%, transparent);
+  border-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 55%, transparent);
+  color: var(--theme-accent, #C9A84C);
+}
+
+/* === Stat pages : 4 cartes en grille 2x2 === */
+.grimoire-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  max-width: 620px;
+  margin: 0 auto;
+}
+.grimoire-stat {
+  position: relative;
+  padding: 14px 16px 14px 18px;
+  border-radius: 0 6px 6px 0;
+  background: linear-gradient(
+    135deg,
+    rgba(20, 15, 8, 0.6) 0%,
+    rgba(10, 8, 4, 0.4) 100%
+  );
+  border-left: 2px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 45%, transparent);
+  text-align: left;
+  transition: border-color 0.18s var(--codex-ease),
+              background 0.18s var(--codex-ease);
+}
+.grimoire-stat:hover {
+  border-left-color: var(--theme-accent, #C9A84C);
+  background: linear-gradient(
+    135deg,
+    rgba(28, 22, 12, 0.7) 0%,
+    rgba(14, 11, 6, 0.5) 100%
+  );
+}
+.grimoire-stat-tag {
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--theme-accent, #C9A84C) 75%, transparent);
+  margin: 0 0 6px;
+}
+.grimoire-stat-value {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+  font-size: 36px;
+  color: #f5f2e8;
+  line-height: 1;
+}
+@media (min-width: 768px) {
+  .grimoire-stat-value { font-size: 40px; }
+}
+.grimoire-stat-label {
+  font-size: 12px;
+  font-style: italic;
+  color: rgba(232, 232, 236, 0.5);
+  margin-top: 6px;
+}
+
+
+/* === Accès rapide : grille de cartes vers chaque entité === */
+.grimoire-quick {
+  margin: 28px auto 0;
+  max-width: 720px;
+  padding-top: 24px;
+  border-top: 1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 8%, transparent);
+}
+.grimoire-quick-title {
+  font-size: 9px;
+  letter-spacing: 0.3em;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--theme-accent, #C9A84C) 70%, transparent);
+  margin: 0 0 14px;
+  text-align: center;
+}
+.grimoire-quick-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+@media (min-width: 640px) {
+  .grimoire-quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .grimoire-quick-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.grimoire-quick-card {
+  padding: 16px 18px;
+  border-radius: 6px;
+  background: linear-gradient(
+    135deg,
+    rgba(20, 15, 8, 0.40) 0%,
+    rgba(10, 8, 4, 0.20) 100%
+  );
+  border: 1px solid rgba(201, 168, 76, 0.10);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s var(--codex-ease),
+              box-shadow 0.2s var(--codex-ease),
+              background 0.2s var(--codex-ease),
+              transform 0.2s var(--codex-ease);
+}
+.grimoire-quick-card:hover {
+  border-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 40%, transparent);
+  background: linear-gradient(
+    135deg,
+    rgba(28, 22, 12, 0.55) 0%,
+    rgba(14, 11, 6, 0.30) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 6px 18px rgba(0, 0, 0, 0.25),
+    0 0 18px color-mix(in srgb, var(--theme-accent, #C9A84C) 14%, transparent);
+  transform: scale(1.01);
+}
+.grimoire-quick-card:active {
+  transform: scale(0.995);
+  transition-duration: 80ms;
+}
+.grimoire-quick-card-title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+  font-size: 18px;
+  color: var(--theme-accent, #C9A84C);
+  margin: 0 0 6px;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+@media (min-width: 768px) {
+  .grimoire-quick-card-title { font-size: 20px; }
+}
+.grimoire-quick-card-desc {
+  font-size: 13px;
+  font-style: italic;
+  color: rgba(232, 232, 236, 0.55);
+  margin: 0;
+  line-height: 1.55;
+}
+@media (min-width: 768px) {
+  .grimoire-quick-card-desc { font-size: 14px; }
+}
+
+
+/* === Accordéon "Personnages des joueurs" — style grimoire === */
+.grimoire-pj {
+  margin: 0 0 24px;
+  border-top: 1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 10%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 10%, transparent);
+  background: linear-gradient(180deg, rgba(14, 10, 6, 0.30) 0%, rgba(8, 6, 4, 0.20) 100%);
+}
+.grimoire-pj-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+}
+.grimoire-pj-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--theme-accent, #C9A84C);
+  transition: color 0.15s var(--codex-ease);
+}
+.grimoire-pj-toggle:hover { color: color-mix(in srgb, var(--theme-accent, #C9A84C) 95%, white); }
+.grimoire-pj-chevron {
+  display: inline-block;
+  font-size: 11px;
+  line-height: 1;
+  color: color-mix(in srgb, var(--theme-accent, #C9A84C) 70%, transparent);
+  transition: transform 0.25s var(--codex-ease);
+}
+.grimoire-pj-chevron.is-open { transform: rotate(90deg); }
+.grimoire-pj-title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+}
+.grimoire-pj-count {
+  font-family: Georgia, serif;
+  font-size: 12px;
+  color: rgba(232, 232, 236, 0.45);
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(10, 12, 16, 0.55);
+  border: 1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 14%, transparent);
+}
+.grimoire-pj-add {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--theme-accent, #C9A84C) 8%, transparent);
+  color: var(--theme-accent, #C9A84C);
+  border: 1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 30%, transparent);
+  cursor: pointer;
+  transition: background 0.18s var(--codex-ease),
+              border-color 0.18s var(--codex-ease),
+              color 0.18s var(--codex-ease);
+}
+.grimoire-pj-add:hover {
+  background: color-mix(in srgb, var(--theme-accent, #C9A84C) 14%, transparent);
+  border-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 55%, transparent);
+  color: color-mix(in srgb, var(--theme-accent, #C9A84C) 90%, white);
+}
+.grimoire-pj-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  padding: 4px 16px 16px;
+}
+@media (min-width: 640px) { .grimoire-pj-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1024px) { .grimoire-pj-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1280px) { .grimoire-pj-grid { grid-template-columns: repeat(4, 1fr); } }
+.grimoire-pj-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 18px;
+  text-align: center;
+  font-size: 12px;
+  font-style: italic;
+  color: rgba(232, 232, 236, 0.40);
+  border: 1px dashed rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+}
+.grimoire-pj-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  text-align: left;
+  background: linear-gradient(135deg, rgba(20, 15, 8, 0.40) 0%, rgba(10, 8, 4, 0.20) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.18s var(--codex-ease),
+              box-shadow 0.18s var(--codex-ease),
+              background 0.18s var(--codex-ease),
+              transform 0.18s var(--codex-ease);
+}
+.grimoire-pj-card:hover {
+  border-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 35%, transparent);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--theme-accent, #C9A84C) 12%, transparent);
+  background: linear-gradient(135deg, rgba(28, 22, 12, 0.55) 0%, rgba(14, 11, 6, 0.30) 100%);
+  transform: translateY(-1px);
+}
+.grimoire-pj-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 35%, transparent);
+}
+.grimoire-pj-avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Georgia, serif;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: var(--theme-accent, #C9A84C);
+  background: linear-gradient(135deg, rgba(28, 22, 12, 0.7) 0%, rgba(10, 8, 4, 0.6) 100%);
+}
+.grimoire-pj-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.grimoire-pj-name {
+  margin: 0 0 2px;
+  font-family: Georgia, 'Times New Roman', serif;
+  color: #f5f2e8;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.grimoire-pj-meta {
+  margin: 0;
+  font-size: 11px;
+  color: rgba(232, 232, 236, 0.55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.grimoire-pj-stats {
+  margin: 2px 0 0;
+  font-size: 10px;
+  color: rgba(232, 232, 236, 0.40);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
+/* === Modale grimoire (utilisée pour ajouter un personnage joueur, etc.) === */
+.grimoire-modal {
+  background: linear-gradient(180deg, #0e0b07 0%, #08060a 100%);
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 30%, transparent);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.7),
+    0 0 30px color-mix(in srgb, var(--theme-accent, #C9A84C) 12%, transparent);
+  overflow: hidden;
+}
+.grimoire-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 12%, transparent);
+}
+.grimoire-modal-title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  color: var(--theme-accent, #C9A84C);
+  margin: 0;
+}
+.grimoire-modal-close {
+  background: transparent;
+  border: none;
+  color: rgba(232, 232, 236, 0.55);
+  font-size: 22px;
+  line-height: 1;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.15s var(--codex-ease), background 0.15s var(--codex-ease);
+}
+.grimoire-modal-close:hover {
+  color: var(--theme-accent, #C9A84C);
+  background: color-mix(in srgb, var(--theme-accent, #C9A84C) 10%, transparent);
+}
+.grimoire-modal-body {
+  padding: 18px;
+}
+.grimoire-modal-desc {
+  margin: 0 0 14px;
+  font-size: 12px;
+  color: rgba(232, 232, 236, 0.55);
+  line-height: 1.6;
+}
+.grimoire-modal-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--theme-accent, #C9A84C) 70%, transparent);
+  font-weight: 700;
+}
+.grimoire-modal-input {
+  width: 100%;
+  padding: 10px 12px;
+  background: #050608;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 4px;
+  color: #e8e8ec;
+  font-size: 13px;
+  transition: border-color 0.15s var(--codex-ease),
+              box-shadow 0.15s var(--codex-ease),
+              background 0.15s var(--codex-ease);
+}
+.grimoire-modal-input-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.grimoire-modal-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 55%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--theme-accent, #C9A84C) 15%, transparent),
+              0 0 12px color-mix(in srgb, var(--theme-accent, #C9A84C) 14%, transparent);
+  background: #08090c;
+}
+.grimoire-modal-message {
+  margin: 10px 0 0;
+  font-size: 12px;
+  font-style: italic;
+  color: color-mix(in srgb, var(--theme-accent, #C9A84C) 80%, white);
+}
+.grimoire-modal-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 14px 18px;
+  border-top: 1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 10%, transparent);
+}
+.grimoire-modal-btn {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  padding: 9px 18px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.18s var(--codex-ease),
+              border-color 0.18s var(--codex-ease),
+              color 0.18s var(--codex-ease),
+              transform 0.12s var(--codex-ease);
+}
+.grimoire-modal-btn:active { transform: scale(0.97); }
+.grimoire-modal-btn-ghost {
+  background: transparent;
+  color: rgba(232, 232, 236, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.grimoire-modal-btn-ghost:hover {
+  color: rgba(232, 232, 236, 0.85);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+.grimoire-modal-btn-primary {
+  background: color-mix(in srgb, var(--theme-accent, #C9A84C) 14%, transparent);
+  color: var(--theme-accent, #C9A84C);
+  border: 1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 50%, transparent);
+}
+.grimoire-modal-btn-primary:hover {
+  background: color-mix(in srgb, var(--theme-accent, #C9A84C) 22%, transparent);
+  border-color: var(--theme-accent, #C9A84C);
+  color: color-mix(in srgb, var(--theme-accent, #C9A84C) 90%, white);
+}
+
+
+/* ============================================================================
+   ACCESSIBILITÉ — règles globales activées par les attributs data-a11y-*
+   posés sur <html> par useA11y() (cf. app/lib/accessibility.ts)
+   ============================================================================ */
+
+/* --- Daltonien : applique le filtre SVG correspondant sur tout le body. --- */
+html[data-a11y-color-mode="deuteranopie"] body { filter: url(#a11y-deuteranopie); }
+html[data-a11y-color-mode="protanopie"]   body { filter: url(#a11y-protanopie); }
+html[data-a11y-color-mode="tritanopie"]   body { filter: url(#a11y-tritanopie); }
+
+
+/* --- Police dyslexique : Atkinson Hyperlegible (proche d'OpenDyslexic) -- */
+html[data-a11y-dyslexic="true"],
+html[data-a11y-dyslexic="true"] body,
+html[data-a11y-dyslexic="true"] h1,
+html[data-a11y-dyslexic="true"] h2,
+html[data-a11y-dyslexic="true"] h3,
+html[data-a11y-dyslexic="true"] h4,
+html[data-a11y-dyslexic="true"] h5,
+html[data-a11y-dyslexic="true"] p,
+html[data-a11y-dyslexic="true"] button,
+html[data-a11y-dyslexic="true"] input,
+html[data-a11y-dyslexic="true"] textarea,
+html[data-a11y-dyslexic="true"] select,
+html[data-a11y-dyslexic="true"] label,
+html[data-a11y-dyslexic="true"] span,
+html[data-a11y-dyslexic="true"] div {
+  font-family: var(--font-dyslexic), 'Atkinson Hyperlegible', 'OpenDyslexic', 'Comic Sans MS', sans-serif !important;
+  letter-spacing: 0.01em !important;
+  word-spacing: 0.05em !important;
+}
+
+
+/* --- Mode haut contraste : bordures plus marquées, texte plus lumineux -- */
+html[data-a11y-contrast="high"] {
+  --a11y-border: rgba(255, 255, 255, 0.45);
+  --a11y-text: #ffffff;
+}
+html[data-a11y-contrast="high"] body { color: #ffffff !important; }
+html[data-a11y-contrast="high"] .bg-gray-800,
+html[data-a11y-contrast="high"] .bg-gray-700 {
+  border: 1.5px solid rgba(255, 255, 255, 0.45) !important;
+}
+html[data-a11y-contrast="high"] button:not(:disabled) {
+  outline: 1px solid rgba(255, 255, 255, 0.2);
+  outline-offset: 1px;
+}
+html[data-a11y-contrast="high"] button:focus-visible,
+html[data-a11y-contrast="high"] a:focus-visible,
+html[data-a11y-contrast="high"] input:focus-visible,
+html[data-a11y-contrast="high"] select:focus-visible,
+html[data-a11y-contrast="high"] textarea:focus-visible {
+  outline: 3px solid #ffffff !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 1px #000000 !important;
+}
+html[data-a11y-contrast="high"] .text-gray-400,
+html[data-a11y-contrast="high"] .text-gray-500,
+html[data-a11y-contrast="high"] .text-\[\#a8a8b0\],
+html[data-a11y-contrast="high"] .text-\[\#6a6a72\] {
+  color: #e8e8ec !important;
+}
+
+
+/* --- Réduire les animations : neutralise toute transition + animation --- */
+html[data-a11y-reduce-motion="true"] *,
+html[data-a11y-reduce-motion="true"] *::before,
+html[data-a11y-reduce-motion="true"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+/* Respect natif de prefers-reduced-motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+
+/* --- Lecteur d'écran amélioré : skip link et focus rings visibles --- */
+.a11y-skip-link {
+  position: absolute;
+  top: -40px;
+  left: 8px;
+  z-index: 1000;
+  background: var(--theme-accent, #C9A84C);
+  color: var(--theme-bg-primary, #050608);
+  padding: 8px 14px;
+  border-radius: 4px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: top 0.15s ease;
+}
+.a11y-skip-link:focus {
+  top: 8px;
+  outline: 2px solid #fff;
+}
+html[data-a11y-aria="true"] :focus-visible {
+  outline: 2px solid var(--theme-accent, #C9A84C) !important;
+  outline-offset: 2px !important;
+}
+
+
+/* ============================================================================
+   Bouton "Retour au dashboard" du mode présentation
+   ----------------------------------------------------------------------------
+   Toujours visible (z-index élevé), positionné en haut à gauche.
+   Style or 50% au repos, plus marqué au hover. Reste accessible y compris
+   pendant le plein écran car il est rendu à l'intérieur de l'élément qui
+   passe en fullscreen.
+   ============================================================================ */
+.presentation-exit {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  left: max(12px, env(safe-area-inset-left));
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(201, 168, 76, 0.55);
+  background: rgba(8, 9, 12, 0.55);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  cursor: pointer;
+  transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease,
+              transform 0.15s ease;
+}
+.presentation-exit:hover,
+.presentation-exit:focus-visible {
+  color: #e8c664;
+  background: rgba(20, 22, 28, 0.75);
+  border-color: rgba(201, 168, 76, 0.7);
+  outline: none;
+}
+.presentation-exit:active {
+  transform: scale(0.97);
+}
+/* Sur mobile : un peu plus grand pour le pouce, label masqué pour gagner
+   de la place — l'icône ← reste lisible. */
+.presentation-exit-label {
+  display: inline;
+}
+@media (max-width: 640px) {
+  .presentation-exit {
+    padding: 8px 12px;
+    font-size: 11px;
+    gap: 4px;
+  }
+  .presentation-exit-label {
+    display: none;
+  }
+}
+
+
+/* ---- Typographie : titre serif optionnel ---- */
+.codex-display {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 300;
+  letter-spacing: 0.08em;
+  color: var(--codex-gold);
+  text-shadow: 0 0 14px rgba(201, 168, 76, 0.22);
+}
+
+
+/* ============================================================================
+   Markdown léger — rendu compact pour le journal de campagne
+   ============================================================================ */
+.markdown-light h3,
+.markdown-light h4,
+.markdown-light h5 {
+  font-weight: 700;
+  color: #e8e8ec;
+  margin: 0.6em 0 0.3em;
+}
+.markdown-light h3 { font-size: 1.05rem; }
+.markdown-light h4 { font-size: 0.98rem; }
+.markdown-light h5 { font-size: 0.9rem; }
+.markdown-light p { margin: 0.25em 0; }
+.markdown-light ul {
+  list-style: disc;
+  padding-left: 1.2em;
+  margin: 0.3em 0;
+}
+.markdown-light li { margin: 0.1em 0; }
+.markdown-light strong { color: #fff; }
+.markdown-light em { color: #d1d5db; }
+.markdown-light code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.05em 0.3em;
+  border-radius: 3px;
+  font-size: 0.9em;
 }
 
 /* Combat — bordure dorée pulsante pour la carte du tour actif (Minimal Eclipsed Forge) */

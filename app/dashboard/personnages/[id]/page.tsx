@@ -1381,7 +1381,7 @@ export default function FichePersonnage() {
 
             <Panel title="Compétences">
               <div className="space-y-1">
-                {COMPETENCES.map((c) => {
+                {COMPETENCES.map((c, idx) => {
                   const maitrise = !!perso.comp_maitrises[c.nom]
                   const expert = !!perso.comp_expertise[c.nom]
                   const mult = expert ? 2 : maitrise ? 1 : 0
@@ -1389,7 +1389,7 @@ export default function FichePersonnage() {
                   const stat = STATS.find((s) => s.key === c.stat)!
                   return (
                     <button
-                      key={c.nom}
+                      key={`${c.nom}-${idx}`}
                       type="button"
                       onClick={() => lancer(c.nom, total)}
                       className="w-full flex items-center gap-2 p-1.5 rounded hover:bg-stone-700/40 transition text-left"

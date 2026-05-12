@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Cinzel, Inter } from "next/font/google";
+import { Geist, Geist_Mono, Cinzel, Inter, Atkinson_Hyperlegible } from "next/font/google";
 import "./globals.css";
 import IntlProvider from "./i18n/IntlProvider";
+import AccessibilityApplier from "./components/AccessibilityApplier";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,6 +24,14 @@ const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600"],
+});
+
+// Police dyslexie-friendly (Atkinson Hyperlegible, conçue par le Braille
+// Institute). Active uniquement quand `data-a11y-dyslexic="true"` sur <html>.
+const atkinson = Atkinson_Hyperlegible({
+  variable: "--font-dyslexic",
+  subsets: ["latin"],
+  weight: ["400", "700"],
 });
 
 export const metadata: Metadata = {
@@ -59,7 +68,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${cinzel.variable} ${inter.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${cinzel.variable} ${inter.variable} ${atkinson.variable} h-full antialiased`}
     >
       <head>
         <link
@@ -75,6 +84,10 @@ export default function RootLayout({
         <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
       </head>
       <body className="min-h-full flex flex-col">
+        <a href="#main-content" className="a11y-skip-link">
+          Aller au contenu
+        </a>
+        <AccessibilityApplier />
         <IntlProvider>{children}</IntlProvider>
       </body>
     </html>

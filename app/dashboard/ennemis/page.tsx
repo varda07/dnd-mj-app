@@ -8,6 +8,8 @@ import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import ImageCropper from '@/app/components/ImageCropper'
 import NumberInput from '@/app/components/NumberInput'
+import StarFavori from '@/app/components/StarFavori'
+import { useFavoris } from '@/app/lib/favoris'
 import {
   construireEnveloppe,
   lireFichierJSON,
@@ -72,6 +74,8 @@ export default function Ennemis() {
   const [imageActuelle, setImageActuelle] = useState('')
   const [cropperKey, setCropperKey] = useState(0)
   const [bestiaireOuvert, setBestiaireOuvert] = useState(false)
+  const [favorisOnly, setFavorisOnly] = useState(false)
+  const { est: estFavori } = useFavoris()
   const t = useTranslations('enemies')
   const tc = useTranslations('common')
   const ti = useTranslations('items')
@@ -355,7 +359,18 @@ export default function Ennemis() {
             </div>
           </div>
           {ennemis.length === 0 && <p className="text-gray-400">{t('empty')}</p>}
-          {ennemis.map((ennemi) => (
+          <label className="inline-flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={favorisOnly}
+              onChange={(e) => setFavorisOnly(e.target.checked)}
+              className="accent-yellow-500"
+            />
+            ⭐ Afficher uniquement les favoris
+          </label>
+          {ennemis
+            .filter((e) => !favorisOnly || estFavori('ennemis', e.id))
+            .map((ennemi) => (
             <div key={ennemi.id} className="bg-gray-800 p-4 rounded-lg">
               <div className="flex gap-4">
                 {ennemi.image_url && (
@@ -368,7 +383,10 @@ export default function Ennemis() {
                 )}
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-                    <h3 className="text-lg font-bold text-white">{ennemi.nom}</h3>
+                    <div className="flex items-center gap-2">
+                      <StarFavori type="ennemis" id={ennemi.id} />
+                      <h3 className="text-lg font-bold text-white">{ennemi.nom}</h3>
+                    </div>
                     <div className="flex gap-3 flex-wrap">
                       <button
                         type="button"
@@ -589,11 +607,11 @@ function BestiaireImporter({
             </p>
           ) : (
             <ul className="space-y-1">
-              {filtres.map((m) => {
+              {filtres.map((m, idx) => {
                 const selected = selection.has(m.nom)
                 const dejaPossede = existingNames.has(m.nom)
                 return (
-                  <li key={m.nom}>
+                  <li key={`${m.nom}-${idx}`}>
                     <label
                       className={`flex items-start gap-3 p-2 rounded cursor-pointer border transition ${
                         selected

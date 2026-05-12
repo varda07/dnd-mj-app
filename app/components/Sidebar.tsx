@@ -4,12 +4,36 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { openCommandPalette } from './CommandPalette'
+import { useLocale } from '@/app/i18n/IntlProvider'
+import { supabase } from '@/lib/supabase'
+import {
+  THEMES,
+  THEME_KEYS,
+  DEFAULT_THEME,
+  PREMIUM_THEMES,
+  applyTheme,
+  type ThemeKey
+} from '@/app/styles/themes'
 
 type NavItem = {
   label: string
   icon: string
-  href: string
+  // Soit on navigue (href) soit on déclenche une action (action). L'un OU
+  // l'autre — pas les deux. L'action est utilisée pour la Sound Box, qui
+  // ouvre un panneau global plutôt que de changer de page.
+  href?: string
+  action?: () => void
   match?: (path: string) => boolean
+}
+
+type PjLite = {
+  id: string
+  nom: string
+  classe: string | null
+  niveau: number
+  hp_actuel: number
+  hp_max: number
+  image_url: string | null
 }
 
 type NavSection = {
@@ -20,7 +44,7 @@ type NavSection = {
 const SIDEBAR_OPEN_EVENT = 'sidebar:open'
 const SIDEBAR_CLOSE_EVENT = 'sidebar:close'
 const COLLAPSED_KEY = 'sidebar_collapsed'
-const WIDTH_EXPANDED = '200px'
+const WIDTH_EXPANDED = '220px'
 const WIDTH_COLLAPSED = '52px'
 
 export function openSidebar() {
@@ -47,15 +71,33 @@ export default function Sidebar() {
   const router = useRouter()
   const pathname = usePathname() ?? ''
   const t = useTranslations('sidebar')
+  const td = useTranslations('dashboard')
   const tSearch = useTranslations('search')
+  const tLang = useTranslations('language')
+  const { locale, setLocale } = useLocale()
+
   const [drawerOuvert, setDrawerOuvert] = useState(false)
   const [replie, setReplie] = useState(false)
+  // États collapsibles pour les sous-menus paramètres
+  const [themeOuvert, setThemeOuvert] = useState(false)
+  const [langueOuvert, setLangueOuvert] = useState(false)
+  const [rejoindreOuvert, setRejoindreOuvert] = useState(false)
+  const [themeActuel, setThemeActuel] = useState<ThemeKey>(DEFAULT_THEME)
+  const [codeScenario, setCodeScenario] = useState('')
+  const [messageJoindre, setMessageJoindre] = useState('')
+  // Personnages des joueurs liés aux scénarios du MJ — section "PJ" du menu.
+  const [pjs, setPjs] = useState<PjLite[]>([])
+  const [pjsOuvert, setPjsOuvert] = useState(true)
 
-  // Restaure le pli depuis localStorage à l'hydratation. Léger flash possible
-  // sur le premier paint — acceptable et évite le mismatch SSR.
+  // --------------------------------------------------------------------------
+  // Restauration de l'état replié
+  // --------------------------------------------------------------------------
   useEffect(() => {
     const stored = window.localStorage.getItem(COLLAPSED_KEY)
     const initial = stored === '1'
+    // setState dans un effet : nécessaire pour lire localStorage côté client
+    // sans casser l'hydratation SSR. Léger flash possible au premier paint.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setReplie(initial)
     setLayoutWidth(initial)
   }, [])
@@ -71,6 +113,60 @@ export default function Sidebar() {
     }
   }, [])
 
+  // --------------------------------------------------------------------------
+  // Charge le thème courant pour cocher la bonne entrée
+  // --------------------------------------------------------------------------
+  useEffect(() => {
+    const load = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase
+        .from('profiles')
+        .select('theme')
+        .eq('id', user.id)
+        .maybeSingle()
+      const raw = data?.theme as string | undefined
+      if (raw && raw in THEMES) setThemeActuel(raw as ThemeKey)
+    }
+    load()
+  }, [])
+
+  // --------------------------------------------------------------------------
+  // Charge la liste des personnages des joueurs (liés à un scénario du MJ).
+  // Refetch automatique quand l'évènement `pj:ajouter:done` est dispatché
+  // (depuis la modale d'ajout, vivant dans le dashboard).
+  // --------------------------------------------------------------------------
+  const fetchPjs = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      setPjs([])
+      return
+    }
+    // Récupère d'abord les scénarios du MJ pour filtrer les PJ associés.
+    const { data: mesScenarios } = await supabase
+      .from('scenarios')
+      .select('id')
+      .eq('mj_id', user.id)
+    const ids = (mesScenarios ?? []).map((s: { id: string }) => s.id)
+    if (ids.length === 0) {
+      setPjs([])
+      return
+    }
+    const { data } = await supabase
+      .from('personnages')
+      .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url')
+      .in('scenario_id', ids)
+      .order('nom')
+    setPjs((data ?? []) as PjLite[])
+  }
+
+  useEffect(() => {
+    fetchPjs()
+    const onAdded = () => fetchPjs()
+    window.addEventListener('pj:ajouter:done', onAdded)
+    return () => window.removeEventListener('pj:ajouter:done', onAdded)
+  }, [])
+
   const togglerReplie = () => {
     setReplie((cur) => {
       const next = !cur
@@ -82,6 +178,60 @@ export default function Sidebar() {
       setLayoutWidth(next)
       return next
     })
+  }
+
+  const changerTheme = async (key: ThemeKey) => {
+    applyTheme(key)
+    setThemeActuel(key)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data: existing } = await supabase
+      .from('profiles')
+      .select('username, role')
+      .eq('id', user.id)
+      .maybeSingle()
+    const username = (existing?.username as string | undefined) ?? user.email ?? user.id
+    const role = (existing?.role as string | undefined) ?? 'joueur'
+    const { error } = await supabase
+      .from('profiles')
+      .upsert({ id: user.id, username, role, theme: key })
+    if (error) console.error('[theme] save :', error)
+  }
+
+  const seDeconnecter = async () => {
+    setDrawerOuvert(false)
+    await supabase.auth.signOut()
+    router.push('/')
+  }
+
+  const refaireTutoriel = () => {
+    setDrawerOuvert(false)
+    window.dispatchEvent(new Event('onboarding:open'))
+  }
+
+  const rejoindreScenario = async () => {
+    setMessageJoindre('')
+    const code = codeScenario.trim().toUpperCase()
+    if (!code) return setMessageJoindre(td('enter_code'))
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data: invit, error: err1 } = await supabase
+      .from('codes_invitation')
+      .select('id, scenario_id, utilise')
+      .eq('code', code)
+      .maybeSingle()
+    if (err1 || !invit) return setMessageJoindre(td('code_not_found'))
+    if (invit.utilise) return setMessageJoindre(td('code_already_used'))
+    if (!invit.scenario_id) return setMessageJoindre(td('code_not_scenario'))
+    const { error: err2 } = await supabase
+      .from('scenarios_joueurs')
+      .insert({ scenario_id: invit.scenario_id, joueur_id: user.id })
+    if (err2 && !err2.message.toLowerCase().includes('duplicate')) {
+      return setMessageJoindre(td('cannot_join', { message: err2.message }))
+    }
+    await supabase.from('codes_invitation').update({ utilise: true }).eq('id', invit.id)
+    setMessageJoindre(td('scenario_joined_short'))
+    setCodeScenario('')
   }
 
   const sections: NavSection[] = [
@@ -106,14 +256,23 @@ export default function Sidebar() {
       title: t('section_aventure'),
       items: [
         { label: t('adv_combat'), icon: '⚔', href: '/dashboard/combat' },
-        { label: t('adv_exploration'), icon: '🧭', href: '/dashboard/exploration' }
+        { label: t('adv_exploration'), icon: '🧭', href: '/dashboard/exploration' },
+        { label: 'Mode présentation', icon: '📺', href: '/dashboard/presentation' }
       ]
     },
     {
       title: t('section_outils'),
       items: [
         { label: t('tools_library'), icon: '📚', href: '/dashboard/bibliotheque' },
-        { label: t('tools_community'), icon: '🌍', href: '/dashboard/communaute' }
+        { label: t('tools_community'), icon: '🌍', href: '/dashboard/communaute' },
+        {
+          label: t('tools_soundbox'),
+          icon: '🎵',
+          action: () => {
+            setDrawerOuvert(false)
+            window.dispatchEvent(new CustomEvent('soundbox:open'))
+          }
+        }
       ]
     }
   ]
@@ -123,12 +282,26 @@ export default function Sidebar() {
     router.push(href)
   }
 
-  // Le pli (replie) ne s'applique qu'au mode desktop. Le drawer mobile reste
-  // toujours en version étendue pour la lisibilité.
+  const declencher = (item: NavItem) => {
+    if (item.action) {
+      item.action()
+    } else if (item.href) {
+      aller(item.href)
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Rendu du contenu (compact = desktop replié, sinon mobile drawer ou desktop)
+  // ---------------------------------------------------------------------------
   const renderContenu = (compact: boolean) => {
-    const renderItem = (item: NavItem) => {
+    const renderNavItem = (item: NavItem) => {
+      // Item de type action (Sound Box) : jamais marqué actif, on déclenche
+      // simplement l'action au clic.
+      const isAction = !item.href
       const isMaps = item.href === '/dashboard/maps'
-      const actif = item.match
+      const actif = isAction
+        ? false
+        : item.match
         ? item.match(pathname)
         : pathname === item.href ||
           (isMaps
@@ -136,17 +309,17 @@ export default function Sidebar() {
             : item.href !== '/dashboard' && pathname.startsWith(item.href + '/'))
       return (
         <button
-          key={item.href}
+          key={item.href ?? `action-${item.label}`}
           type="button"
-          onClick={() => aller(item.href)}
+          onClick={() => declencher(item)}
           title={compact ? item.label : undefined}
           aria-label={compact ? item.label : undefined}
           className={`w-full flex items-center ${
             compact ? 'justify-center px-0' : 'gap-2.5 px-3'
-          } py-2 text-left text-[13px] tracking-wide transition border-l-2 ${
+          } py-2 text-left text-[13px] tracking-wide transition-all duration-150 border-l-2 ${
             actif
               ? 'border-l-[#C9A84C] text-[#C9A84C] bg-[rgba(201,168,76,0.08)]'
-              : 'border-l-transparent text-[#a8a8b0] hover:text-white hover:bg-[rgba(201,168,76,0.05)]'
+              : 'border-l-transparent text-[#a8a8b0] hover:text-white hover:bg-[rgba(201,168,76,0.05)] hover:border-l-[rgba(201,168,76,0.4)]'
           }`}
         >
           <span
@@ -160,56 +333,65 @@ export default function Sidebar() {
       )
     }
 
+    // Item « collapsible » pour Thème/Langue/Rejoindre. En mode compact on
+    // affiche juste un bouton qui (re)déplie la sidebar plutôt que d'ouvrir un
+    // sous-menu inline.
+    const renderToggleItem = (
+      icon: string,
+      label: string,
+      ouvert: boolean,
+      onToggle: () => void,
+      meta?: string
+    ) => {
+      if (compact) {
+        return (
+          <button
+            type="button"
+            onClick={togglerReplie}
+            title={label}
+            aria-label={label}
+            className="w-full flex items-center justify-center py-2 border-l-2 border-l-transparent text-[#a8a8b0] hover:text-white hover:bg-[rgba(201,168,76,0.05)] transition-all duration-150"
+          >
+            <span className="text-base leading-none">{icon}</span>
+          </button>
+        )
+      }
+      return (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={ouvert}
+          className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[13px] tracking-wide border-l-2 border-l-transparent text-[#a8a8b0] hover:text-white hover:bg-[rgba(201,168,76,0.05)] hover:border-l-[rgba(201,168,76,0.4)] transition-all duration-150"
+        >
+          <span className="text-base leading-none w-5 text-center flex-shrink-0" aria-hidden="true">
+            {icon}
+          </span>
+          <span className="truncate flex-1">{label}</span>
+          {meta && <span className="text-[10px] text-[#6a6a72] truncate">{meta}</span>}
+          <span className="text-[10px] text-[#6a6a72]">{ouvert ? '▾' : '▸'}</span>
+        </button>
+      )
+    }
+
     return (
-      <div className="h-full flex flex-col bg-[#12141a] border-r border-[rgba(201,168,76,0.2)]">
+      <div className="h-full flex flex-col bg-[#12141a] border-r border-[rgba(201,168,76,0.15)]">
+        {/* En-tête épuré : juste la recherche. L'identité CODEX / La Forge
+            Éclipsée est portée par le titre central du dashboard, plus par la
+            sidebar. */}
         <div
           className={`${
-            compact ? 'px-2 pt-3 pb-2' : 'px-4 pt-4 pb-3'
-          } border-b border-[rgba(201,168,76,0.15)]`}
+            compact ? 'px-2 pt-3 pb-2' : 'px-3 pt-3 pb-2.5'
+          } border-b border-[rgba(201,168,76,0.10)]`}
         >
-          {compact ? (
-            <button
-              type="button"
-              onClick={() => aller('/dashboard')}
-              className="block w-full text-center"
-              aria-label={t('home')}
-              title={t('home')}
-            >
-              <span
-                className="text-[15px] font-bold tracking-tight text-[#C9A84C]"
-                style={{ fontFamily: 'var(--font-cinzel), Cinzel, serif' }}
-              >
-                ⚒
-              </span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => aller('/dashboard')}
-              className="block w-full text-left"
-              aria-label={t('home')}
-            >
-              <p
-                className="text-[13px] font-bold tracking-[0.2em] text-[#C9A84C] truncate"
-                style={{ fontFamily: 'var(--font-cinzel), Cinzel, serif' }}
-              >
-                CODEX
-              </p>
-              <p className="text-[9px] uppercase tracking-[0.2em] text-[#6a6a72] mt-0.5 truncate">
-                {t('tagline')}
-              </p>
-            </button>
-          )}
-
           <button
             type="button"
             onClick={() => {
               setDrawerOuvert(false)
               openCommandPalette()
             }}
-            className={`mt-3 w-full flex items-center ${
+            className={`w-full flex items-center ${
               compact ? 'justify-center px-0 py-1.5' : 'gap-2 px-2.5 py-1.5'
-            } rounded border border-[rgba(201,168,76,0.2)] bg-[rgba(0,0,0,0.3)] hover:bg-[rgba(201,168,76,0.08)] text-[#a8a8b0] hover:text-white text-xs transition`}
+            } rounded border border-[rgba(201,168,76,0.10)] bg-[rgba(0,0,0,0.3)] hover:bg-[rgba(201,168,76,0.08)] hover:border-[rgba(201,168,76,0.30)] text-[#a8a8b0] hover:text-white text-xs transition-all duration-150`}
             title={tSearch('open_tooltip')}
             aria-label={tSearch('open_tooltip')}
           >
@@ -219,7 +401,7 @@ export default function Sidebar() {
                 <span className="flex-1 truncate text-left">
                   {tSearch('open_tooltip')}
                 </span>
-                <kbd className="text-[9px] px-1 py-0.5 rounded bg-[#0a0b0d] border border-[rgba(201,168,76,0.2)] text-[#6a6a72] font-mono">
+                <kbd className="text-[9px] px-1 py-0.5 rounded bg-[#0a0b0d] border border-[rgba(201,168,76,0.10)] text-[#6a6a72] font-mono">
                   {tSearch('shortcut')}
                 </kbd>
               </>
@@ -227,6 +409,7 @@ export default function Sidebar() {
           </button>
         </div>
 
+        {/* Sections de navigation */}
         <nav className="flex-1 overflow-y-auto py-3 [scrollbar-width:thin]">
           {sections.map((section) => (
             <div key={section.title} className="mb-3">
@@ -241,16 +424,325 @@ export default function Sidebar() {
                   {section.title}
                 </p>
               )}
-              <div>{section.items.map(renderItem)}</div>
+              <div>{section.items.map(renderNavItem)}</div>
             </div>
           ))}
+
+          {/* ----- Section PERSONNAGES JOUEURS ----- */}
+          <div className="mb-3">
+            {compact ? (
+              <div
+                className="mx-3 mb-1.5 h-px"
+                style={{ background: 'rgba(201,168,76,0.12)' }}
+                aria-hidden="true"
+              />
+            ) : (
+              <div className="px-4 mb-1.5 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPjsOuvert((v) => !v)}
+                  aria-expanded={pjsOuvert}
+                  className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.22em] text-[#6a6a72] hover:text-[#a8a8b0] font-bold transition-colors"
+                >
+                  <span
+                    className="inline-block text-[10px] transition-transform"
+                    style={{ transform: pjsOuvert ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                    aria-hidden="true"
+                  >
+                    ▸
+                  </span>
+                  <span>Personnages joueurs</span>
+                  <span className="text-[#6a6a72]/80">({pjs.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDrawerOuvert(false)
+                    window.dispatchEvent(new CustomEvent('pj:ajouter:open'))
+                  }}
+                  title="Ajouter un personnage joueur via code d'invitation"
+                  className="text-[9px] uppercase tracking-[0.18em] font-bold px-1.5 py-0.5 rounded text-[#C9A84C] hover:bg-[rgba(201,168,76,0.10)] border border-[rgba(201,168,76,0.20)] hover:border-[rgba(201,168,76,0.55)] transition-all"
+                >
+                  + Ajouter
+                </button>
+              </div>
+            )}
+            {compact ? (
+              // En mode compact : un seul bouton "+" qui (re)déplie la sidebar
+              // puis ouvre la modale via l'évènement global. Évite de tasser le
+              // rail avec des avatars qu'on ne saurait pas lire.
+              <button
+                type="button"
+                onClick={() => {
+                  // Déplie la sidebar pour donner le contexte avant l'ajout.
+                  togglerReplie()
+                  window.dispatchEvent(new CustomEvent('pj:ajouter:open'))
+                }}
+                title="Ajouter un personnage joueur"
+                aria-label="Ajouter un personnage joueur"
+                className="w-full flex items-center justify-center py-2 border-l-2 border-l-transparent text-[#a8a8b0] hover:text-[#C9A84C] hover:bg-[rgba(201,168,76,0.05)] transition-all duration-150"
+              >
+                <span className="text-base leading-none" aria-hidden="true">🎭</span>
+              </button>
+            ) : (
+              pjsOuvert && (
+                <div className="px-2 space-y-1">
+                  {pjs.length === 0 ? (
+                    <p className="px-2 py-2 text-[10px] italic text-[#6a6a72] leading-relaxed">
+                      Aucun PJ rattaché à un scénario.
+                    </p>
+                  ) : (
+                    pjs.map((p) => {
+                      const actif = pathname === `/dashboard/personnages/${p.id}`
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => aller(`/dashboard/personnages/${p.id}`)}
+                          className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-left text-[12px] transition-all ${
+                            actif
+                              ? 'text-[#C9A84C] bg-[rgba(201,168,76,0.08)]'
+                              : 'text-[#a8a8b0] hover:text-white hover:bg-[rgba(201,168,76,0.05)]'
+                          }`}
+                          title={`${p.nom} — ${[p.classe, `Niv. ${p.niveau}`].filter(Boolean).join(' · ')}`}
+                        >
+                          {p.image_url ? (
+                            <img
+                              src={p.image_url}
+                              alt=""
+                              loading="lazy"
+                              className="w-6 h-6 rounded-full object-cover flex-shrink-0 ring-1 ring-[rgba(201,168,76,0.30)]"
+                            />
+                          ) : (
+                            <span className="w-6 h-6 rounded-full bg-[rgba(201,168,76,0.10)] border border-[rgba(201,168,76,0.20)] flex items-center justify-center text-[9px] font-bold flex-shrink-0 text-[#C9A84C]">
+                              {p.nom.slice(0, 2).toUpperCase()}
+                            </span>
+                          )}
+                          <span className="flex-1 truncate">{p.nom}</span>
+                          <span className="text-[9px] text-[#6a6a72] flex-shrink-0">
+                            N{p.niveau}
+                          </span>
+                        </button>
+                      )
+                    })
+                  )}
+                </div>
+              )
+            )}
+          </div>
+
+          {/* ----- Section PARAMÈTRES ----- */}
+          <div className="mb-3">
+            {compact ? (
+              <div
+                className="mx-3 mb-1.5 h-px"
+                style={{ background: 'rgba(201,168,76,0.12)' }}
+                aria-hidden="true"
+              />
+            ) : (
+              <p className="px-4 mb-1.5 text-[9px] uppercase tracking-[0.22em] text-[#6a6a72] font-bold">
+                {t('section_params')}
+              </p>
+            )}
+
+            {renderToggleItem(
+              '🎨',
+              t('params_theme'),
+              themeOuvert,
+              () => setThemeOuvert((v) => !v),
+              THEMES[themeActuel].label
+            )}
+            {!compact && themeOuvert && (
+              <div className="bg-[rgba(0,0,0,0.3)] border-y border-[rgba(201,168,76,0.08)] p-2 space-y-1 max-h-80 overflow-y-auto [scrollbar-width:thin]">
+                {THEME_KEYS.map((key) => {
+                  const theme = THEMES[key]
+                  const actif = themeActuel === key
+                  const premium = PREMIUM_THEMES.includes(key)
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => changerTheme(key)}
+                      className={`w-full flex items-center gap-2 p-1.5 rounded text-left transition-all ${
+                        actif
+                          ? 'bg-[rgba(201,168,76,0.12)] ring-1 ring-[rgba(201,168,76,0.4)]'
+                          : 'hover:bg-[rgba(201,168,76,0.06)]'
+                      } ${premium ? 'ring-1 ring-yellow-600/30' : ''}`}
+                    >
+                      <div
+                        className="flex flex-shrink-0 rounded overflow-hidden"
+                        style={{ border: `1px solid ${theme.colors.border_color}` }}
+                      >
+                        <span
+                          className="block w-2 h-6"
+                          style={{ backgroundColor: theme.colors.bg_primary }}
+                        />
+                        <span
+                          className="block w-2 h-6"
+                          style={{ backgroundColor: theme.colors.bg_secondary }}
+                        />
+                        <span
+                          className="block w-2 h-6"
+                          style={{ backgroundColor: theme.colors.accent_color }}
+                        />
+                      </div>
+                      <span
+                        className={`flex-1 text-[12px] truncate ${
+                          actif ? 'text-white font-bold' : 'text-[#a8a8b0]'
+                        }`}
+                      >
+                        {premium && <span className="mr-0.5">👑</span>}
+                        {theme.label}
+                      </span>
+                      {actif && (
+                        <span className="text-green-400 text-[11px] flex-shrink-0">✓</span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {renderToggleItem(
+              '🌍',
+              t('params_language'),
+              langueOuvert,
+              () => setLangueOuvert((v) => !v),
+              locale === 'fr' ? '🇫🇷' : '🇬🇧'
+            )}
+            {!compact && langueOuvert && (
+              <div className="bg-[rgba(0,0,0,0.3)] border-y border-[rgba(201,168,76,0.08)] p-2 space-y-1">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await setLocale('fr')
+                    setLangueOuvert(false)
+                  }}
+                  className={`w-full flex items-center gap-2 p-1.5 rounded text-left text-[12px] transition-all ${
+                    locale === 'fr' ? 'bg-[rgba(201,168,76,0.12)] text-white font-bold' : 'text-[#a8a8b0] hover:bg-[rgba(201,168,76,0.06)]'
+                  }`}
+                >
+                  <span className="flex-1">{tLang('fr')}</span>
+                  {locale === 'fr' && <span className="text-green-400">✓</span>}
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await setLocale('en')
+                    setLangueOuvert(false)
+                  }}
+                  className={`w-full flex items-center gap-2 p-1.5 rounded text-left text-[12px] transition-all ${
+                    locale === 'en' ? 'bg-[rgba(201,168,76,0.12)] text-white font-bold' : 'text-[#a8a8b0] hover:bg-[rgba(201,168,76,0.06)]'
+                  }`}
+                >
+                  <span className="flex-1">{tLang('en')}</span>
+                  {locale === 'en' && <span className="text-green-400">✓</span>}
+                </button>
+              </div>
+            )}
+
+            {renderToggleItem(
+              '🎟️',
+              t('params_join'),
+              rejoindreOuvert,
+              () => setRejoindreOuvert((v) => !v)
+            )}
+            {!compact && rejoindreOuvert && (
+              <div className="bg-[rgba(0,0,0,0.3)] border-y border-[rgba(201,168,76,0.08)] p-2 space-y-2">
+                <p className="text-[10px] text-[#6a6a72] leading-relaxed">
+                  {td('menu_join_placeholder')}
+                </p>
+                <input
+                  type="text"
+                  value={codeScenario}
+                  onChange={(e) => setCodeScenario(e.target.value)}
+                  placeholder={td('menu_join_code_ph')}
+                  className="w-full p-1.5 rounded bg-[#0a0b0d] text-white border border-[rgba(201,168,76,0.15)] outline-none font-mono uppercase text-xs focus:border-[rgba(201,168,76,0.5)]"
+                />
+                <button
+                  type="button"
+                  onClick={rejoindreScenario}
+                  className="w-full px-2 py-1.5 bg-[#C9A84C] text-[#0a0b0d] font-bold rounded hover:bg-[#d4b558] text-[11px] uppercase tracking-wider transition-all"
+                >
+                  {td('menu_join_button')}
+                </button>
+                {messageJoindre && (
+                  <p className="text-yellow-400 text-[10px]">{messageJoindre}</p>
+                )}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={refaireTutoriel}
+              title={compact ? t('params_tutorial') : undefined}
+              aria-label={compact ? t('params_tutorial') : undefined}
+              className={`w-full flex items-center ${
+                compact ? 'justify-center px-0' : 'gap-2.5 px-3'
+              } py-2 text-left text-[13px] tracking-wide border-l-2 border-l-transparent text-[#a8a8b0] hover:text-white hover:bg-[rgba(201,168,76,0.05)] hover:border-l-[rgba(201,168,76,0.4)] transition-all duration-150`}
+            >
+              <span className="text-base leading-none w-5 text-center flex-shrink-0" aria-hidden="true">
+                🎓
+              </span>
+              {!compact && <span className="truncate">{t('params_tutorial')}</span>}
+            </button>
+
+            {/* Personnaliser la page d'accueil */}
+            <button
+              type="button"
+              onClick={() => aller('/dashboard/personnalisation')}
+              title={compact ? 'Personnaliser l\'accueil' : undefined}
+              aria-label={compact ? 'Personnaliser l\'accueil' : undefined}
+              className={`w-full flex items-center ${
+                compact ? 'justify-center px-0' : 'gap-2.5 px-3'
+              } py-2 text-left text-[13px] tracking-wide border-l-2 border-l-transparent text-[#a8a8b0] hover:text-white hover:bg-[rgba(201,168,76,0.05)] hover:border-l-[rgba(201,168,76,0.4)] transition-all duration-150`}
+            >
+              <span className="text-base leading-none w-5 text-center flex-shrink-0" aria-hidden="true">
+                🎨
+              </span>
+              {!compact && <span className="truncate">Personnaliser l&apos;accueil</span>}
+            </button>
+
+            {/* Accessibilité */}
+            <button
+              type="button"
+              onClick={() => aller('/dashboard/accessibilite')}
+              title={compact ? 'Accessibilité' : undefined}
+              aria-label={compact ? 'Accessibilité' : undefined}
+              className={`w-full flex items-center ${
+                compact ? 'justify-center px-0' : 'gap-2.5 px-3'
+              } py-2 text-left text-[13px] tracking-wide border-l-2 border-l-transparent text-[#a8a8b0] hover:text-white hover:bg-[rgba(201,168,76,0.05)] hover:border-l-[rgba(201,168,76,0.4)] transition-all duration-150`}
+            >
+              <span className="text-base leading-none w-5 text-center flex-shrink-0" aria-hidden="true">
+                ♿
+              </span>
+              {!compact && <span className="truncate">Accessibilité</span>}
+            </button>
+          </div>
         </nav>
 
-        {!compact && (
-          <div className="px-3 py-2 border-t border-[rgba(201,168,76,0.15)] text-[9px] uppercase tracking-[0.2em] text-[#6a6a72] text-center">
-            Eclipsed Forge
-          </div>
-        )}
+        {/* Pied de sidebar : déconnexion */}
+        <div className="border-t border-[rgba(201,168,76,0.12)]">
+          <button
+            type="button"
+            onClick={seDeconnecter}
+            title={compact ? t('params_logout') : undefined}
+            aria-label={compact ? t('params_logout') : undefined}
+            className={`w-full flex items-center ${
+              compact ? 'justify-center px-0' : 'gap-2.5 px-3'
+            } py-2.5 text-left text-[13px] tracking-wide border-l-2 border-l-transparent text-[#a8a8b0] hover:text-red-300 hover:bg-[rgba(220,38,38,0.08)] hover:border-l-red-500/60 transition-all duration-150`}
+          >
+            <span className="text-base leading-none w-5 text-center flex-shrink-0" aria-hidden="true">
+              🚪
+            </span>
+            {!compact && <span className="truncate">{t('params_logout')}</span>}
+          </button>
+          {!compact && (
+            <div className="px-3 py-2 text-[9px] uppercase tracking-[0.2em] text-[#6a6a72] text-center">
+              Eclipsed Forge
+            </div>
+          )}
+        </div>
       </div>
     )
   }
@@ -262,7 +754,7 @@ export default function Sidebar() {
         type="button"
         onClick={() => setDrawerOuvert(true)}
         aria-label={t('open_menu')}
-        className="md:hidden fixed top-1.5 left-1.5 z-[80] w-9 h-9 flex items-center justify-center rounded bg-[#12141a]/90 border border-[rgba(201,168,76,0.3)] text-[#C9A84C] hover:bg-[#1a1d24] active:scale-95 transition"
+        className="md:hidden fixed top-1.5 left-1.5 z-[80] w-9 h-9 flex items-center justify-center rounded bg-[#12141a]/90 border border-[rgba(201,168,76,0.3)] text-[#C9A84C] hover:bg-[#1a1d24] active:scale-95 transition-all duration-150"
       >
         <span aria-hidden="true" className="text-lg leading-none">
           ☰
@@ -282,7 +774,7 @@ export default function Sidebar() {
           aria-label={replie ? t('expand') : t('collapse')}
           aria-pressed={replie}
           title={replie ? t('expand') : t('collapse')}
-          className="absolute top-3 -right-3 z-[71] w-6 h-6 flex items-center justify-center rounded-full bg-[#12141a] border border-[rgba(201,168,76,0.4)] text-[#C9A84C] hover:bg-[#1a1d24] hover:border-[#C9A84C] shadow-md transition text-[11px] leading-none"
+          className="absolute top-3 -right-3 z-[71] w-6 h-6 flex items-center justify-center rounded-full bg-[#12141a] border border-[rgba(201,168,76,0.4)] text-[#C9A84C] hover:bg-[#1a1d24] hover:border-[#C9A84C] shadow-md transition-all duration-150 text-[11px] leading-none"
         >
           {replie ? '▸' : '◂'}
         </button>
@@ -300,7 +792,7 @@ export default function Sidebar() {
           onClick={() => setDrawerOuvert(false)}
         />
         <aside
-          className={`absolute top-0 left-0 bottom-0 w-[240px] max-w-[80vw] shadow-2xl transition-transform duration-200 ease-out ${
+          className={`absolute top-0 left-0 bottom-0 w-[260px] max-w-[85vw] shadow-2xl transition-transform duration-200 ease-out ${
             drawerOuvert ? 'translate-x-0' : '-translate-x-full'
           }`}
           aria-label={t('main_nav')}
@@ -310,7 +802,7 @@ export default function Sidebar() {
             type="button"
             onClick={() => setDrawerOuvert(false)}
             aria-label={t('close_menu')}
-            className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center rounded text-[#6a6a72] hover:text-white hover:bg-[rgba(255,255,255,0.05)] text-lg"
+            className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center rounded text-[#6a6a72] hover:text-white hover:bg-[rgba(255,255,255,0.05)] text-lg transition-all"
           >
             ✕
           </button>

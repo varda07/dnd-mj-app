@@ -348,6 +348,17 @@ export default function ExplorationPage() {
     explorationRef.current = exploration
   }, [exploration])
 
+  // Cleanup au démontage : si un drag-save est en attente, on l'annule pour
+  // éviter un setTimeout orphelin qui appellerait setState après unmount.
+  useEffect(() => {
+    return () => {
+      if (dragSaveTimerRef.current) {
+        clearTimeout(dragSaveTimerRef.current)
+        dragSaveTimerRef.current = null
+      }
+    }
+  }, [])
+
   const startMarkerDrag = useCallback((
     kind: 'positions_pj' | 'items_caches' | 'ennemis_caches',
     key: string,

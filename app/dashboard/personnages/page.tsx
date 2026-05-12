@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import ImageCropper from '@/app/components/ImageCropper'
+import StarFavori from '@/app/components/StarFavori'
+import { useFavoris } from '@/app/lib/favoris'
 import {
   construireEnveloppe,
   lireFichierJSON,
@@ -133,6 +135,8 @@ export default function Personnages() {
   const [scenarios, setScenarios] = useState<ScenarioOption[]>([])
   const [scenarioId, setScenarioId] = useState('')
   const [cropperKey, setCropperKey] = useState(0)
+  const [favorisOnly, setFavorisOnly] = useState(false)
+  const { est: estFavori } = useFavoris()
   const [codesVisibles, setCodesVisibles] = useState<Record<string, string>>({})
   const [aideOuverte, setAideOuverte] = useState(false)
   const [fichePanelOuvert, setFichePanelOuvert] = useState(true)
@@ -818,8 +822,8 @@ export default function Personnages() {
                   <Help text={methodeStats === '4d6' ? "Sélectionne une race. En méthode 4d6, les bonus raciaux ne sont pas appliqués aux stats — les jets restent bruts." : "Sélectionne une race : les bonus de caractéristiques s'appliqueront automatiquement (base 8 + bonus)."} />
                 </label>
                 <select value={race} onChange={(e) => changerRace(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none">
-                  {RACES.map((r) => (
-                    <option key={r.nom} value={r.nom}>
+                  {RACES.map((r, idx) => (
+                    <option key={`${r.nom}-${idx}`} value={r.nom}>
                       {methodeStats === '4d6'
                         ? r.nom
                         : `${r.nom} — ${Object.entries(r.bonusStats).map(([k, v]) => `+${v} ${STAT_COURT[k as StatKey]}`).join(', ')}`}
@@ -835,8 +839,8 @@ export default function Personnages() {
                   <Help text={`Classe ${classeObj?.nom ?? ''} : HP niveau 1 = ${classeObj?.hpNiveau1Base ?? '?'} + mod Con. Les jets de sauvegarde maîtrisés sont pré-cochés ci-dessous.`} />
                 </label>
                 <select value={classe} onChange={(e) => changerClasse(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none">
-                  {CLASSES.map((c) => (
-                    <option key={c.nom} value={c.nom}>
+                  {CLASSES.map((c, idx) => (
+                    <option key={`${c.nom}-${idx}`} value={c.nom}>
                       {c.nom} ({c.deVie}) — {c.caracteristiquesPrincipales.map((s) => STAT_COURT[s]).join('/')}
                     </option>
                   ))}
@@ -851,8 +855,8 @@ export default function Personnages() {
                   <Help text="L'historique accorde 2 maîtrises de compétences (pré-cochées ci-dessous)." />
                 </label>
                 <select value={historique} onChange={(e) => changerHistorique(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none">
-                  {HISTORIQUES.map((h) => (
-                    <option key={h.nom} value={h.nom}>
+                  {HISTORIQUES.map((h, idx) => (
+                    <option key={`${h.nom}-${idx}`} value={h.nom}>
                       {h.nom} — {h.competences.join(', ')}
                     </option>
                   ))}
@@ -1174,13 +1178,13 @@ export default function Personnages() {
                       <Help text={`Les 2 compétences d'historique (${histObj?.competences.join(', ') ?? '—'}) sont pré-cochées. Ta classe peut en ajouter d'autres.`} />
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-64 overflow-y-auto pr-1">
-                      {COMPETENCES.map((comp) => {
+                      {COMPETENCES.map((comp, idx) => {
                         const coche = competencesCochees.has(comp.nom)
                         const mod = modificateur(statsCourantes[comp.stat])
                         const total = coche ? mod + bonusMaitriseNum : mod
                         return (
                           <label
-                            key={comp.nom}
+                            key={`${comp.nom}-${idx}`}
                             className={`flex items-center gap-2 px-2 py-1 rounded border cursor-pointer text-[11px] ${
                               coche
                                 ? 'bg-yellow-500/10 border-yellow-600/60 text-yellow-200'
@@ -1318,7 +1322,18 @@ export default function Personnages() {
             </button>
           </div>
           {personnages.length === 0 && <p className="text-gray-400">{t('empty')}</p>}
-          {personnages.map((perso) => (
+          <label className="inline-flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={favorisOnly}
+              onChange={(e) => setFavorisOnly(e.target.checked)}
+              className="accent-yellow-500"
+            />
+            ⭐ Afficher uniquement les favoris
+          </label>
+          {personnages
+            .filter((pp) => !favorisOnly || estFavori('personnages', pp.id))
+            .map((perso) => (
             <div key={perso.id} className="bg-gray-800 p-4 rounded-lg">
               <div className="flex gap-3">
                 {perso.image_url && (
@@ -1330,7 +1345,10 @@ export default function Personnages() {
                   />
                 )}
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-bold text-white break-words">{perso.nom}</h3>
+                  <div className="flex items-center gap-2">
+                    <StarFavori type="personnages" id={perso.id} />
+                    <h3 className="text-lg font-bold text-white break-words">{perso.nom}</h3>
+                  </div>
                   <p className="text-gray-400 text-xs break-words">
                     {perso.race} · {perso.classe} · Niv. {perso.niveau} · 🎲 {perso.de_vie}
                   </p>

@@ -2,6 +2,7 @@ import DiceLauncher from '@/app/components/DiceLauncher'
 import SoundBox from '@/app/components/SoundBox'
 import CommandPalette from '@/app/components/CommandPalette'
 import Sidebar from '@/app/components/Sidebar'
+import OnboardingTutorial from '@/app/components/OnboardingTutorial'
 import ThemeLoader from './ThemeLoader'
 
 export default function DashboardLayout({
@@ -19,6 +20,7 @@ export default function DashboardLayout({
       <SoundBox />
       <DiceLauncher />
       <CommandPalette />
+      <OnboardingTutorial />
     </>
   )
 }

@@ -322,19 +322,10 @@ function CombatInner() {
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current)
       if (roundAnnouncementTimeoutRef.current) clearTimeout(roundAnnouncementTimeoutRef.current)
-      console.log('[KO]', performance.now().toFixed(0), 'UNMOUNT — clear', koTimers.size, 'timer(s) actif(s) :', Array.from(koTimers.keys()))
       koTimers.forEach((t) => clearTimeout(t))
       koTimers.clear()
     }
   }, [])
-
-  useEffect(() => {
-    console.log('[KO]', performance.now().toFixed(0), 'koAnimating Set:', Array.from(koAnimating), 'size:', koAnimating.size)
-  }, [koAnimating])
-
-  useEffect(() => {
-    console.log('[KO]', performance.now().toFixed(0), 'etatsCombat:', etatsCombat)
-  }, [etatsCombat])
 
   const fetchScenarios = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -738,8 +729,6 @@ function CombatInner() {
   const triggerKO = useCallback((p: Participant) => {
     const pid = pieceIdOf(p)
     const isPerso = p.kind === 'perso'
-    const t0 = performance.now().toFixed(0)
-    console.log('[KO]', t0, 'triggerKO appelé pour', p.nom, 'isPerso:', isPerso, 'piece_id:', pid)
     const status: StatutKO = isPerso ? 'inconscient' : 'vaincu'
     setEtatsCombat((prev) => {
       const cur = prev[pid] ?? {}
@@ -757,23 +746,17 @@ function CombatInner() {
     setKoAnimating((s) => {
       const next = new Set(s)
       next.add(pid)
-      console.log('[KO]', performance.now().toFixed(0), 'ADD pid au Set →', Array.from(next))
       return next
     })
     // Si un timer existe déjà pour ce pid (re-trigger rapide), on l'annule.
     const existing = koTimerRef.current.get(pid)
-    if (existing) {
-      console.log('[KO]', t0, 'annule timer précédent pour', pid)
-      clearTimeout(existing)
-    }
+    if (existing) clearTimeout(existing)
     const timer = setTimeout(() => {
-      console.log('[KO]', performance.now().toFixed(0), 'setTimeout 3000ms FIRE pour', pid, '— retire du Set')
       koTimerRef.current.delete(pid)
       setKoAnimating((s) => {
         if (!s.has(pid)) return s
         const next = new Set(s)
         next.delete(pid)
-        console.log('[KO]', performance.now().toFixed(0), 'REMOVE pid du Set →', Array.from(next))
         return next
       })
     }, 3000)
@@ -800,7 +783,14 @@ function CombatInner() {
     const nouveauHp = Math.max(0, Math.min(p.hp_max, p.hp_actuel + delta))
     if (nouveauHp === p.hp_actuel) return
     const table = p.kind === 'perso' ? 'personnages' : 'ennemis'
-    await supabase.from(table).update({ hp_actuel: nouveauHp }).eq('id', p.id)
+    const { error: hpErr } = await supabase
+      .from(table)
+      .update({ hp_actuel: nouveauHp })
+      .eq('id', p.id)
+    if (hpErr) {
+      console.error('[combat] HP update échec — état local désynchronisé :', hpErr)
+      return
+    }
     if (p.kind === 'perso') {
       setPersonnages((ps) =>
         ps.map((pp) => (pp.id === p.id ? { ...pp, hp_actuel: nouveauHp } : pp))
@@ -1213,8 +1203,17 @@ function CombatInner() {
           // Réveil — le PJ remonte à 1 PV
           success = 0
           failure = 0
-          // Met à jour le HP du perso aussi (en BDD + local)
-          void supabase.from('personnages').update({ hp_actuel: 1 }).eq('id', refId)
+          // Met à jour le HP du perso aussi (en BDD + local). On log mais on
+          // ne bloque pas l'UI — l'update local optimiste reste valide visible.
+          supabase
+            .from('personnages')
+            .update({ hp_actuel: 1 })
+            .eq('id', refId)
+            .then(({ error }) => {
+              if (error) {
+                console.error('[combat] réveil HP=1 update échec :', error)
+              }
+            })
           setPersonnages((arr) =>
             arr.map((p) => (p.id === refId ? { ...p, hp_actuel: 1 } : p))
           )
@@ -1736,13 +1735,6 @@ function CombatInner() {
                         etat?.status === 'inconscient' ? 'ko-aura-perso ko-crack-perso' : ''
                       ].filter(Boolean).join(' ')
                       const showCracksSVG = isPerso && (isAnimating || etat?.status === 'inconscient' || etat?.status === 'mort')
-                      if (etat || isAnimating) {
-                        console.log('[KO] rendu carte', entry.nom,
-                          'isAnimating:', isAnimating,
-                          'imageEffectClass appliquée:', `"${imageEffectClass}"`,
-                          'cardKoClass:', `"${cardKoClass}"`,
-                          'data-piece-id:', entry.piece_id)
-                      }
                       return (
                         <div
                           key={entry.piece_id}

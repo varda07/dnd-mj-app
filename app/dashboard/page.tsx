@@ -2,21 +2,14 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
-import { useLocale } from '@/app/i18n/IntlProvider'
-import { openCommandPalette } from '@/app/components/CommandPalette'
+import { useFavoris, type FavoriType } from '@/app/lib/favoris'
+import type { DashboardPrefs } from '@/app/lib/widgets'
+import CustomDashboard from '@/app/components/CustomDashboard'
 import Combat from './combat/page'
-import {
-  THEMES,
-  THEME_KEYS,
-  DEFAULT_THEME,
-  PREMIUM_THEMES,
-  applyTheme,
-  type ThemeKey
-} from '@/app/styles/themes'
 
 type ScenarioLite = { id: string; nom: string; actif?: boolean }
 type PersoLite = {
@@ -28,6 +21,15 @@ type PersoLite = {
   hp_max: number
   image_url: string | null
   scenario_id: string | null
+}
+
+type FavorisQuickItem = {
+  type: FavoriType
+  id: string
+  nom: string
+  image_url: string | null
+  route: string
+  icone: string
 }
 
 type ScenarioActif = {
@@ -49,85 +51,154 @@ export default function Dashboard() {
   const [codePersonnage, setCodePersonnage] = useState('')
   const [messageMj, setMessageMj] = useState('')
   const [scenariosRejoints, setScenariosRejoints] = useState<ScenarioLite[]>([])
-  const [codeScenario, setCodeScenario] = useState('')
-  const [messageJoueur, setMessageJoueur] = useState('')
   const [personnagesJoueurs, setPersonnagesJoueurs] = useState<PersoLite[]>([])
   const [scenarioActif, setScenarioActif] = useState<ScenarioActif | null>(null)
-  const [menuOuvert, setMenuOuvert] = useState(false)
-  const [themeOuvert, setThemeOuvert] = useState(false)
-  const [rejoindreOuvert, setRejoindreOuvert] = useState(false)
-  const [personnagesOuvert, setPersonnagesOuvert] = useState(false)
-  const [themeActuel, setThemeActuel] = useState<ThemeKey>(DEFAULT_THEME)
-  const [langueOuvert, setLangueOuvert] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
+  // Modale "Ajouter un personnage joueur" — déclenchée par l'évènement
+  // global `pj:ajouter:open` (dispatché depuis la sidebar).
+  const [ajoutPjOuvert, setAjoutPjOuvert] = useState(false)
+  const [favorisItems, setFavorisItems] = useState<FavorisQuickItem[]>([])
+  // Configuration custom du dashboard (jsonb sur profiles). Si une config
+  // est marquée active, elle remplace le grimoire par défaut côté MJ.
+  const [customPrefs, setCustomPrefs] = useState<DashboardPrefs | null>(null)
+  // Stats affichées dans les 4 "pages" en bas du grimoire (vue MJ)
+  const [stats, setStats] = useState({
+    personnages: 0,
+    ennemis: 0,
+    scenarios: 0,
+    quetesActives: 0
+  })
+  const { favoris } = useFavoris()
   const router = useRouter()
   const pathname = usePathname()
   const t = useTranslations('dashboard')
-  const tLang = useTranslations('language')
-  const tSearch = useTranslations('search')
-  const { locale, setLocale } = useLocale()
 
+  // Charge la config custom du dashboard (si l'utilisateur en a sauvegardé
+  // une et l'a marquée active).
   useEffect(() => {
+    let cancel = false
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       const { data } = await supabase
         .from('profiles')
-        .select('theme')
+        .select('dashboard_config')
         .eq('id', user.id)
         .maybeSingle()
-      const raw = data?.theme as string | undefined
-      if (raw && raw in THEMES) setThemeActuel(raw as ThemeKey)
+      if (cancel) return
+      const raw = data?.dashboard_config as DashboardPrefs | null
+      if (raw && Array.isArray(raw.configs)) setCustomPrefs(raw)
     }
     load()
+    return () => {
+      cancel = true
+    }
   }, [])
 
-  const changerTheme = async (key: ThemeKey) => {
-    applyTheme(key)
-    setThemeActuel(key)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    const { data: existing, error: selectError } = await supabase
-      .from('profiles')
-      .select('username, role')
-      .eq('id', user.id)
-      .maybeSingle()
-    if (selectError) {
-      console.error('[theme] lecture profil échec :', selectError)
+  // Écoute l'évènement global pour ouvrir la modale d'ajout de PJ depuis la
+  // sidebar (ou n'importe quel point d'entrée externe).
+  useEffect(() => {
+    const onOpen = () => {
+      setMessageMj('')
+      setCodePersonnage('')
+      setScenarioCibleId('')
+      setAjoutPjOuvert(true)
     }
+    window.addEventListener('pj:ajouter:open', onOpen)
+    return () => window.removeEventListener('pj:ajouter:open', onOpen)
+  }, [])
 
-    const username =
-      (existing?.username as string | undefined) ?? user.email ?? user.id
-    const role = (existing?.role as string | undefined) ?? 'joueur'
+  // --------------------------------------------------------------------------
+  // Charge le nom + image des éléments épinglés en favoris pour la section
+  // « ⭐ Favoris » en haut du dashboard. Re-fetch à chaque changement de
+  // la map (toggle d'étoile).
+  // --------------------------------------------------------------------------
+  useEffect(() => {
+    let cancel = false
+    const fetchAll = async () => {
+      const out: FavorisQuickItem[] = []
+      const tables: Array<{
+        table: string
+        type: FavoriType
+        icone: string
+        route: (id: string) => string
+      }> = [
+        { table: 'scenarios', type: 'scenarios', icone: '📖', route: (id) => `/dashboard/scenarios/${id}/edit` },
+        { table: 'personnages', type: 'personnages', icone: '🎭', route: (id) => `/dashboard/personnages/${id}` },
+        { table: 'pnj', type: 'pnj', icone: '🧑', route: (id) => `/dashboard/pnj/${id}` },
+        { table: 'ennemis', type: 'ennemis', icone: '👹', route: () => `/dashboard/ennemis` },
+        { table: 'items', type: 'items', icone: '🎒', route: () => `/dashboard/items` },
+        { table: 'maps', type: 'maps', icone: '🗺️', route: () => `/dashboard/maps` },
+        { table: 'sorts', type: 'sorts', icone: '✨', route: () => `/dashboard/sorts` }
+      ]
+      for (const conf of tables) {
+        const ids = favoris[conf.type] ?? []
+        if (ids.length === 0) continue
+        // La table 'sorts' n'a pas de colonne image_url — on sélectionne donc
+        // un superset (id + nom) et l'image_url uniquement quand disponible.
+        const select = conf.table === 'sorts' ? 'id, nom' : 'id, nom, image_url'
+        const res = await supabase
+          .from(conf.table)
+          .select(select)
+          .in('id', ids)
+        const rows = (res.data ?? []) as unknown as Array<{
+          id: string
+          nom: string
+          image_url?: string | null
+        }>
+        rows.forEach((r) => {
+          out.push({
+            type: conf.type,
+            id: r.id,
+            nom: r.nom,
+            image_url: r.image_url ?? null,
+            route: conf.route(r.id),
+            icone: conf.icone
+          })
+        })
+      }
+      if (!cancel) setFavorisItems(out)
+    }
+    fetchAll()
+    return () => {
+      cancel = true
+    }
+  }, [favoris])
 
-    const { error } = await supabase
-      .from('profiles')
-      .upsert({ id: user.id, username, role, theme: key })
-    if (error) {
-      console.error('[theme] sauvegarde échec :', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code,
-        payload: { id: user.id, username, role, theme: key }
+  // --------------------------------------------------------------------------
+  // Stats agrégées (vue MJ) : counts pour les 4 « pages » du grimoire.
+  // ennemis et quetes sont récupérés via Supabase ; les autres dérivent de
+  // l'état déjà chargé (scenariosMj, personnagesJoueurs).
+  // --------------------------------------------------------------------------
+  useEffect(() => {
+    let cancel = false
+    const loadStats = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const [enn, qts] = await Promise.all([
+        supabase
+          .from('ennemis')
+          .select('id', { count: 'exact', head: true })
+          .eq('mj_id', user.id),
+        // RLS filtre déjà les quêtes aux scénarios du MJ → un simple count
+        // suffit.
+        supabase
+          .from('quetes')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'active')
+      ])
+      if (cancel) return
+      setStats({
+        personnages: personnagesJoueurs.length,
+        ennemis: enn.count ?? 0,
+        scenarios: scenariosMj.length,
+        quetesActives: qts.count ?? 0
       })
     }
-  }
-
-  useEffect(() => {
-    if (!menuOuvert) return
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOuvert(false)
-        setThemeOuvert(false)
-        setRejoindreOuvert(false)
-        setLangueOuvert(false)
-      }
+    loadStats()
+    return () => {
+      cancel = true
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [menuOuvert])
+  }, [personnagesJoueurs.length, scenariosMj.length])
 
   const fetchPersonnagesJoueurs = async (scenarioIds: string[]) => {
     if (scenarioIds.length === 0) {
@@ -244,32 +315,36 @@ export default function Dashboard() {
     init()
   }, [])
 
-  const ajouterPersonnageAuScenario = async () => {
+  const ajouterPersonnageAuScenario = async (): Promise<boolean> => {
     setMessageMj('')
     const code = codePersonnage.trim().toUpperCase()
-    if (!code) return setMessageMj(t('enter_code'))
-    if (!scenarioCibleId) return setMessageMj(t('choose_scenario'))
+    if (!code) { setMessageMj(t('enter_code')); return false }
+    if (!scenarioCibleId) { setMessageMj(t('choose_scenario')); return false }
 
     const { data: invit, error: err1 } = await supabase
       .from('codes_invitation')
       .select('id, personnage_id, utilise')
       .eq('code', code)
       .maybeSingle()
-    if (err1 || !invit) return setMessageMj(t('code_not_found'))
-    if (invit.utilise) return setMessageMj(t('code_already_used'))
-    if (!invit.personnage_id) return setMessageMj(t('code_not_player'))
+    if (err1 || !invit) { setMessageMj(t('code_not_found')); return false }
+    if (invit.utilise) { setMessageMj(t('code_already_used')); return false }
+    if (!invit.personnage_id) { setMessageMj(t('code_not_player')); return false }
 
     const { error: err2 } = await supabase
       .from('personnages')
       .update({ scenario_id: scenarioCibleId })
       .eq('id', invit.personnage_id)
-    if (err2) return setMessageMj(t('cannot_link', { message: err2.message }))
+    if (err2) { setMessageMj(t('cannot_link', { message: err2.message })); return false }
 
     await supabase.from('codes_invitation').update({ utilise: true }).eq('id', invit.id)
 
     setMessageMj(t('character_added_ok'))
     setCodePersonnage('')
     fetchPersonnagesJoueurs(scenariosMj.map((s) => s.id))
+    // Notifie la sidebar (et tout autre listener) qu'un PJ vient d'être ajouté
+    // pour qu'elle rafraîchisse sa propre liste.
+    window.dispatchEvent(new CustomEvent('pj:ajouter:done'))
+    return true
   }
 
   const quitterScenario = async (scenarioId: string) => {
@@ -280,723 +355,261 @@ export default function Dashboard() {
       .eq('scenario_id', scenarioId)
       .eq('joueur_id', userId)
     if (error) {
-      setMessageJoueur(t('cannot_leave', { message: error.message }))
+      console.error('[scenario] quitter échec :', error)
+      window.alert(t('cannot_leave', { message: error.message }))
       return
     }
     setScenariosRejoints((prev) => prev.filter((s) => s.id !== scenarioId))
   }
 
-  const rejoindreScenario = async () => {
-    setMessageJoueur('')
-    const code = codeScenario.trim().toUpperCase()
-    if (!code) return setMessageJoueur(t('enter_code'))
-
-    const { data: invit, error: err1 } = await supabase
-      .from('codes_invitation')
-      .select('id, scenario_id, utilise')
-      .eq('code', code)
-      .maybeSingle()
-    if (err1 || !invit) return setMessageJoueur(t('code_not_found'))
-    if (invit.utilise) return setMessageJoueur(t('code_already_used'))
-    if (!invit.scenario_id) return setMessageJoueur(t('code_not_scenario'))
-
-    const { error: err2 } = await supabase
-      .from('scenarios_joueurs')
-      .insert({ scenario_id: invit.scenario_id, joueur_id: userId })
-    if (err2 && !err2.message.toLowerCase().includes('duplicate')) {
-      return setMessageJoueur(t('cannot_join', { message: err2.message }))
-    }
-
-    await supabase.from('codes_invitation').update({ utilise: true }).eq('id', invit.id)
-
-    const { data: scenario } = await supabase
-      .from('scenarios')
-      .select('id, nom')
-      .eq('id', invit.scenario_id)
-      .maybeSingle()
-
-    if (scenario) {
-      setScenariosRejoints((prev) =>
-        prev.some((s) => s.id === scenario.id) ? prev : [...prev, scenario]
-      )
-      setMessageJoueur(t('scenario_joined_ok', { nom: scenario.nom }))
-    } else {
-      setMessageJoueur(t('scenario_joined_short'))
-    }
-    setCodeScenario('')
-  }
-
   return (
-    <main className="min-h-screen bg-gray-900 text-white pb-[calc(56px+env(safe-area-inset-bottom))] md:pb-0">
-      <div className="bg-gray-800 h-12 md:h-auto pl-12 pr-3 md:p-4 flex md:grid md:grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-gray-700 theme-header-border theme-no-deco">
-        <div className="min-w-0 flex-1 md:flex-initial md:justify-self-start">
-          <h1
-            className="text-base md:text-2xl font-bold text-yellow-500 truncate text-left tracking-[0.22em]"
-            style={{ fontFamily: 'var(--font-cinzel), Cinzel, serif' }}
+    <main className="codex-fade-in min-h-screen bg-gray-900 text-white pb-[calc(56px+env(safe-area-inset-bottom))] md:pb-0">
+      {/* Top bar épurée : juste le toggle MJ/Joueur centré, sans titre ni
+          slogan (le titre CODEX vit dans le grimoire central). */}
+      <div className="h-12 md:h-auto pl-12 pr-3 md:p-3 flex items-center justify-end md:justify-center gap-2 border-b border-[rgba(201,168,76,0.10)] theme-header-border theme-no-deco">
+        <div className="grimoire-pill-group">
+          <button
+            type="button"
+            onClick={() => setInterface('mj')}
+            className={`grimoire-pill ${interface_ === 'mj' ? 'is-active' : ''}`}
           >
-            {t('app_title')}
-          </h1>
-          <p
-            className="hidden md:block text-[11px] uppercase text-left truncate mt-0.5 italic"
-            style={{
-              color: THEMES[themeActuel].colors.accent_color,
-              opacity: 0.75,
-              fontFamily: 'var(--font-cinzel), Cinzel, serif',
-              letterSpacing: '0.25em',
-              textShadow: `0 0 6px ${THEMES[themeActuel].colors.accent_color}66`
-            }}
-          >
-            {THEMES[themeActuel].slogan}
-          </p>
-          {themeActuel === 'royal' && (
-            <div
-              className="hidden md:flex justify-center mt-2"
-              style={{
-                background: '#030100',
-                boxShadow: 'inset 0 0 24px rgba(0,0,0,0.95)',
-                borderRadius: '4px',
-                padding: '6px 10px',
-                width: 'fit-content',
-                margin: '8px auto 0'
-              }}
-            >
-              <svg
-                viewBox="0 0 200 80"
-                width="120"
-                aria-label="Yeux de dragon royal"
-              >
-                <style>{`
-                  .royal-eye {
-                    transform-box: fill-box;
-                    transform-origin: center;
-                    animation: royal-eye-blink 4.5s infinite ease-in-out;
-                  }
-                  .royal-iris-wrap {
-                    transform-box: fill-box;
-                    transform-origin: center;
-                    animation: royal-eye-scan 6s infinite ease-in-out;
-                  }
-                  .royal-iris-inner {
-                    animation: royal-iris-pulse 3s infinite ease-in-out;
-                  }
-                  @keyframes royal-eye-blink {
-                    0%, 88%, 100% { transform: scaleY(1); }
-                    92% { transform: scaleY(0.05); }
-                    96% { transform: scaleY(0.05); }
-                  }
-                  @keyframes royal-eye-scan {
-                    0%, 100% { transform: translateX(0); }
-                    30% { transform: translateX(-1.5px); }
-                    70% { transform: translateX(1.5px); }
-                  }
-                  @keyframes royal-iris-pulse {
-                    0%, 100% { opacity: 0.88; }
-                    50% { opacity: 1; }
-                  }
-                `}</style>
-
-                <defs>
-                  <radialGradient id="royal-iris-left" cx="0.5" cy="0.5" r="0.55">
-                    <stop offset="0%" stopColor="#ff2200" />
-                    <stop offset="25%" stopColor="#cc1100" />
-                    <stop offset="55%" stopColor="#880000" />
-                    <stop offset="80%" stopColor="#330000" />
-                    <stop offset="100%" stopColor="#0a0000" />
-                  </radialGradient>
-                  <radialGradient id="royal-iris-right" cx="0.5" cy="0.5" r="0.55">
-                    <stop offset="0%" stopColor="#ff2200" />
-                    <stop offset="25%" stopColor="#cc1100" />
-                    <stop offset="55%" stopColor="#880000" />
-                    <stop offset="80%" stopColor="#330000" />
-                    <stop offset="100%" stopColor="#0a0000" />
-                  </radialGradient>
-                  <clipPath id="royal-eye-clip-left">
-                    <path d="M 32 38 Q 38 28 48 26 Q 70 30 86 46 Q 72 54 52 54 Q 36 48 32 38 Z" />
-                  </clipPath>
-                  <clipPath id="royal-eye-clip-right">
-                    <path d="M 168 38 Q 162 28 152 26 Q 130 30 114 46 Q 128 54 148 54 Q 164 48 168 38 Z" />
-                  </clipPath>
-                </defs>
-
-                {/* Fond sombre */}
-                <rect x="0" y="0" width="200" height="80" fill="#030100" />
-
-                {/* ŒIL GAUCHE */}
-                <g className="royal-eye">
-                  {/* Socle noir sous l'iris */}
-                  <path
-                    d="M 32 38 Q 38 28 48 26 Q 70 30 86 46 Q 72 54 52 54 Q 36 48 32 38 Z"
-                    fill="#0a0000"
-                  />
-                  <g clipPath="url(#royal-eye-clip-left)">
-                    <g className="royal-iris-wrap">
-                      <circle
-                        cx="60"
-                        cy="40"
-                        r="14"
-                        fill="url(#royal-iris-left)"
-                        className="royal-iris-inner"
-                      />
-                      {/* Veines fines rouges */}
-                      <g stroke="#ff2200" strokeWidth="0.25" fill="none" opacity="0.55">
-                        <path d="M 50 34 Q 53 38 52 42" />
-                        <path d="M 68 34 Q 69 39 68 42" />
-                        <path d="M 52 46 Q 56 44 56 48" />
-                        <path d="M 66 46 Q 68 44 70 47" />
-                        <path d="M 48 40 Q 52 42 50 44" />
-                      </g>
-                      {/* Pupille fendue verticale */}
-                      <ellipse cx="60" cy="40" rx="1.2" ry="11" fill="#000" />
-                      {/* Reflet orange haut-gauche */}
-                      <ellipse cx="55" cy="35" rx="2.2" ry="1.4" fill="#ff8844" opacity="0.82" />
-                    </g>
-                  </g>
-                  {/* Contour de la paupière */}
-                  <path
-                    d="M 32 38 Q 38 28 48 26 Q 70 30 86 46 Q 72 54 52 54 Q 36 48 32 38 Z"
-                    fill="none"
-                    stroke="#3a0000"
-                    strokeWidth="0.4"
-                  />
-                </g>
-
-                {/* ŒIL DROIT (miroir) */}
-                <g className="royal-eye">
-                  <path
-                    d="M 168 38 Q 162 28 152 26 Q 130 30 114 46 Q 128 54 148 54 Q 164 48 168 38 Z"
-                    fill="#0a0000"
-                  />
-                  <g clipPath="url(#royal-eye-clip-right)">
-                    <g className="royal-iris-wrap">
-                      <circle
-                        cx="140"
-                        cy="40"
-                        r="14"
-                        fill="url(#royal-iris-right)"
-                        className="royal-iris-inner"
-                      />
-                      <g stroke="#ff2200" strokeWidth="0.25" fill="none" opacity="0.55">
-                        <path d="M 130 34 Q 133 38 132 42" />
-                        <path d="M 148 34 Q 149 39 148 42" />
-                        <path d="M 132 46 Q 136 44 136 48" />
-                        <path d="M 146 46 Q 148 44 150 47" />
-                        <path d="M 128 40 Q 132 42 130 44" />
-                      </g>
-                      <ellipse cx="140" cy="40" rx="1.2" ry="11" fill="#000" />
-                      <ellipse cx="135" cy="35" rx="2.2" ry="1.4" fill="#ff8844" opacity="0.82" />
-                    </g>
-                  </g>
-                  <path
-                    d="M 168 38 Q 162 28 152 26 Q 130 30 114 46 Q 128 54 148 54 Q 164 48 168 38 Z"
-                    fill="none"
-                    stroke="#3a0000"
-                    strokeWidth="0.4"
-                  />
-                </g>
-              </svg>
-            </div>
-          )}
-        </div>
-        <div className="hidden md:flex bg-gray-700 rounded-lg p-1 md:justify-self-center">
-          <button type="button" onClick={() => setInterface('mj')} className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-md text-sm sm:text-base font-bold transition ${interface_ === 'mj' ? 'bg-yellow-500 text-gray-900' : 'text-gray-400 hover:text-white'}`}>
             {t('interface_mj')}
           </button>
-          <button type="button" onClick={() => setInterface('joueur')} className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-md text-sm sm:text-base font-bold transition ${interface_ === 'joueur' ? 'bg-yellow-500 text-gray-900' : 'text-gray-400 hover:text-white'}`}>
+          <button
+            type="button"
+            onClick={() => setInterface('joueur')}
+            className={`grimoire-pill ${interface_ === 'joueur' ? 'is-active' : ''}`}
+          >
             {t('interface_player')}
           </button>
         </div>
-        <div className="relative md:justify-self-end flex items-center gap-1" ref={menuRef}>
-          <button
-            type="button"
-            onClick={openCommandPalette}
-            aria-label={tSearch('open_tooltip')}
-            title={tSearch('open_tooltip')}
-            className="md:hidden w-10 h-10 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 rounded transition text-lg leading-none"
-          >
-            🔎
-          </button>
-          <button
-            type="button"
-            onClick={openCommandPalette}
-            title={tSearch('open_tooltip')}
-            className="hidden md:inline-flex items-center gap-2 h-9 px-3 rounded border border-gray-700 bg-gray-900/60 hover:bg-gray-700 text-gray-400 hover:text-white text-xs transition"
-          >
-            <span aria-hidden="true">🔎</span>
-            <span className="tracking-wide">{tSearch('open_tooltip')}</span>
-            <kbd className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-gray-800 border border-gray-600 text-gray-400 font-mono">
-              {tSearch('shortcut')}
-            </kbd>
-          </button>
-          <button
-            type="button"
-            onClick={() => setMenuOuvert((v) => !v)}
-            aria-label="Menu"
-            aria-expanded={menuOuvert}
-            className="w-10 h-10 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 rounded transition text-2xl leading-none"
-          >
-            ☰
-          </button>
-          {menuOuvert && (
-            <div className="fixed top-12 right-2 w-64 max-h-[calc(100vh-60px)] overflow-y-auto md:absolute md:top-auto md:right-0 md:mt-2 md:max-h-none md:overflow-hidden bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-[100] theme-no-deco">
-              <div className="md:hidden px-4 py-3 border-b border-gray-700">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-gray-500 mb-2">{t('interface')}</div>
-                <div className="flex bg-gray-700 rounded-lg p-1">
-                  <button
-                    type="button"
-                    onClick={() => setInterface('mj')}
-                    className={`flex-1 py-1.5 rounded-md text-xs font-bold transition ${interface_ === 'mj' ? 'bg-yellow-500 text-gray-900' : 'text-gray-400'}`}
-                  >
-                    {t('interface_mj')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setInterface('joueur')}
-                    className={`flex-1 py-1.5 rounded-md text-xs font-bold transition ${interface_ === 'joueur' ? 'bg-yellow-500 text-gray-900' : 'text-gray-400'}`}
-                  >
-                    {t('interface_player')}
-                  </button>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOuvert(false)
-                  setThemeOuvert(false)
-                  setRejoindreOuvert(false)
-                  router.push('/dashboard/bibliotheque')
-                }}
-                className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2 text-sm"
-              >
-                {t('menu_library')}
-              </button>
-              <div className="border-t border-gray-700" />
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOuvert(false)
-                  setThemeOuvert(false)
-                  setRejoindreOuvert(false)
-                  router.push('/dashboard/communaute')
-                }}
-                className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2 text-sm"
-              >
-                {t('menu_community')}
-              </button>
-              <div className="border-t border-gray-700" />
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOuvert(false)
-                  setThemeOuvert(false)
-                  setRejoindreOuvert(false)
-                  router.push('/dashboard/sorts')
-                }}
-                className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2 text-sm"
-              >
-                {t('menu_spells')}
-              </button>
-              <div className="border-t border-gray-700" />
-              <button
-                type="button"
-                onClick={() => setRejoindreOuvert((v) => !v)}
-                className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center justify-between gap-2 text-sm"
-                aria-expanded={rejoindreOuvert}
-              >
-                <span>{t('menu_join_scenario')}</span>
-                <span className="text-xs text-gray-500">{rejoindreOuvert ? '▾' : '▸'}</span>
-              </button>
-              {rejoindreOuvert && (
-                <div className="bg-gray-900/50 border-t border-gray-700 p-3 space-y-2">
-                  <p className="text-gray-400 text-xs">
-                    {t('menu_join_placeholder')}
-                  </p>
-                  <input
-                    type="text"
-                    value={codeScenario}
-                    onChange={(e) => setCodeScenario(e.target.value)}
-                    placeholder={t('menu_join_code_ph')}
-                    className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none font-mono uppercase text-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={rejoindreScenario}
-                    className="w-full px-3 py-2 bg-yellow-500 text-gray-900 font-bold rounded hover:bg-yellow-400 text-sm"
-                  >
-                    {t('menu_join_button')}
-                  </button>
-                  {messageJoueur && (
-                    <p className="text-yellow-400 text-xs">{messageJoueur}</p>
-                  )}
-                </div>
-              )}
-              <div className="border-t border-gray-700" />
-              <button
-                type="button"
-                onClick={() => setThemeOuvert((v) => !v)}
-                className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center justify-between gap-2 text-sm"
-                aria-expanded={themeOuvert}
-              >
-                <span className="flex items-center gap-2">{t('menu_theme')}</span>
-                <span className="text-xs text-gray-500">
-                  {THEMES[themeActuel].label} {themeOuvert ? '▾' : '▸'}
-                </span>
-              </button>
-              {themeOuvert && (
-                <div className="bg-gray-900/50 border-t border-gray-700 p-2 space-y-1 max-h-80 overflow-y-auto">
-                  {THEME_KEYS.map((key) => {
-                    const theme = THEMES[key]
-                    const actif = themeActuel === key
-                    const premium = PREMIUM_THEMES.includes(key)
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => changerTheme(key)}
-                        className={`w-full flex items-center gap-3 p-2 rounded transition text-left ${
-                          actif ? 'bg-gray-700' : 'hover:bg-gray-700/60'
-                        } ${premium ? 'ring-1 ring-yellow-600/40' : ''}`}
-                      >
-                        <div
-                          className="flex flex-shrink-0 rounded overflow-hidden"
-                          style={{ border: `1px solid ${theme.colors.border_color}` }}
-                        >
-                          <span
-                            className="block w-4 h-10"
-                            style={{ backgroundColor: theme.colors.bg_primary }}
-                          />
-                          <span
-                            className="block w-4 h-10"
-                            style={{ backgroundColor: theme.colors.bg_secondary }}
-                          />
-                          <span
-                            className="block w-4 h-10"
-                            style={{ backgroundColor: theme.colors.accent_color }}
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p
-                            className={`text-sm font-bold truncate ${
-                              actif ? 'text-white' : 'text-gray-200'
-                            }`}
-                          >
-                            {premium && <span className="mr-1">👑</span>}
-                            {theme.label}
-                            {premium && (
-                              <span className="ml-1 text-[10px] font-bold tracking-wide text-yellow-500">
-                                — {t('premium')}
-                              </span>
-                            )}
-                          </p>
-                          <p className="text-xs text-gray-500 truncate">
-                            {theme.description}
-                          </p>
-                          <p
-                            className="text-[10px] font-bold tracking-wider truncate mt-0.5"
-                            style={{ color: theme.colors.accent_color }}
-                          >
-                            « {theme.slogan} »
-                          </p>
-                        </div>
-                        {actif && (
-                          <span className="text-green-400 text-sm flex-shrink-0">
-                            ✓
-                          </span>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-              <div className="border-t border-gray-700" />
-              <button
-                type="button"
-                onClick={() => setLangueOuvert((v) => !v)}
-                className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center justify-between gap-2 text-sm"
-                aria-expanded={langueOuvert}
-              >
-                <span>{t('menu_language')}</span>
-                <span className="text-xs text-gray-500">
-                  {locale === 'fr' ? '🇫🇷' : '🇬🇧'} {langueOuvert ? '▾' : '▸'}
-                </span>
-              </button>
-              {langueOuvert && (
-                <div className="bg-gray-900/50 border-t border-gray-700 p-2 space-y-1">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await setLocale('fr')
-                      setLangueOuvert(false)
-                    }}
-                    className={`w-full flex items-center gap-2 p-2 rounded text-left text-sm transition ${
-                      locale === 'fr' ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-700/60'
-                    }`}
-                  >
-                    <span className="flex-1">{tLang('fr')}</span>
-                    {locale === 'fr' && <span className="text-green-400">✓</span>}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await setLocale('en')
-                      setLangueOuvert(false)
-                    }}
-                    className={`w-full flex items-center gap-2 p-2 rounded text-left text-sm transition ${
-                      locale === 'en' ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-700/60'
-                    }`}
-                  >
-                    <span className="flex-1">{tLang('en')}</span>
-                    {locale === 'en' && <span className="text-green-400">✓</span>}
-                  </button>
-                </div>
-              )}
-              <div className="border-t border-gray-700" />
-              <button
-                type="button"
-                onClick={async () => {
-                  setMenuOuvert(false)
-                  setThemeOuvert(false)
-                  setLangueOuvert(false)
-                  await supabase.auth.signOut()
-                  router.push('/')
-                }}
-                className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition flex items-center gap-2 text-sm"
-              >
-                {t('menu_logout')}
-              </button>
-            </div>
-          )}
-        </div>
         <div className="theme-header-glow" />
       </div>
-
       {interface_ === 'mj' && (
         <div>
-          <div className="bg-gray-800 border-b border-gray-700 px-3 py-1.5 md:p-3 flex justify-center gap-2 md:gap-4 theme-no-deco">
-            <button type="button" onClick={() => setModeMJ('travail')} className={`flex-1 md:flex-initial px-3 md:px-6 py-1.5 md:py-2 rounded-md md:rounded-lg text-xs md:text-base font-medium md:font-bold tracking-wider transition ${modeMJ === 'travail' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}>
+          <div className="px-3 py-2 md:py-3 flex justify-center gap-2 md:gap-3 theme-no-deco" style={{ borderBottom: '1px solid rgba(201,168,76,0.10)' }}>
+            <button
+              type="button"
+              onClick={() => setModeMJ('travail')}
+              className={`grimoire-tab ${modeMJ === 'travail' ? 'is-active' : ''}`}
+            >
               {t('forge')}
             </button>
             <button
               type="button"
               onClick={() => router.push('/dashboard/personnages')}
-              className="md:hidden flex-1 px-3 py-1.5 rounded-md text-xs font-medium tracking-wider transition text-gray-400 hover:text-white"
+              className="grimoire-tab md:hidden"
             >
               {t('characters_tab')}
             </button>
-            <button type="button" onClick={() => setModeMJ('action')} className={`hidden md:inline-flex md:flex-initial md:px-6 md:py-2 md:rounded-lg md:text-base md:font-bold tracking-wider transition ${modeMJ === 'action' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'}`}>
+            <button
+              type="button"
+              onClick={() => setModeMJ('action')}
+              className={`grimoire-tab hidden md:inline-flex ${modeMJ === 'action' ? 'is-active' : ''}`}
+            >
               {t('adventure')}
             </button>
           </div>
-          <div className="p-3 md:p-6">
-            {scenarioActif && (
-              <section
-                className="mb-4 md:mb-6 rounded-lg overflow-hidden"
-                style={{
-                  background: '#12141a',
-                  border: '1px solid rgba(201,168,76,0.4)',
-                  boxShadow: '0 0 0 1px rgba(201,168,76,0.08) inset'
-                }}
-              >
-                <div className="flex flex-col md:flex-row md:items-stretch">
-                  <div className="flex-1 p-4 md:p-5 relative">
+          <div className="px-2 sm:px-3 md:px-4 py-3 md:py-5">
+            {favorisItems.length > 0 && (
+              <section className="mb-4 md:mb-6 codex-card codex-surface p-3 md:p-4">
+                <h3 className="codex-section-title codex-section-title-left text-yellow-500" style={{ fontSize: 10, margin: '4px 0 12px' }}>
+                  ⭐ Favoris ({favorisItems.length})
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {favorisItems.map((it) => (
                     <button
+                      key={`${it.type}-${it.id}`}
                       type="button"
-                      onClick={desactiverScenarioActif}
-                      title={t('unset_active_tooltip')}
-                      aria-label={t('unset_active_tooltip')}
-                      className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full text-[#a8a8b0] hover:text-white hover:bg-[rgba(201,168,76,0.15)] border border-transparent hover:border-[rgba(201,168,76,0.3)] transition text-sm leading-none"
+                      onClick={() => router.push(it.route)}
+                      className="codex-press flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all duration-200"
+                      style={{
+                        background: 'linear-gradient(180deg, #0e1014 0%, #0a0c10 100%)',
+                        border: '1px solid rgba(255,255,255,0.04)',
+                        color: 'var(--theme-text-primary, #e8e8ec)'
+                      }}
+                      title={`Ouvrir ${it.nom}`}
                     >
-                      ✕
-                    </button>
-                    <p
-                      className="text-[9px] uppercase tracking-[0.25em] font-bold mb-1"
-                      style={{ color: '#C9A84C' }}
-                    >
-                      ★ {t('active_scenario_label')}
-                    </p>
-                    <h2 className="text-lg md:text-xl font-bold text-white truncate pr-8">
-                      {scenarioActif.nom}
-                    </h2>
-                    {scenarioActif.description && (
-                      <p className="text-xs md:text-sm text-[#a8a8b0] mt-1 line-clamp-2">
-                        {scenarioActif.description}
-                      </p>
-                    )}
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-black/40 border border-[rgba(201,168,76,0.2)] text-[#a8a8b0]">
-                        🧙 {scenarioActif.nbPersos} {t('count_players')}
-                      </span>
-                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-black/40 border border-[rgba(201,168,76,0.2)] text-[#a8a8b0]">
-                        👹 {scenarioActif.nbEnnemis} {t('count_enemies')}
-                      </span>
-                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-black/40 border border-[rgba(201,168,76,0.2)] text-[#a8a8b0]">
-                        🧑 {scenarioActif.nbPnj} {t('count_pnj')}
-                      </span>
-                      {scenarioActif.combatActif && (
-                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-900/40 border border-red-500/40 text-red-200">
-                          ⚔ {t('combat_in_progress', {
-                            round: scenarioActif.combatActif.round,
-                            tour: scenarioActif.combatActif.tour + 1
-                          })}
-                        </span>
+                      {it.image_url ? (
+                        <img
+                          src={it.image_url}
+                          alt=""
+                          loading="lazy"
+                          className="w-6 h-6 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span>{it.icone}</span>
                       )}
-                    </div>
-                  </div>
-                  <div
-                    className="flex md:flex-col md:justify-center gap-2 p-3 md:p-4 md:border-l border-t md:border-t-0"
-                    style={{ borderColor: 'rgba(201,168,76,0.15)' }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => router.push('/dashboard/combat')}
-                      className="flex-1 md:flex-initial px-3 py-2 rounded text-xs font-bold tracking-wider bg-[rgba(201,168,76,0.12)] hover:bg-[rgba(201,168,76,0.2)] text-[#C9A84C] border border-[rgba(201,168,76,0.3)] transition"
-                    >
-                      ⚔ {t('shortcut_combat')}
+                      <span className="text-gray-200 max-w-[200px] truncate">{it.nom}</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => router.push('/dashboard/exploration')}
-                      className="flex-1 md:flex-initial px-3 py-2 rounded text-xs font-bold tracking-wider bg-[rgba(201,168,76,0.12)] hover:bg-[rgba(201,168,76,0.2)] text-[#C9A84C] border border-[rgba(201,168,76,0.3)] transition"
-                    >
-                      🧭 {t('shortcut_explore')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        router.push(`/dashboard/scenarios/${scenarioActif.id}/notes`)
-                      }
-                      className="flex-1 md:flex-initial px-3 py-2 rounded text-xs font-bold tracking-wider bg-[rgba(201,168,76,0.12)] hover:bg-[rgba(201,168,76,0.2)] text-[#C9A84C] border border-[rgba(201,168,76,0.3)] transition"
-                    >
-                      📝 {t('shortcut_notes')}
-                    </button>
-                  </div>
+                  ))}
                 </div>
               </section>
             )}
-            {personnagesJoueurs.length > 0 && (
-              <div className="bg-gray-800 rounded-lg mb-6 overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setPersonnagesOuvert((v) => !v)}
-                  aria-expanded={personnagesOuvert}
-                  className="w-full flex items-center justify-between p-4 hover:bg-gray-700/50 transition text-left"
-                >
-                  <h3 className="text-lg font-bold text-yellow-500">
-                    {t('player_characters_title')} ({personnagesJoueurs.length})
-                  </h3>
-                  <span
-                    className={`text-yellow-500 text-sm transition-transform duration-300 ${
-                      personnagesOuvert ? 'rotate-180' : ''
-                    }`}
-                  >
-                    ▾
-                  </span>
-                </button>
-                <div
-                  className="grid transition-[grid-template-rows] duration-300 ease-in-out"
-                  style={{ gridTemplateRows: personnagesOuvert ? '1fr' : '0fr' }}
-                >
-                  <div className="overflow-hidden">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4 pt-0">
-                      {personnagesJoueurs.map((p) => {
-                        const scenario = scenariosMj.find((s) => s.id === p.scenario_id)
-                        return (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => router.push(`/dashboard/personnages/${p.id}`)}
-                            className="w-full flex items-center gap-3 bg-gray-900/50 border border-gray-700 rounded-lg p-3 hover:bg-gray-700/50 hover:border-yellow-600 transition text-left overflow-hidden"
-                            title={`Ouvrir la fiche de ${p.nom}`}
-                          >
-                            {p.image_url ? (
-                              <img
-                                src={p.image_url}
-                                alt={p.nom}
-                                loading="lazy"
-                                className="w-12 h-12 rounded-full object-cover ring-2 ring-blue-400 flex-shrink-0 bg-gray-900"
-                              />
-                            ) : (
-                              <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center font-bold text-white flex-shrink-0">
-                                {p.nom.slice(0, 2).toUpperCase()}
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0 overflow-hidden">
-                              <p className="text-white font-bold truncate">{p.nom}</p>
-                              <p className="text-gray-400 text-xs truncate">
-                                {[p.classe, `Niv. ${p.niveau}`].filter(Boolean).join(' · ')}
-                              </p>
-                              <p className="text-gray-500 text-xs truncate">
-                                ❤️ {p.hp_actuel}/{p.hp_max}
-                                {scenario && <span className="ml-2">📖 {scenario.nom}</span>}
-                              </p>
-                            </div>
-                          </button>
-                        )
-                      })}
+            {/* === DASHBOARD CUSTOM — remplace le grimoire si l'utilisateur
+                a marqué une config personnalisée comme active. === */}
+            {(() => {
+              const active = customPrefs?.active
+              const cfg = active
+                ? customPrefs?.configs.find((c) => c.id === active)
+                : null
+              if (cfg) {
+                return (
+                  <section className="mb-4 md:mb-6">
+                    <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                      <h2 className="codex-section-title codex-section-title-left text-yellow-500" style={{ fontSize: 10 }}>
+                        🎨 {cfg.nom}
+                      </h2>
+                      <button
+                        type="button"
+                        onClick={() => router.push('/dashboard/personnalisation')}
+                        className="text-xs text-gray-400 hover:text-yellow-300 underline"
+                      >
+                        Modifier
+                      </button>
                     </div>
+                    <CustomDashboard widgets={cfg.widgets} />
+                  </section>
+                )
+              }
+              return null
+            })()}
+
+            {/* === GRIMOIRE — autel central + 4 pages stats (fallback) === */}
+            {!(customPrefs?.active && customPrefs?.configs.find((c) => c.id === customPrefs.active)) && (
+            <section className="mb-4 md:mb-6 grimoire-frame">
+              <span className="grimoire-diamond-top" aria-hidden="true">◆</span>
+              <div className="grimoire-inner">
+                <h2 className="grimoire-codex">CODEX</h2>
+                <p className="grimoire-slogan">— Fortis Fortuna Adiuvat —</p>
+                <div className="grimoire-divider-line" />
+
+                {scenarioActif ? (
+                  <>
+                    <div className="grimoire-altar">
+                      <span className="grimoire-altar-diamond left" aria-hidden="true">◆</span>
+                      <span className="grimoire-altar-diamond right" aria-hidden="true">◆</span>
+                      <p className="grimoire-altar-tag">Scénario actif</p>
+                      <h3 className="grimoire-altar-name">{scenarioActif.nom}</h3>
+                      {scenarioActif.description && (
+                        <p className="grimoire-altar-desc">« {scenarioActif.description} »</p>
+                      )}
+                      {scenarioActif.combatActif && (
+                        <p
+                          className="grimoire-altar-desc"
+                          style={{
+                            color: 'rgba(252,165,165,0.85)',
+                            marginTop: 8,
+                            fontStyle: 'normal',
+                            letterSpacing: '0.12em',
+                            fontSize: 10,
+                            textTransform: 'uppercase'
+                          }}
+                        >
+                          ⚔ Combat en cours — Round {scenarioActif.combatActif.round} · Tour {scenarioActif.combatActif.tour + 1}
+                        </p>
+                      )}
+                    </div>
+                    <div className="grimoire-altar-actions">
+                      <button
+                        type="button"
+                        onClick={() => router.push('/dashboard/combat')}
+                      >
+                        ⚔ Combat
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => router.push('/dashboard/exploration')}
+                      >
+                        🧭 Exploration
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          router.push(`/dashboard/scenarios/${scenarioActif.id}/notes`)
+                        }
+                      >
+                        📝 Journal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          router.push(`/dashboard/scenarios/${scenarioActif.id}/quetes`)
+                        }
+                      >
+                        🎯 Quêtes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={desactiverScenarioActif}
+                        title={t('unset_active_tooltip')}
+                        aria-label={t('unset_active_tooltip')}
+                      >
+                        ✕ Désactiver
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="grimoire-altar-empty">
+                    Aucun scénario actif — choisis-en un dans la liste des scénarios.
+                  </div>
+                )}
+
+                <div className="grimoire-stats">
+                  <div className="grimoire-stat">
+                    <p className="grimoire-stat-tag">Personnages</p>
+                    <p className="grimoire-stat-value">{stats.personnages}</p>
+                    <p className="grimoire-stat-label">actifs</p>
+                  </div>
+                  <div className="grimoire-stat">
+                    <p className="grimoire-stat-tag">Ennemis</p>
+                    <p className="grimoire-stat-value">{stats.ennemis}</p>
+                    <p className="grimoire-stat-label">créés</p>
+                  </div>
+                  <div className="grimoire-stat">
+                    <p className="grimoire-stat-tag">Scénarios</p>
+                    <p className="grimoire-stat-value">{stats.scenarios}</p>
+                    <p className="grimoire-stat-label">en cours</p>
+                  </div>
+                  <div className="grimoire-stat">
+                    <p className="grimoire-stat-tag">Quêtes</p>
+                    <p className="grimoire-stat-value">{stats.quetesActives}</p>
+                    <p className="grimoire-stat-label">actives</p>
+                  </div>
+                </div>
+
+                {/* === Accès rapide : 7 entités principales === */}
+                <div className="grimoire-quick">
+                  <p className="grimoire-quick-title">Accès rapide</p>
+                  <div className="grimoire-quick-grid">
+                    {[
+                      { titre: 'Scénarios', desc: 'Créer et gérer tes aventures', href: '/dashboard/scenarios' },
+                      { titre: 'Personnages', desc: 'Fiches des joueurs et PJ', href: '/dashboard/personnages' },
+                      { titre: 'Ennemis', desc: 'Bestiaire et adversaires', href: '/dashboard/ennemis' },
+                      { titre: 'PNJ', desc: 'Personnages non-joueurs', href: '/dashboard/pnj' },
+                      { titre: 'Items', desc: 'Équipement et trésors', href: '/dashboard/items' },
+                      { titre: 'Maps', desc: "Cartes d'exploration", href: '/dashboard/maps' },
+                      { titre: 'Sorts', desc: 'Grimoire de sorts', href: '/dashboard/sorts' }
+                    ].map((it) => (
+                      <button
+                        key={it.href}
+                        type="button"
+                        className="grimoire-quick-card"
+                        onClick={() => router.push(it.href)}
+                      >
+                        <p className="grimoire-quick-card-title">{it.titre}</p>
+                        <p className="grimoire-quick-card-desc">{it.desc}</p>
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
+            </section>
             )}
-            {modeMJ === 'travail' && (
-              <div>
-                <h2 className="hidden md:block text-2xl font-bold text-blue-400 mb-4">{t('forge')}</h2>
-                <div className="grid grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-6">
-                  <button type="button" onClick={() => router.push('/dashboard/scenarios')} className="bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
-                    <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">{t('forge_scenarios_title')}</h3>
-                    <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">{t('forge_scenarios_desc')}</p>
-                  </button>
-                  <button type="button" onClick={() => router.push('/dashboard/ennemis')} className="bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
-                    <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">{t('forge_enemies_title')}</h3>
-                    <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">{t('forge_enemies_desc')}</p>
-                  </button>
-                  <button type="button" onClick={() => router.push('/dashboard/pnj')} className="bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
-                    <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">🧑 {t('forge_pnj_title')}</h3>
-                    <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">{t('forge_pnj_desc')}</p>
-                  </button>
-                  <button type="button" onClick={() => router.push('/dashboard/items')} className="bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
-                    <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">{t('forge_items_title')}</h3>
-                    <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">{t('forge_items_desc')}</p>
-                  </button>
-                  <button type="button" onClick={() => router.push('/dashboard/maps')} className="col-span-2 bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
-                    <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">{t('forge_maps_title')}</h3>
-                    <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">{t('forge_maps_desc')}</p>
-                  </button>
-                </div>
-                <div className="bg-gray-800 p-4 rounded-lg">
-                  <h3 className="text-lg font-bold text-yellow-500 mb-2">{t('add_player_title')}</h3>
-                  <p className="text-gray-400 text-sm mb-3">
-                    {t('add_player_desc')}
-                  </p>
-                  <div className="flex flex-col md:flex-row gap-2">
-                    <input
-                      type="text"
-                      value={codePersonnage}
-                      onChange={(e) => setCodePersonnage(e.target.value)}
-                      placeholder={t('menu_join_code_ph')}
-                      className="flex-1 p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none font-mono uppercase"
-                    />
-                    <select
-                      value={scenarioCibleId}
-                      onChange={(e) => setScenarioCibleId(e.target.value)}
-                      className="flex-1 p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none"
-                    >
-                      <option value="">{t('add_player_choose_scenario')}</option>
-                      {scenariosMj.map((s) => (
-                        <option key={s.id} value={s.id}>{s.nom}</option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={ajouterPersonnageAuScenario}
-                      className="px-4 py-3 bg-yellow-500 text-gray-900 font-bold rounded hover:bg-yellow-400"
-                    >
-                      {t('add_player_button')}
-                    </button>
-                  </div>
-                  {messageMj && <p className="text-yellow-400 text-sm mt-2">{messageMj}</p>}
-                </div>
-              </div>
-            )}
+            {/* La liste des Personnages des joueurs et le bouton "+ Ajouter"
+                ont migré dans la sidebar gauche (section dédiée). La modale
+                d'invitation reste rendue en bas de cette page et s'ouvre via
+                l'évènement global `pj:ajouter:open`. */}
             {modeMJ === 'action' && (
               <>
                 <div className="mb-4 flex justify-end">
@@ -1016,17 +629,17 @@ export default function Dashboard() {
       )}
 
       {interface_ === 'joueur' && (
-        <div className="p-3 md:p-6">
-          <h2 className="hidden md:block text-2xl font-bold text-yellow-500 mb-4">{t('player_welcome_title')}</h2>
+        <div className="px-2 sm:px-3 md:px-4 py-3 md:py-5">
+          <h2 className="hidden md:flex codex-section-title codex-section-title-left text-yellow-500" style={{ fontSize: 11 }}>{t('player_welcome_title')}</h2>
           <p className="hidden md:block text-gray-400 mb-4">{t('player_welcome_msg')}</p>
           <div className="grid grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-6">
-            <button type="button" onClick={() => router.push('/dashboard/personnages')} className="bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
+            <button type="button" onClick={() => router.push('/dashboard/personnages')} className="codex-tile codex-press p-3 md:p-5 text-left">
               <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">{t('characters_tab')}</h3>
-              <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">{t('player_characters_manage_desc')}</p>
+              <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1.5 leading-relaxed">{t('player_characters_manage_desc')}</p>
             </button>
-            <button type="button" onClick={() => router.push('/dashboard/sorts')} className="bg-gray-800 p-3 md:p-4 rounded-lg hover:bg-gray-700 transition text-left">
+            <button type="button" onClick={() => router.push('/dashboard/sorts')} className="codex-tile codex-press p-3 md:p-5 text-left">
               <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">{t('menu_spells')}</h3>
-              <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1">{t('player_spells_manage_desc')}</p>
+              <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1.5 leading-relaxed">{t('player_spells_manage_desc')}</p>
             </button>
           </div>
 
@@ -1065,6 +678,82 @@ export default function Dashboard() {
                 ))}
               </ul>
             )}
+          </div>
+        </div>
+      )}
+
+      {ajoutPjOuvert && (
+        <div
+          className="fixed inset-0 z-[120] bg-black/75 flex items-center justify-center p-3"
+          onClick={() => setAjoutPjOuvert(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('add_player_title')}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="grimoire-modal w-full max-w-md"
+          >
+            <div className="grimoire-modal-header">
+              <h3 className="grimoire-modal-title">{t('add_player_title')}</h3>
+              <button
+                type="button"
+                onClick={() => setAjoutPjOuvert(false)}
+                className="grimoire-modal-close"
+                aria-label="Fermer"
+              >
+                ×
+              </button>
+            </div>
+            <div className="grimoire-modal-body">
+              <p className="grimoire-modal-desc">{t('add_player_desc')}</p>
+              <label className="grimoire-modal-label">Code d&apos;invitation</label>
+              <input
+                type="text"
+                value={codePersonnage}
+                onChange={(e) => setCodePersonnage(e.target.value)}
+                placeholder={t('menu_join_code_ph')}
+                className="grimoire-modal-input grimoire-modal-input-mono"
+                autoFocus
+              />
+              <label className="grimoire-modal-label" style={{ marginTop: 12 }}>
+                Scénario cible
+              </label>
+              <select
+                value={scenarioCibleId}
+                onChange={(e) => setScenarioCibleId(e.target.value)}
+                className="grimoire-modal-input"
+              >
+                <option value="">{t('add_player_choose_scenario')}</option>
+                {scenariosMj.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nom}
+                  </option>
+                ))}
+              </select>
+              {messageMj && (
+                <p className="grimoire-modal-message">{messageMj}</p>
+              )}
+            </div>
+            <div className="grimoire-modal-footer">
+              <button
+                type="button"
+                onClick={() => setAjoutPjOuvert(false)}
+                className="grimoire-modal-btn grimoire-modal-btn-ghost"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const ok = await ajouterPersonnageAuScenario()
+                  if (ok) setAjoutPjOuvert(false)
+                }}
+                className="grimoire-modal-btn grimoire-modal-btn-primary"
+              >
+                {t('add_player_button')}
+              </button>
+            </div>
           </div>
         </div>
       )}

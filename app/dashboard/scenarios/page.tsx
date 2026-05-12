@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import MindMap from './MindMap'
+import StarFavori from '@/app/components/StarFavori'
+import { useFavoris } from '@/app/lib/favoris'
 import {
   construireEnveloppe,
   lireFichierJSON,
@@ -27,6 +29,8 @@ type Scenario = {
   auteur_username: string | null
   actif: boolean
   nb_chapitres?: number
+  nb_quetes_actives?: number
+  nb_quetes_terminees?: number
 }
 
 export default function Scenarios() {
@@ -42,6 +46,8 @@ export default function Scenarios() {
   const [scenarioCibleId, setScenarioCibleId] = useState('')
   const [messageJoueur, setMessageJoueur] = useState('')
   const [vue, setVue] = useState<'liste' | 'carte'>('liste')
+  const [favorisOnly, setFavorisOnly] = useState(false)
+  const { est: estFavori } = useFavoris()
   const router = useRouter()
   const t = useTranslations('scenarios')
   const tc = useTranslations('common')
@@ -104,20 +110,37 @@ export default function Scenarios() {
       .order('created_at', { ascending: false })
     if (!data) return
 
-    // Compte des chapitres par scénario (un seul round-trip).
+    // Compte des chapitres + quêtes (actives/terminées) par scénario.
     const ids = data.map((s: { id: string }) => s.id)
-    let countMap = new Map<string, number>()
+    const chapMap = new Map<string, number>()
+    const queteActiveMap = new Map<string, number>()
+    const queteTermineeMap = new Map<string, number>()
     if (ids.length > 0) {
-      const { data: chaps } = await supabase
-        .from('chapitres')
-        .select('scenario_id')
-        .in('scenario_id', ids)
+      const [{ data: chaps }, { data: qts }] = await Promise.all([
+        supabase.from('chapitres').select('scenario_id').in('scenario_id', ids),
+        supabase
+          .from('quetes')
+          .select('scenario_id, status')
+          .in('scenario_id', ids)
+      ])
       ;(chaps ?? []).forEach((c: { scenario_id: string }) => {
-        countMap.set(c.scenario_id, (countMap.get(c.scenario_id) ?? 0) + 1)
+        chapMap.set(c.scenario_id, (chapMap.get(c.scenario_id) ?? 0) + 1)
+      })
+      ;(qts ?? []).forEach((q: { scenario_id: string; status: string }) => {
+        if (q.status === 'active') {
+          queteActiveMap.set(q.scenario_id, (queteActiveMap.get(q.scenario_id) ?? 0) + 1)
+        } else if (q.status === 'terminee') {
+          queteTermineeMap.set(q.scenario_id, (queteTermineeMap.get(q.scenario_id) ?? 0) + 1)
+        }
       })
     }
     setScenarios(
-      data.map((s) => ({ ...s, nb_chapitres: countMap.get(s.id) ?? 0 })) as Scenario[]
+      data.map((s) => ({
+        ...s,
+        nb_chapitres: chapMap.get(s.id) ?? 0,
+        nb_quetes_actives: queteActiveMap.get(s.id) ?? 0,
+        nb_quetes_terminees: queteTermineeMap.get(s.id) ?? 0
+      })) as Scenario[]
     )
   }
 
@@ -377,10 +400,22 @@ export default function Scenarios() {
             </button>
           </div>
           {scenarios.length === 0 && <p className="text-gray-400">{t('empty')}</p>}
-          {scenarios.map((scenario) => (
+          <label className="inline-flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={favorisOnly}
+              onChange={(e) => setFavorisOnly(e.target.checked)}
+              className="accent-yellow-500"
+            />
+            ⭐ Afficher uniquement les favoris
+          </label>
+          {scenarios
+            .filter((s) => !favorisOnly || estFavori('scenarios', s.id))
+            .map((scenario) => (
             <div key={scenario.id} className="bg-gray-800 p-4 rounded-lg">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-3 flex-wrap min-w-0">
+                  <StarFavori type="scenarios" id={scenario.id} />
                   <h3 className="text-lg font-bold text-white truncate">{scenario.nom}</h3>
                   {scenario.actif && (
                     <span
@@ -397,6 +432,13 @@ export default function Scenarios() {
                   <span className="text-xs text-gray-500 bg-gray-900/50 border border-gray-700 rounded-full px-2 py-0.5">
                     📖 {scenario.nb_chapitres ?? 0} chapitre{(scenario.nb_chapitres ?? 0) > 1 ? 's' : ''}
                   </span>
+                  {((scenario.nb_quetes_actives ?? 0) > 0 ||
+                    (scenario.nb_quetes_terminees ?? 0) > 0) && (
+                    <span className="text-xs text-gray-400 bg-gray-900/50 border border-gray-700 rounded-full px-2 py-0.5">
+                      🎯 {scenario.nb_quetes_actives ?? 0} active{(scenario.nb_quetes_actives ?? 0) > 1 ? 's' : ''} ·{' '}
+                      {scenario.nb_quetes_terminees ?? 0} terminée{(scenario.nb_quetes_terminees ?? 0) > 1 ? 's' : ''}
+                    </span>
+                  )}
                 </div>
                 <div className="flex gap-3 flex-wrap">
                   <button
@@ -417,6 +459,9 @@ export default function Scenarios() {
                   </button>
                   <button type="button" onClick={() => inviterJoueur(scenario.id)} className="text-green-400 text-sm">
                     {t('invite_player')}
+                  </button>
+                  <button type="button" onClick={() => router.push(`/dashboard/scenarios/${scenario.id}/quetes`)} className="text-yellow-400 text-sm" title="Quêtes du scénario">
+                    🎯 Quêtes
                   </button>
                   <button type="button" onClick={() => router.push(`/dashboard/scenarios/${scenario.id}/notes`)} className="text-yellow-400 text-sm">
                     {t('notes')}
