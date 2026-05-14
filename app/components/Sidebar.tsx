@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { openCommandPalette } from './CommandPalette'
@@ -37,6 +37,7 @@ type PjLite = {
 }
 
 type NavSection = {
+  id: string
   title: string
   items: NavItem[]
 }
@@ -44,6 +45,8 @@ type NavSection = {
 const SIDEBAR_OPEN_EVENT = 'sidebar:open'
 const SIDEBAR_CLOSE_EVENT = 'sidebar:close'
 const COLLAPSED_KEY = 'sidebar_collapsed'
+// État déplié/replié de chaque section de nav (persisté entre sessions).
+const SECTIONS_KEY = 'sidebar_sections_replie'
 const WIDTH_EXPANDED = '220px'
 const WIDTH_COLLAPSED = '52px'
 
@@ -88,6 +91,9 @@ export default function Sidebar() {
   // Personnages des joueurs liés aux scénarios du MJ — section "PJ" du menu.
   const [pjs, setPjs] = useState<PjLite[]>([])
   const [pjsOuvert, setPjsOuvert] = useState(true)
+  // Sections de nav dépliables. Clé = id de section, valeur true = repliée.
+  // Objet vide (défaut au premier chargement) = toutes les sections dépliées.
+  const [sectionsReplie, setSectionsReplie] = useState<Record<string, boolean>>({})
 
   // --------------------------------------------------------------------------
   // Restauration de l'état replié
@@ -110,6 +116,24 @@ export default function Sidebar() {
     return () => {
       window.removeEventListener(SIDEBAR_OPEN_EVENT, open)
       window.removeEventListener(SIDEBAR_CLOSE_EVENT, close)
+    }
+  }, [])
+
+  // --------------------------------------------------------------------------
+  // Restauration de l'état déplié/replié des sections de nav
+  // --------------------------------------------------------------------------
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(SECTIONS_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed && typeof parsed === 'object') {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setSectionsReplie(parsed as Record<string, boolean>)
+        }
+      }
+    } catch {
+      /* localStorage indisponible ou JSON corrompu : on garde tout déplié. */
     }
   }, [])
 
@@ -180,6 +204,19 @@ export default function Sidebar() {
     })
   }
 
+  // Déplie / replie une section de nav et persiste l'état.
+  const toggleSection = (id: string) => {
+    setSectionsReplie((cur) => {
+      const next = { ...cur, [id]: !cur[id] }
+      try {
+        window.localStorage.setItem(SECTIONS_KEY, JSON.stringify(next))
+      } catch {
+        /* localStorage indisponible : état conservé en mémoire seulement. */
+      }
+      return next
+    })
+  }
+
   const changerTheme = async (key: ThemeKey) => {
     applyTheme(key)
     setThemeActuel(key)
@@ -234,37 +271,42 @@ export default function Sidebar() {
     setCodeScenario('')
   }
 
+  // 📚 CODEX — la bibliothèque centralisée. Rendue à part (et pas via `sections`)
+  // car elle intègre deux blocs spéciaux : les avatars « Personnages joueurs »
+  // (après Personnages) et le panneau « Rejoindre un scénario » (à la fin).
+  const codexItems: NavItem[] = [
+    { label: t('forge_scenarios'), icon: '📖', href: '/dashboard/scenarios' },
+    { label: t('forge_personnages'), icon: '🧙', href: '/dashboard/personnages' },
+    { label: t('forge_ennemis'), icon: '👹', href: '/dashboard/ennemis' },
+    { label: t('forge_pnj'), icon: '🧑', href: '/dashboard/pnj' },
+    { label: t('forge_items'), icon: '🎒', href: '/dashboard/items' },
+    {
+      label: t('forge_maps'),
+      icon: '🗺',
+      href: '/dashboard/maps',
+      match: (p) => p.startsWith('/dashboard/maps')
+    },
+    { label: t('forge_sorts'), icon: '✦', href: '/dashboard/sorts' },
+    { label: t('tools_library'), icon: '📚', href: '/dashboard/bibliotheque' },
+    { label: t('tools_community'), icon: '🌍', href: '/dashboard/communaute' }
+  ]
+
   const sections: NavSection[] = [
     {
-      title: t('section_forge'),
-      items: [
-        { label: t('forge_scenarios'), icon: '📖', href: '/dashboard/scenarios' },
-        { label: t('forge_personnages'), icon: '🧙', href: '/dashboard/personnages' },
-        { label: t('forge_ennemis'), icon: '👹', href: '/dashboard/ennemis' },
-        { label: t('forge_pnj'), icon: '🧑', href: '/dashboard/pnj' },
-        { label: t('forge_items'), icon: '🎒', href: '/dashboard/items' },
-        {
-          label: t('forge_maps'),
-          icon: '🗺',
-          href: '/dashboard/maps',
-          match: (p) => p.startsWith('/dashboard/maps')
-        },
-        { label: t('forge_sorts'), icon: '✨', href: '/dashboard/sorts' }
-      ]
-    },
-    {
+      // ⚔️ AVENTURE — ce qu'on joue activement.
+      id: 'aventure',
       title: t('section_aventure'),
       items: [
         { label: t('adv_combat'), icon: '⚔', href: '/dashboard/combat' },
-        { label: t('adv_exploration'), icon: '🧭', href: '/dashboard/exploration' },
-        { label: 'Mode présentation', icon: '📺', href: '/dashboard/presentation' }
+        { label: t('adv_exploration'), icon: '🏞', href: '/dashboard/exploration' },
+        { label: t('adv_presentation'), icon: '📺', href: '/dashboard/presentation' }
       ]
     },
     {
+      // ⚙️ OUTILS — utilitaires transverses.
+      id: 'outils',
       title: t('section_outils'),
       items: [
-        { label: t('tools_library'), icon: '📚', href: '/dashboard/bibliotheque' },
-        { label: t('tools_community'), icon: '🌍', href: '/dashboard/communaute' },
         {
           label: t('tools_soundbox'),
           icon: '🎵',
@@ -272,7 +314,9 @@ export default function Sidebar() {
             setDrawerOuvert(false)
             window.dispatchEvent(new CustomEvent('soundbox:open'))
           }
-        }
+        },
+        { label: t('tools_customize'), icon: '🎨', href: '/dashboard/personnalisation' },
+        { label: t('tools_accessibility'), icon: '♿', href: '/dashboard/accessibilite' }
       ]
     }
   ]
@@ -373,11 +417,51 @@ export default function Sidebar() {
       )
     }
 
+    // Section de nav dépliable : titre cliquable (chevron + losange décoratif)
+    // + corps animé via la transition grid-template-rows (0fr ↔ 1fr).
+    // En mode compact (rail d'icônes), pas de titre : juste un filet + le corps.
+    const renderCollapsible = (id: string, title: string, body: ReactNode) => {
+      if (compact) {
+        return (
+          <div key={id} className="mb-3">
+            <div
+              className="mx-3 mb-1.5 h-px"
+              style={{ background: 'rgba(201,168,76,0.12)' }}
+              aria-hidden="true"
+            />
+            {body}
+          </div>
+        )
+      }
+      const replieSection = !!sectionsReplie[id]
+      return (
+        <div key={id} className="sidebar-section">
+          <button
+            type="button"
+            onClick={() => toggleSection(id)}
+            aria-expanded={!replieSection}
+            className="sidebar-section-title"
+          >
+            <span className="sidebar-section-deco" aria-hidden="true">◆</span>
+            <span className="sidebar-section-label">{title}</span>
+            <span className="sidebar-section-chevron" aria-hidden="true">
+              {replieSection ? '▸' : '▾'}
+            </span>
+          </button>
+          <div
+            className={`sidebar-section-body${replieSection ? ' is-collapsed' : ''}`}
+          >
+            <div className="sidebar-section-body-inner">{body}</div>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div className="h-full flex flex-col bg-[#12141a] border-r border-[rgba(201,168,76,0.15)]">
-        {/* En-tête épuré : juste la recherche. L'identité CODEX / La Forge
-            Éclipsée est portée par le titre central du dashboard, plus par la
-            sidebar. */}
+        {/* En-tête épuré : juste la recherche. L'identité MASTER SCREEN / La
+            Forge Éclipsée est portée par le titre central du dashboard, plus
+            par la sidebar. */}
         <div
           className={`${
             compact ? 'px-2 pt-3 pb-2' : 'px-3 pt-3 pb-2.5'
@@ -411,24 +495,15 @@ export default function Sidebar() {
 
         {/* Sections de navigation */}
         <nav className="flex-1 overflow-y-auto py-3 [scrollbar-width:thin]">
-          {sections.map((section) => (
-            <div key={section.title} className="mb-3">
-              {compact ? (
-                <div
-                  className="mx-3 mb-1.5 h-px"
-                  style={{ background: 'rgba(201,168,76,0.12)' }}
-                  aria-hidden="true"
-                />
-              ) : (
-                <p className="px-4 mb-1.5 text-[9px] uppercase tracking-[0.22em] text-[#6a6a72] font-bold">
-                  {section.title}
-                </p>
-              )}
-              <div>{section.items.map(renderNavItem)}</div>
-            </div>
-          ))}
+          {/* ===== 📚 CODEX : bibliothèque + personnages joueurs + rejoindre ===== */}
+          {renderCollapsible(
+            'codex',
+            t('section_forge'),
+            <>
+            {/* Scénarios + Personnages */}
+            {codexItems.slice(0, 2).map(renderNavItem)}
 
-          {/* ----- Section PERSONNAGES JOUEURS ----- */}
+          {/* ----- Personnages joueurs (avatars), juste après Personnages ----- */}
           <div className="mb-3">
             {compact ? (
               <div
@@ -531,20 +606,97 @@ export default function Sidebar() {
             )}
           </div>
 
-          {/* ----- Section PARAMÈTRES ----- */}
-          <div className="mb-3">
-            {compact ? (
-              <div
-                className="mx-3 mb-1.5 h-px"
-                style={{ background: 'rgba(201,168,76,0.12)' }}
-                aria-hidden="true"
-              />
-            ) : (
-              <p className="px-4 mb-1.5 text-[9px] uppercase tracking-[0.22em] text-[#6a6a72] font-bold">
-                {t('section_params')}
-              </p>
+            {/* Ennemis, PNJ, Items, Maps, Sorts, Bibliothèque, Communauté */}
+            {codexItems.slice(2).map(renderNavItem)}
+
+            {/* ----- Rejoindre un scénario (code d'invitation) ----- */}
+            {renderToggleItem(
+              '🎟️',
+              t('params_join'),
+              rejoindreOuvert,
+              () => setRejoindreOuvert((v) => !v)
+            )}
+            {!compact && rejoindreOuvert && (
+              <div className="bg-[rgba(0,0,0,0.3)] border-y border-[rgba(201,168,76,0.08)] p-2 space-y-2">
+                <p className="text-[10px] text-[#6a6a72] leading-relaxed">
+                  {td('menu_join_placeholder')}
+                </p>
+                <input
+                  type="text"
+                  value={codeScenario}
+                  onChange={(e) => setCodeScenario(e.target.value)}
+                  placeholder={td('menu_join_code_ph')}
+                  className="w-full p-1.5 rounded bg-[#0a0b0d] text-white border border-[rgba(201,168,76,0.15)] outline-none font-mono uppercase text-xs focus:border-[rgba(201,168,76,0.5)]"
+                />
+                <button
+                  type="button"
+                  onClick={rejoindreScenario}
+                  className="w-full px-2 py-1.5 bg-[#C9A84C] text-[#0a0b0d] font-bold rounded hover:bg-[#d4b558] text-[11px] uppercase tracking-wider transition-all"
+                >
+                  {td('menu_join_button')}
+                </button>
+                {messageJoindre && (
+                  <p className="text-yellow-400 text-[10px]">{messageJoindre}</p>
+                )}
+              </div>
+            )}
+            </>
+          )}
+
+          {/* ===== ⚔️ AVENTURE + ⚙️ OUTILS ===== */}
+          {sections.map((section) =>
+            renderCollapsible(
+              section.id,
+              section.title,
+              <div>{section.items.map(renderNavItem)}</div>
+            )
+          )}
+
+          {/* ===== 🔧 PARAMÈTRES ===== */}
+          {renderCollapsible(
+            'params',
+            t('section_params'),
+            <>
+            {/* Langue */}
+            {renderToggleItem(
+              '🌍',
+              t('params_language'),
+              langueOuvert,
+              () => setLangueOuvert((v) => !v),
+              locale === 'fr' ? '🇫🇷' : '🇬🇧'
+            )}
+            {!compact && langueOuvert && (
+              <div className="bg-[rgba(0,0,0,0.3)] border-y border-[rgba(201,168,76,0.08)] p-2 space-y-1">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await setLocale('fr')
+                    setLangueOuvert(false)
+                  }}
+                  className={`w-full flex items-center gap-2 p-1.5 rounded text-left text-[12px] transition-all ${
+                    locale === 'fr' ? 'bg-[rgba(201,168,76,0.12)] text-white font-bold' : 'text-[#a8a8b0] hover:bg-[rgba(201,168,76,0.06)]'
+                  }`}
+                >
+                  <span className="flex-1">{tLang('fr')}</span>
+                  {locale === 'fr' && <span className="text-green-400">✓</span>}
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await setLocale('en')
+                    setLangueOuvert(false)
+                  }}
+                  className={`w-full flex items-center gap-2 p-1.5 rounded text-left text-[12px] transition-all ${
+                    locale === 'en' ? 'bg-[rgba(201,168,76,0.12)] text-white font-bold' : 'text-[#a8a8b0] hover:bg-[rgba(201,168,76,0.06)]'
+                  }`}
+                >
+                  <span className="flex-1">{tLang('en')}</span>
+                  {locale === 'en' && <span className="text-green-400">✓</span>}
+                </button>
+              </div>
             )}
 
+            {/* Thème */}
             {renderToggleItem(
               '🎨',
               t('params_theme'),
@@ -603,75 +755,7 @@ export default function Sidebar() {
               </div>
             )}
 
-            {renderToggleItem(
-              '🌍',
-              t('params_language'),
-              langueOuvert,
-              () => setLangueOuvert((v) => !v),
-              locale === 'fr' ? '🇫🇷' : '🇬🇧'
-            )}
-            {!compact && langueOuvert && (
-              <div className="bg-[rgba(0,0,0,0.3)] border-y border-[rgba(201,168,76,0.08)] p-2 space-y-1">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await setLocale('fr')
-                    setLangueOuvert(false)
-                  }}
-                  className={`w-full flex items-center gap-2 p-1.5 rounded text-left text-[12px] transition-all ${
-                    locale === 'fr' ? 'bg-[rgba(201,168,76,0.12)] text-white font-bold' : 'text-[#a8a8b0] hover:bg-[rgba(201,168,76,0.06)]'
-                  }`}
-                >
-                  <span className="flex-1">{tLang('fr')}</span>
-                  {locale === 'fr' && <span className="text-green-400">✓</span>}
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await setLocale('en')
-                    setLangueOuvert(false)
-                  }}
-                  className={`w-full flex items-center gap-2 p-1.5 rounded text-left text-[12px] transition-all ${
-                    locale === 'en' ? 'bg-[rgba(201,168,76,0.12)] text-white font-bold' : 'text-[#a8a8b0] hover:bg-[rgba(201,168,76,0.06)]'
-                  }`}
-                >
-                  <span className="flex-1">{tLang('en')}</span>
-                  {locale === 'en' && <span className="text-green-400">✓</span>}
-                </button>
-              </div>
-            )}
-
-            {renderToggleItem(
-              '🎟️',
-              t('params_join'),
-              rejoindreOuvert,
-              () => setRejoindreOuvert((v) => !v)
-            )}
-            {!compact && rejoindreOuvert && (
-              <div className="bg-[rgba(0,0,0,0.3)] border-y border-[rgba(201,168,76,0.08)] p-2 space-y-2">
-                <p className="text-[10px] text-[#6a6a72] leading-relaxed">
-                  {td('menu_join_placeholder')}
-                </p>
-                <input
-                  type="text"
-                  value={codeScenario}
-                  onChange={(e) => setCodeScenario(e.target.value)}
-                  placeholder={td('menu_join_code_ph')}
-                  className="w-full p-1.5 rounded bg-[#0a0b0d] text-white border border-[rgba(201,168,76,0.15)] outline-none font-mono uppercase text-xs focus:border-[rgba(201,168,76,0.5)]"
-                />
-                <button
-                  type="button"
-                  onClick={rejoindreScenario}
-                  className="w-full px-2 py-1.5 bg-[#C9A84C] text-[#0a0b0d] font-bold rounded hover:bg-[#d4b558] text-[11px] uppercase tracking-wider transition-all"
-                >
-                  {td('menu_join_button')}
-                </button>
-                {messageJoindre && (
-                  <p className="text-yellow-400 text-[10px]">{messageJoindre}</p>
-                )}
-              </div>
-            )}
-
+            {/* Refaire le tutoriel */}
             <button
               type="button"
               onClick={refaireTutoriel}
@@ -686,39 +770,8 @@ export default function Sidebar() {
               </span>
               {!compact && <span className="truncate">{t('params_tutorial')}</span>}
             </button>
-
-            {/* Personnaliser la page d'accueil */}
-            <button
-              type="button"
-              onClick={() => aller('/dashboard/personnalisation')}
-              title={compact ? 'Personnaliser l\'accueil' : undefined}
-              aria-label={compact ? 'Personnaliser l\'accueil' : undefined}
-              className={`w-full flex items-center ${
-                compact ? 'justify-center px-0' : 'gap-2.5 px-3'
-              } py-2 text-left text-[13px] tracking-wide border-l-2 border-l-transparent text-[#a8a8b0] hover:text-white hover:bg-[rgba(201,168,76,0.05)] hover:border-l-[rgba(201,168,76,0.4)] transition-all duration-150`}
-            >
-              <span className="text-base leading-none w-5 text-center flex-shrink-0" aria-hidden="true">
-                🎨
-              </span>
-              {!compact && <span className="truncate">Personnaliser l&apos;accueil</span>}
-            </button>
-
-            {/* Accessibilité */}
-            <button
-              type="button"
-              onClick={() => aller('/dashboard/accessibilite')}
-              title={compact ? 'Accessibilité' : undefined}
-              aria-label={compact ? 'Accessibilité' : undefined}
-              className={`w-full flex items-center ${
-                compact ? 'justify-center px-0' : 'gap-2.5 px-3'
-              } py-2 text-left text-[13px] tracking-wide border-l-2 border-l-transparent text-[#a8a8b0] hover:text-white hover:bg-[rgba(201,168,76,0.05)] hover:border-l-[rgba(201,168,76,0.4)] transition-all duration-150`}
-            >
-              <span className="text-base leading-none w-5 text-center flex-shrink-0" aria-hidden="true">
-                ♿
-              </span>
-              {!compact && <span className="truncate">Accessibilité</span>}
-            </button>
-          </div>
+            </>
+          )}
         </nav>
 
         {/* Pied de sidebar : déconnexion */}

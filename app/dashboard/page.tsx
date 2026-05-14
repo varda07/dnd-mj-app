@@ -9,7 +9,6 @@ import { supabase } from '@/lib/supabase'
 import { useFavoris, type FavoriType } from '@/app/lib/favoris'
 import type { DashboardPrefs } from '@/app/lib/widgets'
 import CustomDashboard from '@/app/components/CustomDashboard'
-import Combat from './combat/page'
 
 type ScenarioLite = { id: string; nom: string; actif?: boolean }
 type PersoLite = {
@@ -45,6 +44,8 @@ type ScenarioActif = {
 export default function Dashboard() {
   const [interface_, setInterface] = useState<'mj' | 'joueur'>('mj')
   const [modeMJ, setModeMJ] = useState<'travail' | 'action'>('travail')
+  // Scénario sélectionné dans le tableau de bord « Aventure ».
+  const [scenarioAventureId, setScenarioAventureId] = useState('')
   const [userId, setUserId] = useState('')
   const [scenariosMj, setScenariosMj] = useState<ScenarioLite[]>([])
   const [scenarioCibleId, setScenarioCibleId] = useState('')
@@ -362,10 +363,20 @@ export default function Dashboard() {
     setScenariosRejoints((prev) => prev.filter((s) => s.id !== scenarioId))
   }
 
+  // Scénario effectif du mode Aventure : choix explicite, sinon scénario actif,
+  // sinon premier scénario du MJ.
+  const scenarioAventureEffectif =
+    scenarioAventureId || scenarioActif?.id || scenariosMj[0]?.id || ''
+
   return (
     <main className="codex-fade-in min-h-screen bg-gray-900 text-white pb-[calc(56px+env(safe-area-inset-bottom))] md:pb-0">
-      {/* Top bar épurée : juste le toggle MJ/Joueur centré, sans titre ni
-          slogan (le titre CODEX vit dans le grimoire central). */}
+      {/* Identité de l'app : titre + slogan en tout premier. */}
+      <header className="dashboard-hero">
+        <h1 className="grimoire-codex">MASTER SCREEN</h1>
+        <p className="grimoire-slogan">— Fortis Fortuna Adiuvat —</p>
+        <div className="grimoire-divider-line" />
+      </header>
+      {/* Sous le titre : bascule MJ/Joueur. */}
       <div className="h-12 md:h-auto pl-12 pr-3 md:p-3 flex items-center justify-end md:justify-center gap-2 border-b border-[rgba(201,168,76,0.10)] theme-header-border theme-no-deco">
         <div className="grimoire-pill-group">
           <button
@@ -411,6 +422,9 @@ export default function Dashboard() {
             </button>
           </div>
           <div className="px-2 sm:px-3 md:px-4 py-3 md:py-5">
+            {/* === MODE FORGE — favoris, dashboard perso ou grimoire === */}
+            {modeMJ === 'travail' && (
+            <>
             {favorisItems.length > 0 && (
               <section className="mb-4 md:mb-6 codex-card codex-surface p-3 md:p-4">
                 <h3 className="codex-section-title codex-section-title-left text-yellow-500" style={{ fontSize: 10, margin: '4px 0 12px' }}>
@@ -480,10 +494,6 @@ export default function Dashboard() {
             <section className="mb-4 md:mb-6 grimoire-frame">
               <span className="grimoire-diamond-top" aria-hidden="true">◆</span>
               <div className="grimoire-inner">
-                <h2 className="grimoire-codex">CODEX</h2>
-                <p className="grimoire-slogan">— Fortis Fortuna Adiuvat —</p>
-                <div className="grimoire-divider-line" />
-
                 {scenarioActif ? (
                   <>
                     <div className="grimoire-altar">
@@ -606,23 +616,88 @@ export default function Dashboard() {
               </div>
             </section>
             )}
+            </>
+            )}
+
             {/* La liste des Personnages des joueurs et le bouton "+ Ajouter"
                 ont migré dans la sidebar gauche (section dédiée). La modale
                 d'invitation reste rendue en bas de cette page et s'ouvre via
                 l'évènement global `pj:ajouter:open`. */}
+
+            {/* === MODE AVENTURE — tableau de bord dédié qui remplace le
+                contenu central (au lieu d'ajouter le combat en bas de page). */}
             {modeMJ === 'action' && (
-              <>
-                <div className="mb-4 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => router.push('/dashboard/exploration')}
-                    className="px-4 py-2 rounded-lg font-bold bg-gray-800 border border-yellow-600 text-yellow-500 hover:bg-gray-700"
-                  >
-                    {t('explore')}
-                  </button>
+              <section className="mb-4 md:mb-6 grimoire-frame">
+                <span className="grimoire-diamond-top" aria-hidden="true">◆</span>
+                <div className="grimoire-inner">
+                  <p className="grimoire-quick-title" style={{ marginBottom: 16 }}>
+                    Mode Aventure
+                  </p>
+                  {scenariosMj.length === 0 ? (
+                    <div className="grimoire-altar-empty">
+                      Aucun scénario — crée d&apos;abord un scénario pour lancer une aventure.
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grimoire-aventure-picker">
+                        <label htmlFor="aventure-scenario">Scénario</label>
+                        <select
+                          id="aventure-scenario"
+                          value={scenarioAventureEffectif}
+                          onChange={(e) => setScenarioAventureId(e.target.value)}
+                        >
+                          {scenariosMj.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.nom}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="grimoire-aventure-grid">
+                        {[
+                          {
+                            icon: '⚔',
+                            titre: 'Combat',
+                            desc: 'Initiatives, HP et conditions tour par tour',
+                            href: `/dashboard/combat?scenario=${scenarioAventureEffectif}`
+                          },
+                          {
+                            icon: '🧭',
+                            titre: 'Exploration',
+                            desc: 'Carte partagée et brouillard de guerre',
+                            href: `/dashboard/exploration?scenario=${scenarioAventureEffectif}`
+                          },
+                          {
+                            icon: '📺',
+                            titre: 'Présentation',
+                            desc: 'Écran joueurs / mode TV',
+                            href: `/dashboard/presentation?scenario=${scenarioAventureEffectif}`
+                          },
+                          {
+                            icon: '📝',
+                            titre: 'Journal',
+                            desc: 'Notes de session du scénario',
+                            href: `/dashboard/scenarios/${scenarioAventureEffectif}/notes`
+                          }
+                        ].map((c) => (
+                          <button
+                            key={c.titre}
+                            type="button"
+                            className="grimoire-aventure-card"
+                            onClick={() => router.push(c.href)}
+                          >
+                            <span className="grimoire-aventure-icon" aria-hidden="true">
+                              {c.icon}
+                            </span>
+                            <p className="grimoire-aventure-card-title">{c.titre}</p>
+                            <p className="grimoire-aventure-card-desc">{c.desc}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
-                <Combat />
-              </>
+              </section>
             )}
           </div>
         </div>

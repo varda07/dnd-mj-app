@@ -31,7 +31,7 @@
     "export_failed": "Export failed."
   },
   "login": {
-    "app_title": "CODEX",
+    "app_title": "MASTER SCREEN",
     "app_slogan": "THE ECLIPSED FORGE",
     "email": "Email",
     "email_placeholder": "you@example.com",
@@ -43,7 +43,7 @@
     "signup_error": "Account creation error: {message}"
   },
   "dashboard": {
-    "app_title": "CODEX",
+    "app_title": "MASTER SCREEN",
     "interface_mj": "DM",
     "interface_player": "Player",
     "interface": "Interface",
@@ -124,10 +124,10 @@
     "expand": "Expand menu",
     "home": "Home",
     "tagline": "The Eclipsed Forge",
-    "section_forge": "Forge",
-    "section_aventure": "Adventure",
-    "section_outils": "Tools",
-    "section_params": "Settings",
+    "section_forge": "📚 Codex",
+    "section_aventure": "⚔️ Adventure",
+    "section_outils": "⚙️ Tools",
+    "section_params": "🔧 Settings",
     "params_theme": "Theme",
     "params_language": "Language",
     "params_tutorial": "Replay tutorial",
@@ -142,9 +142,12 @@
     "forge_sorts": "Spells",
     "adv_combat": "Combat",
     "adv_exploration": "Exploration",
+    "adv_presentation": "Presentation mode",
     "tools_library": "Library",
     "tools_community": "Community",
-    "tools_soundbox": "Sound Box"
+    "tools_soundbox": "Sound Box",
+    "tools_customize": "Customize home",
+    "tools_accessibility": "Accessibility"
   },
   "palette": {
     "placeholder": "Search or run an action…",

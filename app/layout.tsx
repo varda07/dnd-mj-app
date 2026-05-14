@@ -35,13 +35,13 @@ const atkinson = Atkinson_Hyperlegible({
 });
 
 export const metadata: Metadata = {
-  title: "Codex",
-  description: "Codex — La Forge Éclipsée. Gestionnaire de campagnes D&D : scénarios, personnages, combats.",
+  title: "Master Screen",
+  description: "Master Screen — La Forge Éclipsée. Gestionnaire de campagnes D&D : scénarios, personnages, combats.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Codex",
+    title: "Master Screen",
   },
   icons: {
     icon: [
@@ -79,7 +79,7 @@ export default function RootLayout({
         {/* theme-color est émis par `export const viewport` — pas de <meta> manuel. */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Codex" />
+        <meta name="apple-mobile-web-app-title" content="Master Screen" />
         <link rel="apple-touch-icon" href="/icon-512.png" />
         <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
       </head>

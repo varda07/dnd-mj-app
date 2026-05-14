@@ -31,7 +31,7 @@
     "export_failed": "Échec de l'export."
   },
   "login": {
-    "app_title": "CODEX",
+    "app_title": "MASTER SCREEN",
     "app_slogan": "LA FORGE ÉCLIPSÉE",
     "email": "Email",
     "email_placeholder": "vous@exemple.com",
@@ -43,7 +43,7 @@
     "signup_error": "Erreur création compte : {message}"
   },
   "dashboard": {
-    "app_title": "CODEX",
+    "app_title": "MASTER SCREEN",
     "interface_mj": "MJ",
     "interface_player": "Joueur",
     "interface": "Interface",
@@ -124,10 +124,10 @@
     "expand": "Déplier le menu",
     "home": "Accueil",
     "tagline": "La Forge Éclipsée",
-    "section_forge": "Forge",
-    "section_aventure": "Aventure",
-    "section_outils": "Outils",
-    "section_params": "Paramètres",
+    "section_forge": "📚 Codex",
+    "section_aventure": "⚔️ Aventure",
+    "section_outils": "⚙️ Outils",
+    "section_params": "🔧 Paramètres",
     "params_theme": "Thème",
     "params_language": "Langue",
     "params_tutorial": "Refaire le tutoriel",
@@ -142,9 +142,12 @@
     "forge_sorts": "Sorts",
     "adv_combat": "Combat",
     "adv_exploration": "Exploration",
+    "adv_presentation": "Mode présentation",
     "tools_library": "Bibliothèque",
     "tools_community": "Communauté",
-    "tools_soundbox": "Sound Box"
+    "tools_soundbox": "Sound Box",
+    "tools_customize": "Personnaliser l'accueil",
+    "tools_accessibility": "Accessibilité"
   },
   "palette": {
     "placeholder": "Rechercher ou exécuter une action…",

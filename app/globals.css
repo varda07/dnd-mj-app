@@ -431,8 +431,10 @@ html[data-theme="royal"] {
   --premium-ornament-tip: #e8c664;
   --premium-overlay: rgba(5, 2, 0, 0.85);
   --premium-texture: url('https://www.transparenttextures.com/patterns/dark-mosaic.png');
-  --premium-inset: rgba(139, 0, 0, 0.25);
-  --premium-inset-strong: rgba(139, 0, 0, 0.4);
+  /* Lueur interne dorée et discrète : l'ancien rouge sang (139,0,0) jurait
+     avec l'accent or et donnait un rendu de bordures « rouge moche ». */
+  --premium-inset: rgba(201, 168, 76, 0.14);
+  --premium-inset-strong: rgba(201, 168, 76, 0.28);
 }
 
 
@@ -496,13 +498,19 @@ html[data-theme] .ring-yellow-500 {
   100% { background-position: 200% 0; }
 }
 
-/* Fond : texture spécifique au thème + overlay teinté */
+/* Fond « grimoire » appliqué à TOUTE l'app : halo doré en haut + halo
+   violet/sang en bas (ancrés au viewport), puis overlay teinté + texture.
+   Donne le rendu immersif du dashboard sur chaque page sans toucher au JSX. */
 html[data-theme] body,
 html[data-theme] .bg-gray-900 {
   background-image:
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--theme-accent, #C9A84C) 9%, transparent) 0%, transparent 48%),
+    radial-gradient(ellipse at 50% 100%, rgba(74, 26, 92, 0.16) 0%, transparent 52%),
     linear-gradient(var(--premium-overlay), var(--premium-overlay)),
     var(--premium-texture);
-  background-repeat: repeat;
+  background-repeat: no-repeat, no-repeat, repeat, repeat;
+  background-attachment: fixed, fixed, scroll, scroll;
+  background-size: 100% 100%, 100% 100%, auto, auto;
 }
 
 /* Police Cinzel sur tous les titres et boutons */
@@ -649,9 +657,12 @@ html[data-theme="royal"] .bg-yellow-500 {
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
+/* Bordures fines et discrètes — on laisse le filet de sécurité générique
+   appliquer var(--theme-border) (or semi-transparent) au lieu d'un rouge
+   sang opaque qui rendait des bordures « en dents de scie » très visibles. */
 html[data-theme="royal"] .border-gray-700,
 html[data-theme="royal"] .border-gray-600 {
-  border-color: #8B0000 !important;
+  border-color: var(--theme-border) !important;
 }
 
 
@@ -1092,6 +1103,73 @@ html[data-theme="eclipsed"] ::-webkit-scrollbar-thumb:hover {
 .codex-scroll::-webkit-scrollbar-thumb:hover { background: rgba(201, 168, 76, 0.32); }
 
 
+/* ============================================================================
+   SIDEBAR — sections de nav dépliables
+   ============================================================================
+   Titre cliquable imposant (losange décoratif + chevron) et corps animé via
+   la transition grid-template-rows 1fr ↔ 0fr (anime la hauteur sans la
+   connaître à l'avance). */
+
+.sidebar-section {
+  padding-top: 16px;
+  padding-bottom: 8px;
+}
+
+.sidebar-section-title {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  margin-bottom: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: rgba(201, 168, 76, 0.8);
+  transition: color 0.15s var(--codex-ease);
+}
+.sidebar-section-title:hover {
+  color: #c9a84c;
+}
+.sidebar-section-deco {
+  font-size: 9px;
+  line-height: 1;
+  color: rgba(201, 168, 76, 0.55);
+  flex-shrink: 0;
+}
+.sidebar-section-label {
+  flex: 1;
+  text-align: left;
+  /* le letter-spacing pousse le dernier caractère : on compense à droite */
+  margin-right: -3px;
+}
+.sidebar-section-chevron {
+  font-size: 10px;
+  line-height: 1;
+  color: rgba(201, 168, 76, 0.6);
+  flex-shrink: 0;
+}
+
+/* Corps animé : grid 1fr (déplié) ↔ 0fr (replié). L'inner overflow:hidden
+   masque le contenu pendant la transition. */
+.sidebar-section-body {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.25s var(--codex-ease);
+}
+.sidebar-section-body.is-collapsed {
+  grid-template-rows: 0fr;
+}
+.sidebar-section-body-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+
 /* ---- Bouton de dés flottant (FAB) — version minimaliste Linear/Notion ----
         Cercle 60×60 thémé, ombre légère qui respire, hover scale 1.05.
         Pas de halo or, pas de tremble, pas de rotation hover : sobre. */
@@ -1144,11 +1222,13 @@ html[data-theme="eclipsed"] ::-webkit-scrollbar-thumb:hover {
    ============================================================================ */
 
 /* Cadre extérieur : gradient radial or en haut + violet sombre en bas, fine
-   bordure intérieure à 12px des bords. */
+   bordure intérieure à 12px des bords. Padding volontairement léger pour que
+   le contenu respire sur toute la largeur (le cadre reste décoratif, il
+   n'« enferme » plus le contenu). */
 .grimoire-frame {
   position: relative;
   border-radius: 14px;
-  padding: 32px 28px 28px;
+  padding: 20px 20px 24px;
   background:
     radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--theme-accent, #C9A84C) 12%, transparent) 0%, transparent 55%),
     radial-gradient(ellipse at 50% 100%, rgba(64, 24, 92, 0.18) 0%, transparent 55%),
@@ -1159,7 +1239,7 @@ html[data-theme="eclipsed"] ::-webkit-scrollbar-thumb:hover {
 }
 @media (min-width: 768px) {
   .grimoire-frame {
-    padding: 48px 40px 40px;
+    padding: 24px 24px 28px;
   }
 }
 
@@ -1192,12 +1272,13 @@ html[data-theme="eclipsed"] ::-webkit-scrollbar-thumb:hover {
   text-align: center;
 }
 
-/* Titre CODEX */
+/* Titre MASTER SCREEN — tailles ajustées pour le libellé long (13 caractères)
+   afin qu'il tienne sur une ligne du mobile au desktop. */
 .grimoire-codex {
   font-family: Georgia, 'Times New Roman', serif;
   font-weight: 300;
-  font-size: 32px;
-  letter-spacing: 0.22em;
+  font-size: 26px;
+  letter-spacing: 0.10em;
   color: var(--theme-accent, #C9A84C);
   margin: 0 0 12px;
   text-align: center;
@@ -1207,8 +1288,8 @@ html[data-theme="eclipsed"] ::-webkit-scrollbar-thumb:hover {
 }
 @media (min-width: 768px) {
   .grimoire-codex {
-    font-size: 42px;
-    letter-spacing: 0.30em;
+    font-size: 40px;
+    letter-spacing: 0.16em;
   }
 }
 
@@ -1305,11 +1386,13 @@ html[data-theme="eclipsed"] ::-webkit-scrollbar-thumb:hover {
 }
 
 
-/* === Autel : scénario actif === */
+/* === Autel : scénario actif ===
+   Reste centré (c'est un « autel », un point focal) mais nettement plus large
+   qu'avant pour ne plus paraître à l'étroit. */
 .grimoire-altar {
   position: relative;
   margin: 0 auto 28px;
-  max-width: 560px;
+  max-width: 720px;
   padding: 16px 36px 18px;
   border-radius: 6px;
   background:
@@ -1355,7 +1438,7 @@ html[data-theme="eclipsed"] ::-webkit-scrollbar-thumb:hover {
 }
 .grimoire-altar-empty {
   margin: 0 auto 28px;
-  max-width: 560px;
+  max-width: 720px;
   padding: 14px;
   font-size: 11px;
   font-style: italic;
@@ -1372,7 +1455,7 @@ html[data-theme="eclipsed"] ::-webkit-scrollbar-thumb:hover {
   gap: 8px;
   justify-content: center;
   margin: 0 auto 24px;
-  max-width: 560px;
+  max-width: 720px;
 }
 .grimoire-altar-actions button {
   font-size: 10px;
@@ -1395,13 +1478,13 @@ html[data-theme="eclipsed"] ::-webkit-scrollbar-thumb:hover {
   color: var(--theme-accent, #C9A84C);
 }
 
-/* === Stat pages : 4 cartes en grille 2x2 === */
+/* === Stat pages : cartes en grille fluide, pleine largeur ===
+   auto-fit : 2 colonnes sur mobile, jusqu'à 4+ sur grand écran, sans
+   max-width qui « enfermerait » le contenu. */
 .grimoire-stats {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
-  max-width: 620px;
-  margin: 0 auto;
 }
 .grimoire-stat {
   position: relative;
@@ -1451,10 +1534,9 @@ html[data-theme="eclipsed"] ::-webkit-scrollbar-thumb:hover {
 }
 
 
-/* === Accès rapide : grille de cartes vers chaque entité === */
+/* === Accès rapide : grille de cartes vers chaque entité — pleine largeur === */
 .grimoire-quick {
-  margin: 28px auto 0;
-  max-width: 720px;
+  margin: 28px 0 0;
   padding-top: 24px;
   border-top: 1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 8%, transparent);
 }
@@ -1469,14 +1551,8 @@ html[data-theme="eclipsed"] ::-webkit-scrollbar-thumb:hover {
 }
 .grimoire-quick-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 10px;
-}
-@media (min-width: 640px) {
-  .grimoire-quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (min-width: 1024px) {
-  .grimoire-quick-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 .grimoire-quick-card {
   padding: 16px 18px;
@@ -1532,6 +1608,143 @@ html[data-theme="eclipsed"] ::-webkit-scrollbar-thumb:hover {
 }
 @media (min-width: 768px) {
   .grimoire-quick-card-desc { font-size: 14px; }
+}
+
+
+/* === Hero du dashboard : titre MASTER SCREEN + slogan, tout en haut === */
+.dashboard-hero {
+  text-align: center;
+  padding: 22px 16px 10px;
+}
+.dashboard-hero .grimoire-codex {
+  margin: 0 0 8px;
+}
+.dashboard-hero .grimoire-slogan {
+  margin: 0 0 14px;
+}
+.dashboard-hero .grimoire-divider-line {
+  margin-bottom: 0;
+}
+
+
+/* === Mode Aventure : sélecteur de scénario + grille de cartes d'activité === */
+.grimoire-aventure-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  margin: 0 auto 20px;
+  flex-wrap: wrap;
+}
+.grimoire-aventure-picker label {
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--theme-accent, #C9A84C) 75%, transparent);
+}
+.grimoire-aventure-picker select {
+  min-width: 220px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(20, 15, 8, 0.6) 0%, rgba(10, 8, 4, 0.5) 100%);
+  border: 1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 30%, transparent);
+  color: #f5f2e8;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.18s var(--codex-ease);
+}
+.grimoire-aventure-picker select:focus {
+  border-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 65%, transparent);
+}
+.grimoire-aventure-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+.grimoire-aventure-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 18px 18px 16px;
+  border-radius: 6px;
+  text-align: left;
+  cursor: pointer;
+  background: linear-gradient(135deg, rgba(20, 15, 8, 0.6) 0%, rgba(10, 8, 4, 0.4) 100%);
+  border: 1px solid rgba(201, 168, 76, 0.12);
+  border-left: 2px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 45%, transparent);
+  transition: border-color 0.2s var(--codex-ease),
+              box-shadow 0.2s var(--codex-ease),
+              background 0.2s var(--codex-ease),
+              transform 0.2s var(--codex-ease);
+}
+.grimoire-aventure-card:hover {
+  border-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 40%, transparent);
+  border-left-color: var(--theme-accent, #C9A84C);
+  background: linear-gradient(135deg, rgba(28, 22, 12, 0.7) 0%, rgba(14, 11, 6, 0.5) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 6px 18px rgba(0, 0, 0, 0.25),
+    0 0 18px color-mix(in srgb, var(--theme-accent, #C9A84C) 14%, transparent);
+  transform: scale(1.01);
+}
+.grimoire-aventure-card:active {
+  transform: scale(0.995);
+  transition-duration: 80ms;
+}
+.grimoire-aventure-icon {
+  font-size: 26px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.grimoire-aventure-card-title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+  font-size: 18px;
+  color: var(--theme-accent, #C9A84C);
+  letter-spacing: 0.04em;
+  margin: 0;
+  line-height: 1.2;
+}
+.grimoire-aventure-card-desc {
+  font-size: 12px;
+  font-style: italic;
+  color: rgba(232, 232, 236, 0.55);
+  margin: 0;
+  line-height: 1.5;
+}
+
+
+/* ============================================================================
+   GRIMOIRE GLOBAL — finitions cohérentes sur toute l'app
+   ============================================================================
+   Enrichit les surfaces et champs communs (sans toucher au JSX des pages) pour
+   que chaque écran partage l'ambiance du dashboard : cartes en dégradé sombre,
+   focus doré sur les champs, séparateurs or discrets. */
+
+/* Cartes / surfaces : dégradé sombre subtil par-dessus le fond thémé. */
+html[data-theme] .bg-gray-800:not(.theme-no-deco) {
+  background-image: linear-gradient(
+    135deg,
+    rgba(20, 15, 8, 0.5) 0%,
+    rgba(10, 8, 4, 0.3) 100%
+  );
+}
+
+/* Champs de saisie : focus doré cohérent partout. */
+html[data-theme] input:not([type='checkbox']):not([type='radio']):not([type='range']):focus,
+html[data-theme] textarea:focus,
+html[data-theme] select:focus {
+  border-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 60%, transparent) !important;
+  outline-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 55%, transparent);
+}
+
+/* Séparateurs de listes / tableaux : filet or à ~12 % d'opacité. */
+html[data-theme] hr,
+html[data-theme] .divide-gray-700 > * + *,
+html[data-theme] .divide-gray-800 > * + * {
+  border-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 12%, transparent) !important;
 }
 
 

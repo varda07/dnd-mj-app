@@ -13,7 +13,70 @@ import {
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
-type NodeType = 'lieu' | 'pnj' | 'evenement' | 'indice' | 'custom'
+type NodeType =
+  | 'lieu'
+  | 'pnj'
+  | 'evenement'
+  | 'indice'
+  | 'custom'
+  | 'ennemi'
+  | 'item'
+  | 'map'
+
+// Types « libres » : nœuds sans entité rattachée, créés via la barre d'outils.
+type FreeNodeType = 'lieu' | 'pnj' | 'evenement' | 'indice'
+const FREE_NODE_TYPES: FreeNodeType[] = ['lieu', 'pnj', 'evenement', 'indice']
+
+// Types de nœuds liés à une entité réelle de l'app (table + fiche dédiée).
+type EntityType = 'pnj' | 'ennemi' | 'item' | 'map'
+
+// Métadonnées d'une entité liable : table Supabase, libellés, icône, couleur
+// du nœud et route vers la fiche. PNJ a une vraie fiche détaillée ; ennemis /
+// items / maps renvoient vers leur page de liste (pas de page [id] dédiée).
+const ENTITY_META: Record<
+  EntityType,
+  {
+    table: string
+    label: string
+    labelPlural: string
+    icon: string
+    color: string
+    route: (id: string) => string
+  }
+> = {
+  pnj: {
+    table: 'pnj',
+    label: 'PNJ',
+    labelPlural: 'PNJ',
+    icon: '🧙',
+    color: '#a855f7',
+    route: (id) => `/dashboard/pnj/${id}`
+  },
+  ennemi: {
+    table: 'ennemis',
+    label: 'Ennemi',
+    labelPlural: 'Ennemis',
+    icon: '👹',
+    color: '#ef4444',
+    route: () => `/dashboard/ennemis`
+  },
+  item: {
+    table: 'items',
+    label: 'Item',
+    labelPlural: 'Items',
+    icon: '🎒',
+    color: '#eab308',
+    route: () => `/dashboard/items`
+  },
+  map: {
+    table: 'maps',
+    label: 'Map',
+    labelPlural: 'Cartes',
+    icon: '🗺️',
+    color: '#06b6d4',
+    route: () => `/dashboard/maps`
+  }
+}
 
 // Palette pour les types personnalisés (clé stockée en base, hex pour rendu)
 type CustomColorKey = 'or' | 'rouge' | 'vert' | 'bleu' | 'violet' | 'orange' | 'gris'
@@ -57,7 +120,13 @@ type MindNode = {
   position_y: number
   couleur: string | null
   custom_type_id: string | null
+  // Si renseignés : nœud rattaché à une entité réelle (PNJ, ennemi, item, map).
+  entite_type: EntityType | null
+  entite_id: string | null
 }
+
+// Entité liable telle que listée dans la modale de sélection.
+type EntityLite = { id: string; nom: string }
 
 type MindLink = {
   id: string
@@ -83,7 +152,11 @@ const BUILTIN_TYPE_META: Record<Exclude<NodeType, 'custom'>, { label: string; ic
   lieu: { label: 'Lieu', icon: '📍', color: '#3b82f6' },
   pnj: { label: 'PNJ', icon: '👤', color: '#a855f7' },
   evenement: { label: 'Événement', icon: '⚡', color: '#f97316' },
-  indice: { label: 'Indice', icon: '🔍', color: '#22c55e' }
+  indice: { label: 'Indice', icon: '🔍', color: '#22c55e' },
+  // Types « entité » : utilisés par les nœuds liés à une entité existante.
+  ennemi: { label: 'Ennemi', icon: '👹', color: '#ef4444' },
+  item: { label: 'Item', icon: '🎒', color: '#eab308' },
+  map: { label: 'Map', icon: '🗺️', color: '#06b6d4' }
 }
 
 const CUSTOM_FALLBACK_META = { label: 'Personnalisé', icon: '✨', color: '#6b7280' }
@@ -145,6 +218,93 @@ const PNJ_RELATION_COLORS: Record<string, string> = {
   neutre: '#6b7280'
 }
 
+// Format des fichiers d'export/import de carte mentale.
+const MINDMAP_EXPORT_FORMAT = 'codex-mindmap'
+const MINDMAP_EXPORT_VERSION = 1
+
+// Déclenche le téléchargement d'un Blob dans le navigateur.
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+// Nettoie un nom de carte pour en faire un nom de fichier sûr.
+function safeFileName(nom: string): string {
+  return (nom || 'carte-mentale')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^\w-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 60) || 'carte-mentale'
+}
+
+// Construit un PDF minimal (une page, image JPEG plein cadre) sans dépendance
+// externe : jspdf n'est pas installable dans cet environnement (le registre
+// npm est derrière un proxy SSL non vérifiable). On écrit donc le PDF à la main
+// — un document mono-page avec une seule image DCTDecode suffit ici.
+async function canvasToPdfBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  const jpegBlob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error('canvas.toBlob a échoué'))),
+      'image/jpeg',
+      0.92
+    )
+  })
+  const jpeg = new Uint8Array(await jpegBlob.arrayBuffer())
+  const iw = canvas.width
+  const ih = canvas.height
+
+  const enc = new TextEncoder()
+  const chunks: Uint8Array[] = []
+  let length = 0
+  const offsets: number[] = []
+  const push = (data: Uint8Array | string) => {
+    const u = typeof data === 'string' ? enc.encode(data) : data
+    chunks.push(u)
+    length += u.length
+  }
+  const obj = (n: number, body: string) => {
+    offsets[n] = length
+    push(`${n} 0 obj\n${body}\nendobj\n`)
+  }
+
+  push('%PDF-1.4\n')
+  push(new Uint8Array([0x25, 0xe2, 0xe3, 0xcf, 0xd3, 0x0a]))
+  obj(1, '<< /Type /Catalog /Pages 2 0 R >>')
+  obj(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>')
+  obj(
+    3,
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${iw} ${ih}] ` +
+      `/Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`
+  )
+  offsets[4] = length
+  push(
+    `4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${iw} /Height ${ih} ` +
+      `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode ` +
+      `/Length ${jpeg.length} >>\nstream\n`
+  )
+  push(jpeg)
+  push('\nendstream\nendobj\n')
+  const content = `q ${iw} 0 0 ${ih} 0 0 cm /Im0 Do Q`
+  obj(5, `<< /Length ${content.length} >>\nstream\n${content}\nendstream`)
+
+  const xrefOffset = length
+  let xref = 'xref\n0 6\n0000000000 65535 f \n'
+  for (let i = 1; i <= 5; i++) {
+    xref += String(offsets[i]).padStart(10, '0') + ' 00000 n \n'
+  }
+  push(xref)
+  push(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`)
+
+  return new Blob(chunks as BlobPart[], { type: 'application/pdf' })
+}
+
 export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
   const router = useRouter()
   const [scenarioId, setScenarioId] = useState<string>(scenarios[0]?.id ?? '')
@@ -174,6 +334,12 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
     }>
   >([])
   const [pnjByName, setPnjByName] = useState<Map<string, string>>(new Map())
+  // Modale de sélection d'entités existantes à lier (PNJ / ennemi / item / map).
+  const [entityPicker, setEntityPicker] = useState<EntityType | null>(null)
+  // Menu déroulant d'export + état d'import en cours.
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const [contextMenu, setContextMenu] = useState<
     | { kind: 'node'; x: number; y: number; nodeId: string }
     | { kind: 'link'; x: number; y: number; linkId: string }
@@ -598,6 +764,418 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
     setCustomTypes((prev) => prev.filter((t) => t.id !== id))
   }
 
+  const currentMindmap = mindmaps.find((m) => m.id === mindmapId)
+
+  // --------------------------------------------------------------------------
+  // Nœuds liés à des entités existantes (PNJ / ennemi / item / map)
+  // --------------------------------------------------------------------------
+
+  // Crée un nœud par entité sélectionnée dans la modale, rattaché à l'entité.
+  const addEntityNodes = async (type: EntityType, entities: EntityLite[]) => {
+    if (!mindmapId || entities.length === 0) return
+    const rect = canvasRef.current?.getBoundingClientRect()
+    const w = rect?.width ?? 800
+    const h = rect?.height ?? 600
+    const v = viewRef.current
+    const cx = (w / 2 - v.x) / v.scale
+    const cy = (h / 2 - v.y) / v.scale
+    const meta = ENTITY_META[type]
+    // Disposition en grille autour du centre pour ne pas empiler les nœuds.
+    const payloads = entities.map((ent, i) => {
+      const col = i % 4
+      const row = Math.floor(i / 4)
+      const jitter = () => Math.round((Math.random() - 0.5) * 36)
+      return {
+        mindmap_id: mindmapId,
+        type,
+        titre: ent.nom,
+        contenu: '',
+        position_x: Math.round(cx + (col - 1.5) * 190 + jitter()),
+        position_y: Math.round(cy + (row - 0.5) * 120 + jitter()),
+        couleur: meta.color,
+        custom_type_id: null,
+        entite_type: type,
+        entite_id: ent.id
+      }
+    })
+    const { data, error } = await supabase
+      .from('mindmap_noeuds')
+      .insert(payloads)
+      .select()
+    if (error) {
+      console.error('[mindmap] insert noeuds entités échec :', error)
+      alert(
+        "Échec de l'ajout des nœuds. As-tu exécuté la migration supabase/mindmap_entites.sql ?"
+      )
+      return
+    }
+    if (data) setNodes((ns) => [...ns, ...((data as MindNode[]) ?? [])])
+  }
+
+  // --------------------------------------------------------------------------
+  // Export / Import de la carte mentale
+  // --------------------------------------------------------------------------
+
+  // Rend la carte mentale courante dans un <canvas> hors écran (nœuds + liens).
+  // On dessine directement depuis le modèle de données plutôt qu'en capturant
+  // le DOM : rendu net, indépendant du zoom courant et des effets CSS.
+  const renderMindmapCanvas = (): HTMLCanvasElement | null => {
+    if (nodes.length === 0) return null
+    const PAD_X = 180
+    const PAD_Y = 110
+    const xs = nodes.map((n) => n.position_x)
+    const ys = nodes.map((n) => n.position_y)
+    const minX = Math.min(...xs) - PAD_X
+    const maxX = Math.max(...xs) + PAD_X
+    const minY = Math.min(...ys) - PAD_Y
+    const maxY = Math.max(...ys) + PAD_Y
+    const w = Math.max(1, maxX - minX)
+    const h = Math.max(1, maxY - minY)
+    const dpr = 2
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(w * dpr)
+    canvas.height = Math.round(h * dpr)
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.scale(dpr, dpr)
+    ctx.translate(-minX, -minY)
+    // Fond + grille pointillée discrète (rappel du canvas de l'app).
+    ctx.fillStyle = '#0a0b0d'
+    ctx.fillRect(minX, minY, w, h)
+
+    // Liens
+    links.forEach((l) => {
+      const a = nodes.find((n) => n.id === l.noeud_from)
+      const b = nodes.find((n) => n.id === l.noeud_to)
+      if (!a || !b) return
+      const metaA = resolveNodeMeta(a, customTypes)
+      const metaB = resolveNodeMeta(b, customTypes)
+      const ck = isColorKey(l.couleur) ? l.couleur : 'auto'
+      let stroke: string | CanvasGradient
+      if (ck === 'auto') {
+        if (metaA.color === metaB.color) {
+          stroke = metaA.color
+        } else {
+          const g = ctx.createLinearGradient(
+            a.position_x,
+            a.position_y,
+            b.position_x,
+            b.position_y
+          )
+          g.addColorStop(0, metaA.color)
+          g.addColorStop(1, metaB.color)
+          stroke = g
+        }
+      } else {
+        stroke = LINK_COLORS[ck].hex
+      }
+      ctx.strokeStyle = stroke
+      ctx.lineWidth = 2
+      ctx.globalAlpha = 0.85
+      ctx.beginPath()
+      ctx.moveTo(a.position_x, a.position_y)
+      ctx.lineTo(b.position_x, b.position_y)
+      ctx.stroke()
+      ctx.globalAlpha = 1
+      const annotation = (l.annotation ?? '').trim()
+      if (annotation) {
+        const mx = (a.position_x + b.position_x) / 2
+        const my = (a.position_y + b.position_y) / 2
+        ctx.font = '11px system-ui, sans-serif'
+        const tw = ctx.measureText(annotation).width
+        ctx.fillStyle = 'rgba(10,11,13,0.85)'
+        ctx.fillRect(mx - tw / 2 - 6, my - 9, tw + 12, 18)
+        ctx.fillStyle = '#e8e8ec'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(annotation, mx, my)
+      }
+    })
+
+    // Nœuds (pilules arrondies)
+    nodes.forEach((n) => {
+      const meta = resolveNodeMeta(n, customTypes)
+      const color = n.couleur ?? meta.color
+      const label = `${meta.icon} ${n.titre || meta.label}`
+      ctx.font = 'bold 14px system-ui, sans-serif'
+      const tw = ctx.measureText(label).width
+      const boxW = Math.min(260, Math.max(150, tw + 36))
+      const boxH = 40
+      const x = n.position_x - boxW / 2
+      const y = n.position_y - boxH / 2
+      ctx.beginPath()
+      ctx.roundRect(x, y, boxW, boxH, 20)
+      ctx.fillStyle = color + '33'
+      ctx.fill()
+      ctx.strokeStyle = '#eab308'
+      ctx.lineWidth = 2
+      ctx.stroke()
+      ctx.fillStyle = color
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(label, n.position_x, n.position_y, boxW - 22)
+    })
+
+    return canvas
+  }
+
+  // Export PNG ou PDF (image plein cadre).
+  const handleExportImage = async (format: 'png' | 'pdf') => {
+    setExportMenuOpen(false)
+    const canvas = renderMindmapCanvas()
+    if (!canvas) {
+      alert('Carte vide — ajoute des nœuds avant d’exporter.')
+      return
+    }
+    const base = safeFileName(currentMindmap?.nom ?? 'carte-mentale')
+    if (format === 'png') {
+      canvas.toBlob((blob) => {
+        if (blob) downloadBlob(blob, `${base}.png`)
+      }, 'image/png')
+    } else {
+      try {
+        const blob = await canvasToPdfBlob(canvas)
+        downloadBlob(blob, `${base}.pdf`)
+      } catch (e) {
+        console.error('[mindmap] export PDF échec :', e)
+        alert("Échec de l'export PDF — voir la console.")
+      }
+    }
+  }
+
+  // Export JSON (format Master Screen, réimportable).
+  const handleExportJSON = () => {
+    setExportMenuOpen(false)
+    if (nodes.length === 0) {
+      alert('Carte vide — ajoute des nœuds avant d’exporter.')
+      return
+    }
+    // On n'embarque que les types personnalisés réellement utilisés.
+    const usedCustomIds = new Set(
+      nodes
+        .filter((n) => n.type === 'custom' && n.custom_type_id)
+        .map((n) => n.custom_type_id as string)
+    )
+    const payload = {
+      format: MINDMAP_EXPORT_FORMAT,
+      version: MINDMAP_EXPORT_VERSION,
+      exported_at: new Date().toISOString(),
+      mindmap: { nom: currentMindmap?.nom ?? 'Carte mentale' },
+      customTypes: customTypes
+        .filter((t) => usedCustomIds.has(t.id))
+        .map((t) => ({
+          id: t.id,
+          nom: t.nom,
+          couleur: t.couleur,
+          icone: t.icone
+        })),
+      nodes: nodes.map((n) => ({
+        id: n.id,
+        type: n.type,
+        titre: n.titre,
+        contenu: n.contenu,
+        position_x: n.position_x,
+        position_y: n.position_y,
+        couleur: n.couleur,
+        custom_type_id: n.custom_type_id,
+        entite_type: n.entite_type,
+        entite_id: n.entite_id
+      })),
+      links: links.map((l) => ({
+        noeud_from: l.noeud_from,
+        noeud_to: l.noeud_to,
+        couleur: l.couleur,
+        annotation: l.annotation
+      }))
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: 'application/json'
+    })
+    downloadBlob(blob, `${safeFileName(currentMindmap?.nom ?? 'carte-mentale')}.json`)
+  }
+
+  // Import d'un fichier JSON exporté depuis Master Screen : crée une nouvelle carte
+  // dans le scénario courant avec tous ses nœuds, liens et types personnalisés.
+  const handleImportFile = async (file: File) => {
+    if (!scenarioId) {
+      alert('Sélectionne d’abord un scénario.')
+      return
+    }
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(await file.text())
+    } catch {
+      alert('Fichier JSON invalide.')
+      return
+    }
+    const data = parsed as {
+      format?: string
+      mindmap?: { nom?: string }
+      customTypes?: Array<{ id?: string; nom?: string; couleur?: string; icone?: string }>
+      nodes?: Array<Record<string, unknown>>
+      links?: Array<Record<string, unknown>>
+    }
+    if (data?.format !== MINDMAP_EXPORT_FORMAT || !Array.isArray(data.nodes)) {
+      alert('Format non reconnu — attendu : un export Master Screen de carte mentale.')
+      return
+    }
+    setImporting(true)
+    try {
+      // 1. Nouvelle carte
+      const nom = data.mindmap?.nom
+        ? `${data.mindmap.nom} (importé)`
+        : 'Carte importée'
+      const { data: mm, error: mmErr } = await supabase
+        .from('mindmaps')
+        .insert({ scenario_id: scenarioId, nom })
+        .select('id, scenario_id, nom')
+        .single()
+      if (mmErr || !mm) throw mmErr ?? new Error('création de la carte échouée')
+      const newMindmapId = (mm as Mindmap).id
+
+      // 2. Types personnalisés : réutilise ceux du scénario (match par nom),
+      //    crée les manquants. ctMap : ancien id → nouvel id.
+      const ctMap = new Map<string, string>()
+      const existingByName = new Map(
+        customTypes.map((t) => [t.nom.trim().toLowerCase(), t.id])
+      )
+      for (const ct of data.customTypes ?? []) {
+        const key = String(ct.nom ?? '').trim().toLowerCase()
+        if (!key) continue
+        let newId = existingByName.get(key)
+        if (!newId) {
+          const couleur = isCustomColorKey(ct.couleur) ? ct.couleur : 'gris'
+          const { data: created } = await supabase
+            .from('mindmap_types_custom')
+            .insert({
+              scenario_id: scenarioId,
+              nom: String(ct.nom),
+              couleur,
+              icone: String(ct.icone || '✨')
+            })
+            .select('id, scenario_id, nom, couleur, icone')
+            .single()
+          if (created) {
+            newId = created.id as string
+            existingByName.set(key, newId)
+            setCustomTypes((prev) => [
+              ...prev,
+              {
+                id: created.id,
+                scenario_id: created.scenario_id,
+                nom: created.nom,
+                couleur: isCustomColorKey(created.couleur)
+                  ? created.couleur
+                  : 'gris',
+                icone: created.icone || '✨'
+              }
+            ])
+          }
+        }
+        if (newId && ct.id) ctMap.set(String(ct.id), newId)
+      }
+
+      // 3. Nœuds : insertion séquentielle pour fiabiliser le mapping d'id.
+      const validTypes = [
+        'lieu',
+        'pnj',
+        'evenement',
+        'indice',
+        'custom',
+        'ennemi',
+        'item',
+        'map'
+      ]
+      const idMap = new Map<string, string>()
+      for (const raw of data.nodes) {
+        const rawType = String(raw.type ?? 'indice')
+        let type = validTypes.includes(rawType) ? rawType : 'indice'
+        let custom_type_id: string | null = null
+        if (type === 'custom') {
+          custom_type_id = raw.custom_type_id
+            ? ctMap.get(String(raw.custom_type_id)) ?? null
+            : null
+          // Type custom introuvable → on retombe sur un nœud « indice ».
+          if (!custom_type_id) type = 'indice'
+        }
+        let entite_type: EntityType | null = null
+        let entite_id: string | null = null
+        const rawEntiteType = raw.entite_type
+        if (
+          (rawEntiteType === 'pnj' ||
+            rawEntiteType === 'ennemi' ||
+            rawEntiteType === 'item' ||
+            rawEntiteType === 'map') &&
+          raw.entite_id
+        ) {
+          entite_type = rawEntiteType
+          entite_id = String(raw.entite_id)
+        }
+        const px = Number(raw.position_x)
+        const py = Number(raw.position_y)
+        const { data: created } = await supabase
+          .from('mindmap_noeuds')
+          .insert({
+            mindmap_id: newMindmapId,
+            type,
+            titre: String(raw.titre ?? ''),
+            contenu: String(raw.contenu ?? ''),
+            position_x: Number.isFinite(px) ? Math.round(px) : 0,
+            position_y: Number.isFinite(py) ? Math.round(py) : 0,
+            couleur: typeof raw.couleur === 'string' ? raw.couleur : null,
+            custom_type_id,
+            entite_type,
+            entite_id
+          })
+          .select('id')
+          .single()
+        if (created && raw.id) idMap.set(String(raw.id), created.id as string)
+      }
+
+      // 4. Liens : on remappe les extrémités, on ignore les liens orphelins.
+      const linkPayloads: Array<{
+        mindmap_id: string
+        noeud_from: string
+        noeud_to: string
+        couleur: string
+        annotation: string
+      }> = []
+      for (const raw of data.links ?? []) {
+        const from = idMap.get(String(raw.noeud_from))
+        const to = idMap.get(String(raw.noeud_to))
+        if (!from || !to) continue
+        linkPayloads.push({
+          mindmap_id: newMindmapId,
+          noeud_from: from,
+          noeud_to: to,
+          couleur: typeof raw.couleur === 'string' ? raw.couleur : 'auto',
+          annotation:
+            typeof raw.annotation === 'string'
+              ? raw.annotation.slice(0, ANNOTATION_MAX)
+              : ''
+        })
+      }
+      if (linkPayloads.length > 0) {
+        const { error: lErr } = await supabase
+          .from('mindmap_liens')
+          .insert(linkPayloads)
+        if (lErr) console.error('[mindmap] import liens échec :', lErr)
+      }
+
+      // 5. Bascule sur la carte importée (recharge nœuds/liens via l'effet).
+      setMindmaps((prev) => [...prev, mm as Mindmap])
+      setMindmapId(newMindmapId)
+      alert(
+        `Carte « ${nom} » importée : ${idMap.size} nœud(s), ${linkPayloads.length} lien(s).`
+      )
+    } catch (e) {
+      console.error('[mindmap] import échec :', e)
+      alert("Échec de l'import — voir la console.")
+    } finally {
+      setImporting(false)
+    }
+  }
+
   const connect = useCallback((from: string, to: string) => {
     if (from === to) return
     if (
@@ -988,7 +1566,7 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
           )}
         </select>
         <div className="flex flex-wrap gap-1">
-          {(Object.keys(BUILTIN_TYPE_META) as Array<Exclude<NodeType, 'custom'>>).map((t) => (
+          {FREE_NODE_TYPES.map((t) => (
             <button
               key={t}
               type="button"
@@ -1037,6 +1615,22 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
             ✨ Personnalisé
           </button>
         </div>
+        <div className="flex flex-wrap gap-1">
+          {(Object.keys(ENTITY_META) as EntityType[]).map((et) => (
+            <button
+              key={et}
+              type="button"
+              onClick={() => setEntityPicker(et)}
+              disabled={!scenarioId || !mindmapId}
+              className="px-3 py-2 rounded-full text-sm font-bold text-white disabled:opacity-40 border border-white/10"
+              style={{ backgroundColor: `${ENTITY_META[et].color}cc` }}
+              title={`Lier ${ENTITY_META[et].label} existant·e`}
+            >
+              🔗 {ENTITY_META[et].icon} Lier un{et === 'map' ? 'e' : ''}{' '}
+              {ENTITY_META[et].label}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           onClick={() => setNotesOpen((v) => !v)}
@@ -1063,6 +1657,73 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
         >
           🤝 Relations PNJ
         </button>
+
+        {/* Export : menu déroulant PNG / PDF / JSON */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setExportMenuOpen((v) => !v)}
+            disabled={!mindmapId}
+            className="px-3 py-2 rounded-full text-sm font-bold bg-gray-700 text-yellow-400 hover:bg-gray-600 disabled:opacity-40"
+            title="Exporter la carte mentale"
+          >
+            📥 Exporter ▾
+          </button>
+          {exportMenuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-[60]"
+                onClick={() => setExportMenuOpen(false)}
+              />
+              <div className="absolute left-0 mt-1 z-[61] min-w-[180px] bg-gray-900 border-2 border-yellow-500 rounded-lg shadow-2xl py-1">
+                <button
+                  type="button"
+                  onClick={() => handleExportImage('png')}
+                  className="w-full text-left px-3 py-2 text-sm text-yellow-400 hover:bg-gray-800"
+                >
+                  🖼️ Image PNG
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExportImage('pdf')}
+                  className="w-full text-left px-3 py-2 text-sm text-yellow-400 hover:bg-gray-800"
+                >
+                  📄 Document PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportJSON}
+                  className="w-full text-left px-3 py-2 text-sm text-yellow-400 hover:bg-gray-800"
+                >
+                  🧾 JSON (réimportable)
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Import : fichier JSON Master Screen */}
+        <button
+          type="button"
+          onClick={() => importInputRef.current?.click()}
+          disabled={!scenarioId || importing}
+          className="px-3 py-2 rounded-full text-sm font-bold bg-gray-700 text-yellow-400 hover:bg-gray-600 disabled:opacity-40"
+          title="Importer une carte mentale (JSON Master Screen)"
+        >
+          {importing ? '⏳ Import…' : '📤 Importer'}
+        </button>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            e.target.value = ''
+            if (file) handleImportFile(file)
+          }}
+        />
+
         <p className="text-gray-400 text-xs ml-auto">
           <span className="text-yellow-500">Shift + clic</span> sur 2 nœuds pour les relier ·
           molette/pinch = zoom · glisser le fond = déplacer
@@ -1721,6 +2382,24 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
           }}
         />
       )}
+
+      {entityPicker && (
+        <EntityPicker
+          type={entityPicker}
+          existingEntiteIds={
+            new Set(
+              nodes
+                .filter((n) => n.entite_type === entityPicker && n.entite_id)
+                .map((n) => n.entite_id as string)
+            )
+          }
+          onCancel={() => setEntityPicker(null)}
+          onConfirm={async (selected) => {
+            await addEntityNodes(entityPicker, selected)
+            setEntityPicker(null)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -1848,6 +2527,172 @@ function CustomTypeCreator({
   )
 }
 
+// ============================================================================
+// EntityPicker — modale de sélection d'entités existantes à lier
+// ============================================================================
+
+function EntityPicker({
+  type,
+  existingEntiteIds,
+  onCancel,
+  onConfirm
+}: {
+  type: EntityType
+  existingEntiteIds: Set<string>
+  onCancel: () => void
+  onConfirm: (selected: EntityLite[]) => Promise<void>
+}) {
+  const meta = ENTITY_META[type]
+  const [entities, setEntities] = useState<EntityLite[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [search, setSearch] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    let cancel = false
+    const load = async () => {
+      setLoading(true)
+      const {
+        data: { user }
+      } = await supabase.auth.getUser()
+      if (!user) {
+        if (!cancel) {
+          setEntities([])
+          setLoading(false)
+        }
+        return
+      }
+      const { data, error } = await supabase
+        .from(meta.table)
+        .select('id, nom')
+        .eq('mj_id', user.id)
+        .order('nom', { ascending: true })
+      if (cancel) return
+      if (error) console.error('[mindmap] chargement entités échec :', error)
+      setEntities(((data ?? []) as EntityLite[]).filter((e) => e.nom))
+      setLoading(false)
+    }
+    load()
+    return () => {
+      cancel = true
+    }
+  }, [meta.table])
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const filtered = entities.filter((e) =>
+    e.nom.toLowerCase().includes(search.trim().toLowerCase())
+  )
+
+  const submit = async () => {
+    if (selected.size === 0 || submitting) return
+    setSubmitting(true)
+    try {
+      await onConfirm(entities.filter((e) => selected.has(e.id)))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 z-[80] flex items-center justify-center p-4"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-gray-800 border-2 border-yellow-600 rounded-lg shadow-2xl w-full max-w-md p-4 space-y-3 flex flex-col max-h-[80vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-yellow-500 font-bold flex items-center gap-2">
+          <span>{meta.icon}</span> Lier un{type === 'map' ? 'e' : ''} {meta.label}
+        </h3>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={`Rechercher parmi tes ${meta.labelPlural}…`}
+          className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm"
+        />
+        <div className="flex-1 overflow-y-auto -mx-1 px-1 space-y-1 min-h-[120px]">
+          {loading && (
+            <p className="text-gray-500 text-sm text-center py-6">Chargement…</p>
+          )}
+          {!loading && entities.length === 0 && (
+            <p className="text-gray-500 text-sm text-center py-6">
+              Aucun·e {meta.label} dans ta bibliothèque.
+            </p>
+          )}
+          {!loading && entities.length > 0 && filtered.length === 0 && (
+            <p className="text-gray-500 text-sm text-center py-6">
+              Aucun résultat pour « {search} ».
+            </p>
+          )}
+          {!loading &&
+            filtered.map((e) => {
+              const dejaLie = existingEntiteIds.has(e.id)
+              const checked = selected.has(e.id)
+              return (
+                <label
+                  key={e.id}
+                  className={`flex items-center gap-2 p-2 rounded border cursor-pointer transition ${
+                    checked
+                      ? 'bg-yellow-500/15 border-yellow-500'
+                      : 'bg-gray-900 border-gray-700 hover:bg-gray-700'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggle(e.id)}
+                    className="accent-yellow-500"
+                  />
+                  <span className="text-sm text-gray-200 truncate flex-1">
+                    {e.nom}
+                  </span>
+                  {dejaLie && (
+                    <span
+                      className="text-[10px] text-gray-500 flex-shrink-0"
+                      title="Un nœud lié à cette entité existe déjà sur cette carte"
+                    >
+                      déjà lié
+                    </span>
+                  )}
+                </label>
+              )
+            })}
+        </div>
+        <div className="flex gap-2 flex-shrink-0">
+          <button
+            type="button"
+            onClick={submit}
+            disabled={selected.size === 0 || submitting}
+            className="flex-1 p-2 bg-yellow-500 text-gray-900 font-bold rounded hover:bg-yellow-400 disabled:opacity-50"
+          >
+            {submitting
+              ? 'Ajout…'
+              : `Ajouter ${selected.size || ''} nœud${selected.size > 1 ? 's' : ''}`.trim()}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 p-2 bg-gray-700 text-white rounded hover:bg-gray-600"
+          >
+            Annuler
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const MindNodeView = memo(function MindNodeView({
   node,
   customTypes,
@@ -1898,6 +2743,20 @@ const MindNodeView = memo(function MindNodeView({
         <div className="text-[11px] text-gray-300 text-center mt-1 line-clamp-2 break-words">
           {node.contenu}
         </div>
+      )}
+      {node.entite_type && node.entite_id && (
+        <a
+          href={ENTITY_META[node.entite_type].route(node.entite_id)}
+          target="_blank"
+          rel="noopener noreferrer"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          className="block text-[10px] text-center mt-1 underline decoration-dotted hover:opacity-80"
+          style={{ color }}
+          title={`Ouvrir la fiche ${ENTITY_META[node.entite_type].label}`}
+        >
+          Ouvrir la fiche ↗
+        </a>
       )}
     </div>
   )

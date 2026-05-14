@@ -97,8 +97,8 @@ export default function Home() {
         .codex-title {
           font-family: Georgia, 'Times New Roman', serif;
           font-weight: 300;
-          font-size: 32px;
-          letter-spacing: 0.18em;
+          font-size: 26px;
+          letter-spacing: 0.1em;
           color: #C9A84C;
           text-shadow:
             0 0 18px rgba(201, 168, 76, 0.35),
@@ -107,8 +107,8 @@ export default function Home() {
         }
         @media (min-width: 640px) {
           .codex-title {
-            font-size: 44px;
-            letter-spacing: 0.2em;
+            font-size: 40px;
+            letter-spacing: 0.16em;
           }
         }
 
@@ -309,11 +309,11 @@ export default function Home() {
       <div className="codex-content">
         {/* Logo / sceau */}
         <div className="mx-auto" style={{ width: 80, height: 80 }} aria-hidden="true">
-          <CodexSeal />
+          <MasterScreenSeal />
         </div>
 
         {/* Titre */}
-        <h1 className="codex-title">CODEX</h1>
+        <h1 className="codex-title">MASTER SCREEN</h1>
 
         {/* Ligne dorée */}
         <div className="codex-divider" />
@@ -528,37 +528,38 @@ export default function Home() {
 }
 
 // ============================================================================
-// CodexSeal — sceau SVG : anneau + C médiéval orné, accordé avec public/icon.svg
+// MasterScreenSeal — sceau SVG : anneau + monogramme « M S », accordé avec
+// public/icon.svg.
 // ============================================================================
-function CodexSeal() {
+function MasterScreenSeal() {
   return (
     <svg
       viewBox="0 0 100 100"
       width="100%"
       height="100%"
       role="img"
-      aria-label="Sceau du Codex"
+      aria-label="Sceau Master Screen"
     >
       <defs>
-        <linearGradient id="codex-seal-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id="ms-seal-gold" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#ffdd88" />
           <stop offset="50%" stopColor="#C9A84C" />
           <stop offset="100%" stopColor="#5a4520" />
         </linearGradient>
-        <radialGradient id="codex-seal-glow" cx="50%" cy="50%" r="50%">
+        <radialGradient id="ms-seal-glow" cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor="#C9A84C" stopOpacity="0.35" />
           <stop offset="100%" stopColor="#C9A84C" stopOpacity="0" />
         </radialGradient>
       </defs>
       {/* halo central */}
-      <circle cx="50" cy="50" r="44" fill="url(#codex-seal-glow)" />
+      <circle cx="50" cy="50" r="44" fill="url(#ms-seal-glow)" />
       {/* anneau extérieur */}
       <circle
         cx="50"
         cy="50"
         r="44"
         fill="none"
-        stroke="url(#codex-seal-gold)"
+        stroke="url(#ms-seal-gold)"
         strokeWidth="1.6"
       />
       {/* anneau intérieur pointillé */}
@@ -567,7 +568,7 @@ function CodexSeal() {
         cy="50"
         r="40"
         fill="none"
-        stroke="url(#codex-seal-gold)"
+        stroke="url(#ms-seal-gold)"
         strokeWidth="0.6"
         strokeDasharray="2 2"
       />
@@ -576,15 +577,34 @@ function CodexSeal() {
       <circle cx="94" cy="50" r="2.2" fill="#ffdd88" />
       <circle cx="50" cy="94" r="2.2" fill="#ffdd88" />
       <circle cx="6" cy="50" r="2.2" fill="#ffdd88" />
-      {/* C médiéval orné */}
-      <path
-        d="M 72 32 Q 65 24, 52 24 Q 32 24, 28 50 Q 32 76, 52 76 Q 65 76, 72 68 L 67 60 Q 60 66, 52 66 Q 38 66, 35 50 Q 38 34, 52 34 Q 60 34, 67 40 Z"
-        fill="url(#codex-seal-gold)"
-        stroke="#5a4520"
-        strokeWidth="0.8"
-      />
-      {/* point central */}
-      <circle cx="50" cy="50" r="1.2" fill="#ffdd88" />
+      {/* monogramme M S */}
+      <text
+        x="48"
+        y="67"
+        textAnchor="middle"
+        fontFamily="Georgia, 'Times New Roman', serif"
+        fontSize="56"
+        fontWeight="bold"
+        fontStyle="italic"
+        fill="url(#ms-seal-gold)"
+      >
+        M
+      </text>
+      <text
+        x="62"
+        y="71"
+        textAnchor="middle"
+        fontFamily="Georgia, 'Times New Roman', serif"
+        fontSize="27"
+        fontWeight="bold"
+        fontStyle="italic"
+        fill="#0a0a0a"
+        stroke="#f5f1e8"
+        strokeWidth="0.6"
+        paintOrder="stroke"
+      >
+        S
+      </text>
     </svg>
   )
 }

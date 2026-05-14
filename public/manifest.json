@@ -1,7 +1,7 @@
 {
-  "name": "Codex",
-  "short_name": "Codex",
-  "description": "Codex — La Forge Éclipsée. Gestionnaire de campagnes D&D : scénarios, personnages, combats.",
+  "name": "Master Screen",
+  "short_name": "Master Screen",
+  "description": "Master Screen — La Forge Éclipsée. Gestionnaire de campagnes D&D : scénarios, personnages, combats.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#050200",

@@ -111,9 +111,11 @@ export const THEMES: Record<ThemeKey, Theme> = {
       bg_primary: '#050200',
       bg_secondary: '#0f0805',
       bg_card: '#1a0f05',
-      border_color: '#8B0000',
+      // Bordure fine et discrète, alignée sur les autres thèmes (semi-transparente).
+      // L'ancien '#8B0000' opaque rendait des bordures rouges agressives.
+      border_color: 'rgba(201,168,76,0.22)',
       text_primary: '#C9A84C',
-      text_secondary: '#8B0000',
+      text_secondary: '#b9892f',
       accent_color: '#C9A84C'
     }
   }
