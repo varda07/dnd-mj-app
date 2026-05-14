@@ -1142,3 +1142,24 @@ export const itemMagiqueVersItem = (item: ItemMagique, mj_id: string) => ({
   personnage_id: null,
   image_url: null
 })
+
+// ----------------------------------------------------------------------------
+// Roadmap 4.1 — générateur d'objet magique aléatoire depuis le SRD ci-dessus.
+// Filtres optionnels : rareté et/ou type. Renvoie null si rien ne correspond.
+// ----------------------------------------------------------------------------
+export type FiltresItemMagique = {
+  rarete?: RareteItem
+  type?: TypeItem
+}
+
+export function genererItemMagique(
+  filtres: FiltresItemMagique = {}
+): ItemMagique | null {
+  const candidats = ITEMS_DND5E.filter(
+    (it) =>
+      (!filtres.rarete || it.rarete === filtres.rarete) &&
+      (!filtres.type || it.type === filtres.type)
+  )
+  if (candidats.length === 0) return null
+  return candidats[Math.floor(Math.random() * candidats.length)]
+}

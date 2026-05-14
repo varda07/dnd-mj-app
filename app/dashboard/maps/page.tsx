@@ -192,8 +192,24 @@ export default function Maps() {
           <h1 className="text-2xl font-bold text-yellow-500">{t('title')}</h1>
           <button
             type="button"
-            onClick={() => router.push('/dashboard/maps/editor')}
+            onClick={() => router.push('/dashboard/maps/generer-donjon')}
             className="ml-auto px-4 py-2 rounded font-bold bg-[#C9A84C]/15 text-[#e6c878] border border-[#C9A84C] hover:bg-[#C9A84C]/25 text-sm transition"
+            title="Générer un donjon procédural"
+          >
+            🏰 Générer un donjon
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard/maps/hexcrawl')}
+            className="px-4 py-2 rounded font-bold bg-[#C9A84C]/15 text-[#e6c878] border border-[#C9A84C] hover:bg-[#C9A84C]/25 text-sm transition"
+            title="Explorer le monde en grille hexagonale"
+          >
+            🧭 Hexcrawl
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard/maps/editor')}
+            className="px-4 py-2 rounded font-bold bg-[#C9A84C]/15 text-[#e6c878] border border-[#C9A84C] hover:bg-[#C9A84C]/25 text-sm transition"
             title="Créer une carte avec l'éditeur de tuiles"
           >
             🎨 Créer une map

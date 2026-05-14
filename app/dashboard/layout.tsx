@@ -3,6 +3,7 @@ import SoundBox from '@/app/components/SoundBox'
 import CommandPalette from '@/app/components/CommandPalette'
 import Sidebar from '@/app/components/Sidebar'
 import OnboardingTutorial from '@/app/components/OnboardingTutorial'
+import NotificationCenter from '@/app/components/NotificationCenter'
 import ThemeLoader from './ThemeLoader'
 
 export default function DashboardLayout({
@@ -20,6 +21,7 @@ export default function DashboardLayout({
       <SoundBox />
       <DiceLauncher />
       <CommandPalette />
+      <NotificationCenter />
       <OnboardingTutorial />
     </>
   )

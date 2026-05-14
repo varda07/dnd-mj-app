@@ -24,10 +24,15 @@ import {
   RARETES_ITEM,
   compareRarete,
   itemMagiqueVersItem,
+  itemDescription,
+  genererItemMagique,
   type ItemMagique,
   type RareteItem,
   type TypeItem
 } from '@/app/data/items_dnd5e'
+
+// Roadmap 4.3 — recette de craft (JSONB libre sur la table items).
+type RecetteCraft = { materiaux: string; temps: string; competence: string }
 
 type Item = {
   id: string
@@ -40,12 +45,33 @@ type Item = {
   public: boolean
   nb_copies: number
   auteur_username: string | null
+  // Roadmap 4.2 — identification d'objet.
+  identifie: boolean
+  niveau_identification: number
+  // Roadmap 4.3 — recette de craft.
+  recette_craft: RecetteCraft | null
 }
 
 type ScenarioOption = { id: string; nom: string }
 
 const TYPES = ['Arme', 'Armure', 'Potion', 'Parchemin', 'Objet merveilleux', 'Autre']
 const RARETES = ['Commun', 'Peu commun', 'Rare', 'Très rare', 'Légendaire', 'Artéfact']
+
+// Roadmap 4.2 — ce que voient les joueurs selon le niveau d'identification :
+// 0 « Objet inconnu » · 1 nom · 2 +type/rareté · 3 +description complète.
+// Un objet `identifie` (ou pré-migration, champ absent) est entièrement visible.
+function vueJoueurItem(item: Item): { nom: string; type: string; rarete: string; description: string } {
+  if (item.identifie !== false) {
+    return { nom: item.nom, type: item.type, rarete: item.rarete, description: item.description }
+  }
+  const n = item.niveau_identification ?? 0
+  return {
+    nom: n >= 1 ? item.nom : 'Objet inconnu',
+    type: n >= 2 ? item.type : '???',
+    rarete: n >= 2 ? item.rarete : '???',
+    description: n >= 3 ? item.description : ''
+  }
+}
 
 export default function Items() {
   const router = useRouter()
@@ -64,6 +90,45 @@ export default function Items() {
   const [cropperKey, setCropperKey] = useState(0)
   const [importerOuvert, setImporterOuvert] = useState(false)
   const [favorisOnly, setFavorisOnly] = useState(false)
+  // Roadmap 4.1 — filtre de rareté pour le générateur d'item magique ('' = au hasard).
+  const [genRarete, setGenRarete] = useState<RareteItem | ''>('')
+  // Roadmap 3.3 — composeur de propriétés d'item custom (inséré dans la
+  // description, pas de colonne SQL dédiée).
+  const [craftOuvert, setCraftOuvert] = useState(false)
+  const [craftDegats, setCraftDegats] = useState('')
+  const [craftCa, setCraftCa] = useState('')
+  const [craftPoids, setCraftPoids] = useState('')
+  const [craftValeur, setCraftValeur] = useState('')
+  const [craftProprietes, setCraftProprietes] = useState('')
+  // Roadmap 4.2 — identification (objet mystérieux + révélation progressive).
+  const [identifie, setIdentifie] = useState(true)
+  const [niveauIdent, setNiveauIdent] = useState(3)
+  // Roadmap 4.3 — recette de craft.
+  const [recetteOuvert, setRecetteOuvert] = useState(false)
+  const [recetteMateriaux, setRecetteMateriaux] = useState('')
+  const [recetteTemps, setRecetteTemps] = useState('')
+  const [recetteCompetence, setRecetteCompetence] = useState('')
+
+  // Compose les propriétés renseignées en bloc texte et l'insère dans la
+  // description, puis vide les champs.
+  const insererProprietes = () => {
+    const lignes: string[] = []
+    if (craftDegats.trim()) lignes.push(`Dégâts : ${craftDegats.trim()}`)
+    if (craftCa.trim()) lignes.push(`CA / armure : ${craftCa.trim()}`)
+    if (craftPoids.trim()) lignes.push(`Poids : ${craftPoids.trim()}`)
+    if (craftValeur.trim()) lignes.push(`Valeur : ${craftValeur.trim()}`)
+    if (craftProprietes.trim())
+      lignes.push(`Propriétés magiques : ${craftProprietes.trim()}`)
+    if (lignes.length === 0) return
+    const bloc = `— Propriétés —\n${lignes.join('\n')}`
+    setDescription((d) => (d.trim() ? `${d.trimEnd()}\n\n${bloc}` : bloc))
+    setCraftDegats('')
+    setCraftCa('')
+    setCraftPoids('')
+    setCraftValeur('')
+    setCraftProprietes('')
+    setCraftOuvert(false)
+  }
   const { est: estFavori } = useFavoris()
   const t = useTranslations('items')
   const tc = useTranslations('common')
@@ -94,6 +159,12 @@ export default function Items() {
     setFile(null)
     setImageActuelle('')
     setCropperKey((k) => k + 1)
+    setIdentifie(true)
+    setNiveauIdent(3)
+    setRecetteOuvert(false)
+    setRecetteMateriaux('')
+    setRecetteTemps('')
+    setRecetteCompetence('')
   }
 
   const commencerEdition = (item: Item) => {
@@ -106,6 +177,13 @@ export default function Items() {
     setFile(null)
     setImageActuelle(item.image_url ?? '')
     setCropperKey((k) => k + 1)
+    setIdentifie(item.identifie ?? true)
+    setNiveauIdent(item.niveau_identification ?? 3)
+    const rc = item.recette_craft
+    setRecetteMateriaux(rc?.materiaux ?? '')
+    setRecetteTemps(rc?.temps ?? '')
+    setRecetteCompetence(rc?.competence ?? '')
+    setRecetteOuvert(!!(rc && (rc.materiaux || rc.temps || rc.competence)))
     setMessage('')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -140,13 +218,26 @@ export default function Items() {
       imageUrl = urlData.publicUrl
     }
 
+    const recetteRenseignee =
+      recetteMateriaux.trim() || recetteTemps.trim() || recetteCompetence.trim()
     const payload = {
       nom,
       description,
       type,
       rarete,
       scenario_id: scenarioId || null,
-      image_url: imageUrl
+      image_url: imageUrl,
+      // Roadmap 4.2 — un objet identifié est toujours au niveau 3 (tout visible).
+      identifie,
+      niveau_identification: identifie ? 3 : niveauIdent,
+      // Roadmap 4.3 — null si aucun champ de recette renseigné.
+      recette_craft: recetteRenseignee
+        ? {
+            materiaux: recetteMateriaux.trim(),
+            temps: recetteTemps.trim(),
+            competence: recetteCompetence.trim()
+          }
+        : null
     }
 
     if (editingId) {
@@ -257,6 +348,185 @@ export default function Items() {
               </select>
             </div>
             <textarea placeholder={tc('description')} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none h-24" />
+
+            {/* Roadmap 3.3 — composeur de propriétés d'item custom (arme /
+                armure / objet magique). Les champs remplis sont formatés et
+                insérés dans la description ci-dessus. */}
+            <div className="rounded border border-gray-700 bg-gray-900/40">
+              <button
+                type="button"
+                onClick={() => setCraftOuvert((v) => !v)}
+                aria-expanded={craftOuvert}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-sm font-bold text-yellow-300"
+              >
+                <span>🔨 Propriétés (arme / armure / objet magique)</span>
+                <span className="text-[10px] text-gray-500">
+                  {craftOuvert ? '▾' : '▸'}
+                </span>
+              </button>
+              {craftOuvert && (
+                <div className="px-3 pb-3 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      value={craftDegats}
+                      onChange={(e) => setCraftDegats(e.target.value)}
+                      placeholder="Dégâts (1d8 tranchant)"
+                      className="p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm"
+                    />
+                    <input
+                      type="text"
+                      value={craftCa}
+                      onChange={(e) => setCraftCa(e.target.value)}
+                      placeholder="CA / armure (+1, 14+Dex…)"
+                      className="p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm"
+                    />
+                    <input
+                      type="text"
+                      value={craftPoids}
+                      onChange={(e) => setCraftPoids(e.target.value)}
+                      placeholder="Poids (1,5 kg)"
+                      className="p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm"
+                    />
+                    <input
+                      type="text"
+                      value={craftValeur}
+                      onChange={(e) => setCraftValeur(e.target.value)}
+                      placeholder="Valeur (50 po)"
+                      className="p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm"
+                    />
+                  </div>
+                  <textarea
+                    value={craftProprietes}
+                    onChange={(e) => setCraftProprietes(e.target.value)}
+                    placeholder="Propriétés magiques (bonus, sorts, malédictions…)"
+                    className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm h-16"
+                  />
+                  <button
+                    type="button"
+                    onClick={insererProprietes}
+                    className="w-full px-3 py-2 rounded bg-gray-800 border border-yellow-600/50 text-yellow-300 hover:bg-gray-700 text-xs font-bold"
+                  >
+                    🔨 Insérer dans la description
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Roadmap 4.2 — identification d'objet : objet mystérieux + révélation progressive. */}
+            <div className="rounded border border-gray-700 bg-gray-900/40 p-3 space-y-2">
+              <label className="flex items-center gap-2 text-sm font-bold text-yellow-300 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={!identifie}
+                  onChange={(e) => setIdentifie(!e.target.checked)}
+                  className="accent-yellow-500"
+                />
+                🔮 Objet mystérieux (non identifié)
+              </label>
+              {!identifie && (
+                <div>
+                  <label className="text-gray-400 text-xs">
+                    Niveau de révélation : {niveauIdent}/3
+                  </label>
+                  <div className="flex gap-1 mt-1">
+                    {[0, 1, 2, 3].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setNiveauIdent(n)}
+                        className={`flex-1 py-1.5 rounded text-xs font-bold border ${
+                          niveauIdent === n
+                            ? 'bg-yellow-600 text-gray-900 border-yellow-500'
+                            : 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
+                        }`}
+                      >
+                        {['Rien', 'Nom', 'Type', 'Tout'][n]}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    0 « Objet inconnu » · 1 nom révélé · 2 +type/rareté · 3 +description complète
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Roadmap 4.3 — recette de craft (matériaux / temps / compétence). */}
+            <div className="rounded border border-gray-700 bg-gray-900/40">
+              <button
+                type="button"
+                onClick={() => setRecetteOuvert((v) => !v)}
+                aria-expanded={recetteOuvert}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-sm font-bold text-yellow-300"
+              >
+                <span>⚒️ Recette de craft</span>
+                <span className="text-[10px] text-gray-500">{recetteOuvert ? '▾' : '▸'}</span>
+              </button>
+              {recetteOuvert && (
+                <div className="px-3 pb-3 space-y-2">
+                  <textarea
+                    value={recetteMateriaux}
+                    onChange={(e) => setRecetteMateriaux(e.target.value)}
+                    placeholder="Matériaux requis (2 lingots de mithril, 1 cœur d'élémentaire…)"
+                    className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm h-16"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      value={recetteTemps}
+                      onChange={(e) => setRecetteTemps(e.target.value)}
+                      placeholder="Temps de craft (3 jours)"
+                      className="p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm"
+                    />
+                    <input
+                      type="text"
+                      value={recetteCompetence}
+                      onChange={(e) => setRecetteCompetence(e.target.value)}
+                      placeholder="Compétence requise (Forge, DD 15)"
+                      className="p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Roadmap 4.1 — générateur d'item magique (SRD), pré-remplit le formulaire */}
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={genRarete}
+                onChange={(e) => setGenRarete(e.target.value as RareteItem | '')}
+                className="flex-1 min-w-[140px] p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm"
+                aria-label="Rareté de l'item magique généré"
+              >
+                <option value="">Rareté : au hasard</option>
+                {RARETES_ITEM.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => {
+                  const item = genererItemMagique(
+                    genRarete ? { rarete: genRarete } : {}
+                  )
+                  if (!item) {
+                    setMessage('Aucun item magique pour ce filtre.')
+                    return
+                  }
+                  setNom(item.nom)
+                  setRarete(item.rarete)
+                  setType(TYPES.includes(item.type) ? item.type : 'Autre')
+                  setDescription(itemDescription(item))
+                }}
+                className="px-3 py-2 rounded bg-gray-800 border border-yellow-600/50 text-yellow-300 hover:bg-gray-700 text-sm font-bold whitespace-nowrap"
+                title="Générer un objet magique du SRD et pré-remplir le formulaire"
+              >
+                🎲 Générer un item magique
+              </button>
+            </div>
             <ImageCropper
               key={cropperKey}
               inputId="item-file"
@@ -352,11 +622,57 @@ export default function Items() {
                       </button>
                     </div>
                   </div>
-                  <div className="flex gap-3 text-sm text-gray-400 mb-2">
+                  <div className="flex gap-3 text-sm text-gray-400 mb-2 flex-wrap items-center">
                     <span>📦 {item.type}</span>
                     <span>✨ {item.rarete}</span>
+                    {item.identifie === false && (
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded-full"
+                        style={{
+                          background: 'rgba(167,139,250,0.15)',
+                          color: '#a78bfa',
+                          border: '1px solid rgba(167,139,250,0.3)'
+                        }}
+                        title="Objet mystérieux — révélation progressive"
+                      >
+                        🔮 Mystérieux — révélation {item.niveau_identification ?? 0}/3
+                      </span>
+                    )}
+                    {item.recette_craft && (
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded-full"
+                        style={{
+                          background: 'rgba(201,168,76,0.12)',
+                          color: '#C9A84C',
+                          border: '1px solid rgba(201,168,76,0.3)'
+                        }}
+                        title="Recette de craft renseignée"
+                      >
+                        ⚒️ Recette
+                      </span>
+                    )}
                   </div>
                   {item.description && <p className="text-gray-500 text-sm italic">{item.description}</p>}
+                  {item.identifie === false && (
+                    <p className="text-[11px] text-purple-300/70 mt-1">
+                      👁 Vue joueur : <span className="italic">{vueJoueurItem(item).nom}</span>
+                      {vueJoueurItem(item).type !== '???' &&
+                        ` · ${vueJoueurItem(item).type} · ${vueJoueurItem(item).rarete}`}
+                    </p>
+                  )}
+                  {item.recette_craft && (
+                    <div className="mt-2 text-xs text-gray-400 rounded border border-yellow-700/30 bg-yellow-900/10 p-2 space-y-0.5">
+                      {item.recette_craft.materiaux && (
+                        <p>⚒️ <span className="text-gray-300">Matériaux :</span> {item.recette_craft.materiaux}</p>
+                      )}
+                      {item.recette_craft.temps && (
+                        <p>⏳ <span className="text-gray-300">Temps :</span> {item.recette_craft.temps}</p>
+                      )}
+                      {item.recette_craft.competence && (
+                        <p>🛠 <span className="text-gray-300">Compétence :</span> {item.recette_craft.competence}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

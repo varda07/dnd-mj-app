@@ -2,8 +2,12 @@
 
 export const dynamic = 'force-dynamic'
 
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useA11y, type DaltonienType } from '@/app/lib/accessibility'
+import { supabase } from '@/lib/supabase'
+import { CONDITIONS } from '@/app/data/conditions'
+import { setEmojisConditionsCache } from '@/app/lib/conditionEmojis'
 
 // ============================================================================
 // Page Accessibilité — 6 options activées globalement via les attributs
@@ -171,6 +175,9 @@ export default function AccessibilitePage() {
             </header>
           </section>
 
+          {/* ---- 7. Emojis de conditions personnalisés (Roadmap 11.3) ---- */}
+          <EmojisConditionsSection />
+
           {/* ---- 6. Lecteur d'écran amélioré ---- */}
           <section className="bg-gray-800 rounded-lg p-4 md:p-5">
             <header className="flex items-center justify-between flex-wrap gap-2">
@@ -192,6 +199,103 @@ export default function AccessibilitePage() {
         </div>
       </div>
     </main>
+  )
+}
+
+// ============================================================================
+// Roadmap 11.3 — Emojis de conditions personnalisés
+// ----------------------------------------------------------------------------
+// Surcharge l'emoji de chaque condition D&D. Persisté dans
+// profiles.emojis_conditions + cache localStorage (lu par emojiCondition()).
+// ============================================================================
+function EmojisConditionsSection() {
+  const [emojis, setEmojis] = useState<Record<string, string>>({})
+  const [message, setMessage] = useState('')
+
+  const charger = useCallback(async () => {
+    const {
+      data: { user }
+    } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('profiles')
+      .select('emojis_conditions')
+      .eq('id', user.id)
+      .maybeSingle()
+    const map = (data?.emojis_conditions as Record<string, string>) ?? {}
+    setEmojis(map)
+    setEmojisConditionsCache(map)
+  }, [])
+
+  useEffect(() => {
+    charger()
+  }, [charger])
+
+  const sauvegarder = async (map: Record<string, string>) => {
+    setEmojis(map)
+    setEmojisConditionsCache(map)
+    const {
+      data: { user }
+    } = await supabase.auth.getUser()
+    if (!user) return
+    const { error } = await supabase
+      .from('profiles')
+      .update({ emojis_conditions: map })
+      .eq('id', user.id)
+    setMessage(error ? `Erreur : ${error.message}` : '✓ Enregistré')
+    if (!error) setTimeout(() => setMessage(''), 1500)
+  }
+
+  return (
+    <section className="bg-gray-800 rounded-lg p-4 md:p-5">
+      <header className="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <div>
+          <h2 className="text-base font-bold text-yellow-500">
+            🎭 Emojis des conditions
+          </h2>
+          <p className="text-xs text-gray-400 mt-1">
+            Remplace l&apos;emoji par défaut de chaque condition D&amp;D par
+            celui de ton choix. Laisse vide pour garder l&apos;emoji original.
+          </p>
+        </div>
+        {Object.keys(emojis).length > 0 && (
+          <button
+            type="button"
+            onClick={() => sauvegarder({})}
+            className="text-xs text-gray-400 hover:text-white underline"
+          >
+            Tout réinitialiser
+          </button>
+        )}
+      </header>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {CONDITIONS.map((c) => (
+          <div
+            key={c.key}
+            className="flex items-center gap-2 bg-gray-900/40 border border-gray-700 rounded-md p-2"
+          >
+            <input
+              type="text"
+              value={emojis[c.key] ?? ''}
+              maxLength={4}
+              onChange={(e) => {
+                const v = e.target.value
+                const next = { ...emojis }
+                if (v.trim()) next[c.key] = v
+                else delete next[c.key]
+                setEmojis(next)
+              }}
+              onBlur={() => sauvegarder(emojis)}
+              placeholder={c.icone}
+              className="w-12 text-center p-1.5 rounded bg-gray-700 text-white border border-gray-600 outline-none text-base"
+              aria-label={`Emoji pour ${c.nom}`}
+            />
+            <span className="text-xs text-gray-300 truncate">{c.nom}</span>
+          </div>
+        ))}
+      </div>
+      {message && <p className="text-yellow-400 text-xs mt-2">{message}</p>}
+    </section>
   )
 }
 

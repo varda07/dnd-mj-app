@@ -13,7 +13,12 @@ import {
   extraireDes,
   type DiceExpr
 } from '@/app/data/sorts_dnd5e'
-import { xpRequisProchainNiveau, type ClasseMultiple } from '@/app/data/dnd5e'
+import {
+  xpRequisProchainNiveau,
+  niveauTotal,
+  type ClasseMultiple
+} from '@/app/data/dnd5e'
+import { genererBackstory } from '@/app/data/backstory_templates'
 import ModaleMonteeNiveau, {
   type MonteeResult
 } from './ModaleMonteeNiveau'
@@ -49,6 +54,10 @@ type Personnage = {
   death_fail: number
   de_vie_utilises: number
   inspiration: boolean
+  // Roadmap 3.6 — tracker d'inspiration (points / max). 3.4 — récit libre.
+  inspiration_max: number
+  inspiration_points: number
+  backstory: string
   saves_maitrises: Record<string, boolean>
   comp_maitrises: Record<string, boolean>
   comp_expertise: Record<string, boolean>
@@ -136,6 +145,9 @@ const FICHE_COLUMNS = [
   'death_fail',
   'de_vie_utilises',
   'inspiration',
+  'inspiration_max',
+  'inspiration_points',
+  'backstory',
   'saves_maitrises',
   'comp_maitrises',
   'comp_expertise',
@@ -167,6 +179,9 @@ const normalize = (row: Record<string, unknown>): Personnage => ({
   death_fail: (row.death_fail as number) ?? 0,
   de_vie_utilises: (row.de_vie_utilises as number) ?? 0,
   inspiration: (row.inspiration as boolean) ?? false,
+  inspiration_max: (row.inspiration_max as number) ?? 1,
+  inspiration_points: (row.inspiration_points as number) ?? 0,
+  backstory: (row.backstory as string) ?? '',
   saves_maitrises: (row.saves_maitrises as Record<string, boolean>) ?? {},
   comp_maitrises: (row.comp_maitrises as Record<string, boolean>) ?? {},
   comp_expertise: (row.comp_expertise as Record<string, boolean>) ?? {},
@@ -1138,6 +1153,62 @@ export default function FichePersonnage() {
                 />
               </Champ>
               <Champ label="Niveau" value={String(perso.niveau)} />
+
+              {/* Roadmap 3.7 — multiclassing visuel : répartition des classes
+                  + niveau total bien visible (affiché si le perso est
+                  multiclasse). */}
+              {perso.classes_multiples.length > 0 && (
+                <div
+                  className="col-span-2 md:col-span-3 rounded-lg p-3 border"
+                  style={{
+                    background:
+                      'linear-gradient(135deg, rgba(40,28,8,0.6) 0%, rgba(20,14,4,0.4) 100%)',
+                    borderColor: 'rgba(201,168,76,0.30)'
+                  }}
+                >
+                  <div className="flex items-baseline justify-between gap-2 flex-wrap mb-2">
+                    <p className="text-xs uppercase tracking-widest text-yellow-600">
+                      Multiclasse
+                    </p>
+                    <p className="text-sm text-yellow-200 font-serif">
+                      Niveau total :{' '}
+                      <span className="text-xl font-bold">
+                        {niveauTotal(perso.classes_multiples, perso.niveau)}
+                      </span>
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {perso.classes_multiples.map((c, i) => (
+                      <span
+                        key={`${c.classe}-${i}`}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm"
+                        style={{
+                          background: 'rgba(201,168,76,0.12)',
+                          border: '1px solid rgba(201,168,76,0.35)',
+                          color: '#f0e8d0'
+                        }}
+                      >
+                        <span className="font-bold">{c.classe || '—'}</span>
+                        {c.sous_classe && (
+                          <span className="text-yellow-300/70 italic text-xs">
+                            {c.sous_classe}
+                          </span>
+                        )}
+                        <span
+                          className="text-xs font-bold px-1.5 rounded"
+                          style={{
+                            background: 'rgba(201,168,76,0.25)',
+                            color: '#ffe6a8'
+                          }}
+                        >
+                          Niv. {c.niveau}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <Champ label="XP">
                 <div className="relative flex items-center gap-1">
                   <NumberInput
@@ -1246,16 +1317,94 @@ export default function FichePersonnage() {
                 </div>
               </Champ>
               <Champ label="Bonus maîtrise" value={formatMod(bm)} />
+              {/* Roadmap 3.6 — tracker d'inspiration : N losanges cliquables,
+                  max configurable (1..5). `inspiration` (booléen) reste
+                  synchronisé pour la compat. */}
               <Champ label="Inspiration">
-                <button
-                  type="button"
-                  onClick={() => update('inspiration', !perso.inspiration)}
-                  className={`w-6 h-6 rounded-full border-2 ${
-                    perso.inspiration
-                      ? 'bg-yellow-500 border-yellow-300'
-                      : 'border-yellow-700/60 hover:border-yellow-500'
-                  }`}
-                />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1">
+                    {Array.from({
+                      length: Math.max(1, perso.inspiration_max)
+                    }).map((_, i) => {
+                      const rempli = i < perso.inspiration_points
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => {
+                            const cible =
+                              i + 1 === perso.inspiration_points ? i : i + 1
+                            setPerso((p) =>
+                              p
+                                ? {
+                                    ...p,
+                                    inspiration_points: cible,
+                                    inspiration: cible > 0
+                                  }
+                                : p
+                            )
+                          }}
+                          aria-label={`Point d'inspiration ${i + 1}`}
+                          className="text-lg leading-none transition-transform hover:scale-110"
+                          style={{
+                            color: rempli
+                              ? '#eab308'
+                              : 'rgba(201,168,76,0.3)'
+                          }}
+                        >
+                          ◆
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {isOwner && (
+                    <span className="flex items-center gap-1 text-[11px] text-gray-500">
+                      max
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPerso((p) => {
+                            if (!p) return p
+                            const nm = Math.max(1, p.inspiration_max - 1)
+                            return {
+                              ...p,
+                              inspiration_max: nm,
+                              inspiration_points: Math.min(
+                                p.inspiration_points,
+                                nm
+                              )
+                            }
+                          })
+                        }
+                        className="w-4 h-4 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 leading-none"
+                      >
+                        −
+                      </button>
+                      <span className="text-gray-300">
+                        {perso.inspiration_max}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPerso((p) =>
+                            p
+                              ? {
+                                  ...p,
+                                  inspiration_max: Math.min(
+                                    5,
+                                    p.inspiration_max + 1
+                                  )
+                                }
+                              : p
+                          )
+                        }
+                        className="w-4 h-4 rounded bg-gray-800 hover:bg-gray-700 text-gray-300 leading-none"
+                      >
+                        +
+                      </button>
+                    </span>
+                  )}
+                </div>
               </Champ>
               {isOwner && (() => {
                 const xpRequis = xpRequisProchainNiveau(perso.niveau)
@@ -2022,6 +2171,35 @@ export default function FichePersonnage() {
                 onChange={(e) => update('equipement', e.target.value)}
                 placeholder="Sac à dos, corde (15m), torches (10), rations (5 jours), bourse avec 50 po..."
                 className="w-full h-32 bg-stone-900/60 border border-yellow-800/30 rounded p-2 text-sm text-gray-200 outline-none resize-y"
+              />
+            </Panel>
+
+            {/* Roadmap 3.4 — récit libre du personnage + générateur */}
+            <Panel title="Backstory">
+              {isOwner && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (
+                      perso.backstory.trim() &&
+                      !window.confirm(
+                        'Remplacer la backstory actuelle par une backstory générée ?'
+                      )
+                    )
+                      return
+                    update('backstory', genererBackstory(perso.nom).texte)
+                  }}
+                  className="mb-2 px-3 py-1.5 rounded bg-stone-800 border border-yellow-700/40 text-yellow-300 hover:border-yellow-600 text-xs font-bold"
+                  title="Générer origine, événement marquant, perte, motivation et secret"
+                >
+                  📝 Générer une backstory
+                </button>
+              )}
+              <textarea
+                value={perso.backstory}
+                onChange={(e) => update('backstory', e.target.value)}
+                placeholder="Origine, événement marquant, perte, motivation, secret… (ou utilise le générateur)"
+                className="w-full h-44 bg-stone-900/60 border border-yellow-800/30 rounded p-2 text-sm text-gray-200 outline-none resize-y whitespace-pre-wrap"
               />
             </Panel>
           </div>

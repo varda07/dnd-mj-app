@@ -1434,7 +1434,7 @@ function CombatInner() {
   return (
     <main className="min-h-screen bg-gray-900 text-white p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex items-center gap-4 mb-6 flex-wrap">
           <button
             type="button"
             onClick={() => router.back()}
@@ -1443,6 +1443,14 @@ function CombatInner() {
             {tc('back')}
           </button>
           <h1 className="text-2xl font-bold text-yellow-500">{tCombat('title')}</h1>
+          {/* Roadmap 2.6 — accès au calculateur de rencontre */}
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard/combat/encounter-builder')}
+            className="ml-auto px-3 py-1.5 text-xs uppercase tracking-[0.16em] font-bold rounded border border-yellow-600/50 text-yellow-300 hover:bg-yellow-500/10 transition"
+          >
+            🧮 Calculateur de rencontre
+          </button>
         </div>
 
         <div className="bg-gray-800 p-4 rounded-lg mb-4">

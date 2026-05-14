@@ -17,6 +17,8 @@ type Chapitre = {
   contenu: string
   ordre: number
   parent_id: string | null
+  // Roadmap 1.4 — durée estimée du chapitre en minutes.
+  duree_estimee: number
 }
 
 type ElementType = 'ennemi' | 'item' | 'map' | 'pnj'
@@ -88,6 +90,12 @@ export default function ScenarioEditPage() {
   const scenarioId = params?.id
 
   const [scenarioNom, setScenarioNom] = useState('')
+  // Roadmap 1.3 — notes secrètes MJ (jamais affichées en présentation).
+  const [notesSecretes, setNotesSecretes] = useState('')
+  const [notesSecretesOuvert, setNotesSecretesOuvert] = useState(false)
+  // Roadmap 11.2 — wallpaper d'ambiance du scénario.
+  const [wallpaperUrl, setWallpaperUrl] = useState('')
+  const [wallpaperOuvert, setWallpaperOuvert] = useState(false)
   const [chapitres, setChapitres] = useState<Chapitre[]>([])
   const [liens, setLiens] = useState<ScenarioLien[]>([])
   const [ennemis, setEnnemis] = useState<Elem[]>([])
@@ -126,7 +134,7 @@ export default function ScenarioEditPage() {
 
       const { data: scn } = await supabase
         .from('scenarios')
-        .select('id, nom')
+        .select('id, nom, notes_secretes, wallpaper_url')
         .eq('id', scenarioId)
         .maybeSingle()
 
@@ -136,6 +144,8 @@ export default function ScenarioEditPage() {
         return
       }
       setScenarioNom(scn.nom)
+      setNotesSecretes((scn.notes_secretes as string | null) ?? '')
+      setWallpaperUrl((scn.wallpaper_url as string | null) ?? '')
 
       const [chapRes, lienRes, enn, itm, mps, pnjRes] = await Promise.all([
         supabase
@@ -217,7 +227,7 @@ export default function ScenarioEditPage() {
   }, [scenarioId, router])
 
   // --------------------------------------------------------------------------
-  // Auto-save du chapitre courant (titre + contenu)
+  // Auto-save du chapitre courant (titre + contenu + durée estimée)
   // --------------------------------------------------------------------------
   useEffect(() => {
     if (!selected || ignoreNextAutoSave.current) {
@@ -230,7 +240,11 @@ export default function ScenarioEditPage() {
       setSaveState('saving')
       const { error } = await supabase
         .from('chapitres')
-        .update({ titre: selected.titre, contenu: selected.contenu })
+        .update({
+          titre: selected.titre,
+          contenu: selected.contenu,
+          duree_estimee: selected.duree_estimee
+        })
         .eq('id', selected.id)
       if (error) {
         console.error('[scenario edit] save chapitre :', error)
@@ -241,7 +255,57 @@ export default function ScenarioEditPage() {
       if (saveTimer.current) clearTimeout(saveTimer.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected?.titre, selected?.contenu])
+  }, [selected?.titre, selected?.contenu, selected?.duree_estimee])
+
+  // Roadmap 1.3 — auto-save des notes secrètes MJ (débounce).
+  const notesSecretesTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const notesSecretesInit = useRef(true)
+  useEffect(() => {
+    if (notesSecretesInit.current) {
+      notesSecretesInit.current = false
+      return
+    }
+    if (!scenarioId) return
+    if (notesSecretesTimer.current) clearTimeout(notesSecretesTimer.current)
+    notesSecretesTimer.current = setTimeout(async () => {
+      const { error } = await supabase
+        .from('scenarios')
+        .update({ notes_secretes: notesSecretes || null })
+        .eq('id', scenarioId)
+      if (error) console.error('[scenario edit] save notes secrètes :', error)
+    }, AUTO_SAVE_MS)
+    return () => {
+      if (notesSecretesTimer.current) clearTimeout(notesSecretesTimer.current)
+    }
+  }, [notesSecretes, scenarioId])
+
+  // Roadmap 11.2 — auto-save du wallpaper du scénario (débounce).
+  const wallpaperTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const wallpaperInit = useRef(true)
+  useEffect(() => {
+    if (wallpaperInit.current) {
+      wallpaperInit.current = false
+      return
+    }
+    if (!scenarioId) return
+    if (wallpaperTimer.current) clearTimeout(wallpaperTimer.current)
+    wallpaperTimer.current = setTimeout(async () => {
+      const { error } = await supabase
+        .from('scenarios')
+        .update({ wallpaper_url: wallpaperUrl.trim() || null })
+        .eq('id', scenarioId)
+      if (error) console.error('[scenario edit] save wallpaper :', error)
+    }, AUTO_SAVE_MS)
+    return () => {
+      if (wallpaperTimer.current) clearTimeout(wallpaperTimer.current)
+    }
+  }, [wallpaperUrl, scenarioId])
+
+  // Roadmap 1.4 — total de durée estimée sur l'ensemble des chapitres.
+  const dureeTotale = chapitres.reduce(
+    (sum, c) => sum + (c.duree_estimee || 0),
+    0
+  )
 
   // Patch local d'un chapitre (déclenche auto-save via l'effet ci-dessus)
   const patchChapitre = (id: string, patch: Partial<Chapitre>) => {
@@ -540,6 +604,17 @@ export default function ScenarioEditPage() {
         fontFeatureSettings: '"cv11", "ss01", "ss03"'
       }}
     >
+      {/* Roadmap 11.2 — wallpaper d'ambiance affiché discrètement en fond. */}
+      {wallpaperUrl.trim() && (
+        <div
+          aria-hidden
+          className="fixed inset-0 -z-10 bg-cover bg-center pointer-events-none"
+          style={{
+            backgroundImage: `url(${wallpaperUrl.trim()})`,
+            opacity: 0.12
+          }}
+        />
+      )}
       {/* Barre supérieure — minimaliste, peu de bordures */}
       <header className="flex items-center gap-3 px-5 py-3 bg-[#191919]/95 backdrop-blur sticky top-0 z-20">
         <button
@@ -660,6 +735,33 @@ export default function ScenarioEditPage() {
                 titre={selected.titre}
                 onTitreChange={(v) => patchChapitre(selected.id, { titre: v })}
               />
+
+              {/* Roadmap 1.4 — durée estimée du chapitre + total du scénario */}
+              <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400 -mt-3">
+                <label className="flex items-center gap-2">
+                  <span className="uppercase tracking-[0.18em]">⏱ Durée estimée</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={5}
+                    value={selected.duree_estimee ?? 0}
+                    onChange={(e) =>
+                      patchChapitre(selected.id, {
+                        duree_estimee: Math.max(0, Number(e.target.value) || 0)
+                      })
+                    }
+                    className="w-20 bg-transparent border-b border-yellow-700/40 text-yellow-100 outline-none text-sm px-1 focus:border-yellow-500"
+                  />
+                  <span>min</span>
+                </label>
+                {dureeTotale > 0 && (
+                  <span className="text-gray-500 italic">
+                    · Total scénario : {Math.floor(dureeTotale / 60)}h{' '}
+                    {String(dureeTotale % 60).padStart(2, '0')} ({dureeTotale} min)
+                  </span>
+                )}
+              </div>
+
               <textarea
                 value={selected.contenu}
                 onChange={(e) => patchChapitre(selected.id, { contenu: e.target.value })}
@@ -719,6 +821,119 @@ export default function ScenarioEditPage() {
             </span>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-4">
+            {/* Roadmap 1.2 — accès à la Session zéro */}
+            <button
+              type="button"
+              onClick={() =>
+                router.push(`/dashboard/scenarios/${scenarioId}/session-zero`)
+              }
+              className="w-full px-3 py-2 rounded border border-yellow-700/40 bg-[#171717] text-yellow-400 hover:bg-[#1c1c1c] hover:border-yellow-600 text-xs font-bold uppercase tracking-[0.16em] transition"
+            >
+              📋 Session zéro
+            </button>
+
+            {/* Roadmap 4.4 — accès à l'Économie de campagne */}
+            <button
+              type="button"
+              onClick={() =>
+                router.push(`/dashboard/scenarios/${scenarioId}/economie`)
+              }
+              className="w-full px-3 py-2 rounded border border-yellow-700/40 bg-[#171717] text-yellow-400 hover:bg-[#1c1c1c] hover:border-yellow-600 text-xs font-bold uppercase tracking-[0.16em] transition"
+            >
+              💰 Économie de campagne
+            </button>
+
+            {/* Roadmap 8.2 — accès au suivi d'XP */}
+            <button
+              type="button"
+              onClick={() =>
+                router.push(`/dashboard/scenarios/${scenarioId}/xp`)
+              }
+              className="w-full px-3 py-2 rounded border border-yellow-700/40 bg-[#171717] text-yellow-400 hover:bg-[#1c1c1c] hover:border-yellow-600 text-xs font-bold uppercase tracking-[0.16em] transition"
+            >
+              ✨ Suivi d&apos;XP
+            </button>
+
+            {/* Roadmap 8.4 — accès au Memo MJ */}
+            <button
+              type="button"
+              onClick={() =>
+                router.push(`/dashboard/scenarios/${scenarioId}/memo`)
+              }
+              className="w-full px-3 py-2 rounded border border-yellow-700/40 bg-[#171717] text-yellow-400 hover:bg-[#1c1c1c] hover:border-yellow-600 text-xs font-bold uppercase tracking-[0.16em] transition"
+            >
+              📌 Memo MJ
+            </button>
+
+            {/* Roadmap 11.2 — Wallpaper d'ambiance du scénario. */}
+            <div className="rounded-lg border border-yellow-800/40 bg-[#171717]">
+              <button
+                type="button"
+                onClick={() => setWallpaperOuvert((v) => !v)}
+                aria-expanded={wallpaperOuvert}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left"
+              >
+                <span className="text-xs font-bold text-yellow-500">
+                  🖼️ Wallpaper d&apos;ambiance
+                </span>
+                <span className="text-[10px] text-gray-500">
+                  {wallpaperOuvert ? '▾' : '▸'}
+                </span>
+              </button>
+              {wallpaperOuvert && (
+                <div className="px-3 pb-3 space-y-2">
+                  <input
+                    type="text"
+                    value={wallpaperUrl}
+                    onChange={(e) => setWallpaperUrl(e.target.value)}
+                    placeholder="URL d'une image de fond (https://…)"
+                    className="w-full bg-[#0f0f0f] text-[12px] text-gray-200 rounded border border-yellow-900/30 outline-none focus:border-yellow-700/60 p-2 placeholder-gray-600"
+                  />
+                  {wallpaperUrl.trim() && (
+                    <div
+                      className="h-24 rounded border border-yellow-900/30 bg-cover bg-center"
+                      style={{ backgroundImage: `url(${wallpaperUrl.trim()})` }}
+                    />
+                  )}
+                  <p className="text-[10px] text-gray-600 italic">
+                    Affiché discrètement en fond quand le scénario est ouvert.
+                    Sauvegarde automatique.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Roadmap 1.3 — Notes secrètes MJ : jamais affichées aux joueurs
+                ni en mode présentation. */}
+            <div className="rounded-lg border border-yellow-800/40 bg-[#171717]">
+              <button
+                type="button"
+                onClick={() => setNotesSecretesOuvert((v) => !v)}
+                aria-expanded={notesSecretesOuvert}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left"
+              >
+                <span className="text-xs font-bold text-yellow-500">
+                  🔒 Notes secrètes MJ
+                </span>
+                <span className="text-[10px] text-gray-500">
+                  {notesSecretesOuvert ? '▾' : '▸'}
+                </span>
+              </button>
+              {notesSecretesOuvert && (
+                <div className="px-3 pb-3">
+                  <textarea
+                    value={notesSecretes}
+                    onChange={(e) => setNotesSecretes(e.target.value)}
+                    placeholder="Twists, identités cachées, pièges… visible uniquement par toi, jamais en présentation."
+                    className="w-full min-h-[140px] bg-[#0f0f0f] text-[13px] text-gray-200 leading-relaxed rounded border border-yellow-900/30 outline-none focus:border-yellow-700/60 p-2 resize-y placeholder-gray-600"
+                  />
+                  <p className="text-[10px] text-gray-600 italic mt-1">
+                    Sauvegarde automatique.
+                  </p>
+                </div>
+              )}
+            </div>
+
             {(['pnj', 'ennemi', 'item', 'map'] as ElementType[]).map((type) => {
               const lst = liensDuScenario.filter((l) => l.element_type === type)
               return (

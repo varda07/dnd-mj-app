@@ -525,16 +525,20 @@ html[data-theme] button {
 html[data-theme] h1 { letter-spacing: 0.12em; }
 html[data-theme] h2 { letter-spacing: 0.08em; }
 
-/* Cartes : bordure animée + lueur inset */
-html[data-theme] .bg-gray-800:not(.theme-no-deco) {
+/* Cartes : bordure animée + lueur inset.
+   ⚠ `:not(button)` partout : les BOUTONS qui utilisent .bg-gray-800 ne doivent
+   JAMAIS recevoir le traitement premium (bordure animée + ornements de coins) —
+   ça produisait de petites équerres dorées « pas nettes » sur les boutons. Les
+   boutons gardent leur bordure pleine fine + hover, sur tous les thèmes. */
+html[data-theme] .bg-gray-800:not(.theme-no-deco):not(button) {
   position: relative;
   border: 1px solid var(--premium-accent-soft);
   animation: premium-pulse 4s ease-in-out infinite;
 }
 
 /* Ornements de coins : L filigrané + points colorés (couleur spécifique ornement) */
-html[data-theme] .bg-gray-800:not(.theme-no-deco)::before,
-html[data-theme] .bg-gray-800:not(.theme-no-deco)::after {
+html[data-theme] .bg-gray-800:not(.theme-no-deco):not(button)::before,
+html[data-theme] .bg-gray-800:not(.theme-no-deco):not(button)::after {
   content: '';
   position: absolute;
   width: 30px;
@@ -554,12 +558,12 @@ html[data-theme] .bg-gray-800:not(.theme-no-deco)::after {
     radial-gradient(circle, var(--premium-ornament) 1.6px, transparent 2.2px) -3px -3px / 10px 10px no-repeat;
 }
 
-html[data-theme] .bg-gray-800:not(.theme-no-deco)::before {
+html[data-theme] .bg-gray-800:not(.theme-no-deco):not(button)::before {
   top: 5px;
   left: 5px;
 }
 
-html[data-theme] .bg-gray-800:not(.theme-no-deco)::after {
+html[data-theme] .bg-gray-800:not(.theme-no-deco):not(button)::after {
   bottom: 5px;
   right: 5px;
   transform: rotate(180deg);
@@ -638,7 +642,7 @@ html[data-theme] .theme-no-deco::after {
 html[data-theme="royal"] h1 { letter-spacing: 0.15em; }
 html[data-theme="royal"] h2 { letter-spacing: 0.10em; }
 
-html[data-theme="royal"] .bg-gray-800:not(.theme-no-deco) {
+html[data-theme="royal"] .bg-gray-800:not(.theme-no-deco):not(button) {
   background-image: linear-gradient(
     135deg,
     rgba(201, 168, 76, 0.05) 0%,
@@ -1723,8 +1727,9 @@ html[data-theme="eclipsed"] ::-webkit-scrollbar-thumb:hover {
    que chaque écran partage l'ambiance du dashboard : cartes en dégradé sombre,
    focus doré sur les champs, séparateurs or discrets. */
 
-/* Cartes / surfaces : dégradé sombre subtil par-dessus le fond thémé. */
-html[data-theme] .bg-gray-800:not(.theme-no-deco) {
+/* Cartes / surfaces : dégradé sombre subtil par-dessus le fond thémé.
+   `:not(button)` : les boutons gardent leur fond plat, sans dégradé. */
+html[data-theme] .bg-gray-800:not(.theme-no-deco):not(button) {
   background-image: linear-gradient(
     135deg,
     rgba(20, 15, 8, 0.5) 0%,
@@ -2205,6 +2210,615 @@ html[data-a11y-aria="true"] :focus-visible {
   }
   .presentation-exit-label {
     display: none;
+  }
+}
+
+
+/* ============================================================================
+   MODE PRÉSENTATION — rosters en cartes portraits
+   ============================================================================ */
+
+.presentation-roster {
+  border-radius: 10px;
+  padding: 16px 16px 18px;
+  background: linear-gradient(135deg, rgba(20, 15, 8, 0.4) 0%, rgba(10, 8, 4, 0.2) 100%);
+  border: 1px solid rgba(201, 168, 76, 0.15);
+}
+.presentation-roster-ennemi {
+  background: linear-gradient(135deg, rgba(40, 12, 12, 0.42) 0%, rgba(18, 6, 6, 0.22) 100%);
+  border-color: rgba(220, 38, 38, 0.22);
+}
+.presentation-roster-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: #c9a84c;
+}
+.presentation-roster-ennemi .presentation-roster-title {
+  color: #e9938f;
+}
+.presentation-roster-count {
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  opacity: 0.6;
+}
+.presentation-roster-empty {
+  margin: 0;
+  padding: 14px 0;
+  text-align: center;
+  font-style: italic;
+  font-size: 13px;
+  color: rgba(232, 232, 236, 0.4);
+}
+.presentation-roster-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .presentation-roster-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 540px) {
+  .presentation-roster-grid {
+    grid-template-columns: 1fr;
+  }
+}
+/* Vue compacte (preview MJ) : cartes plus petites, 2 colonnes max. */
+.presentation-roster-grid.is-compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.presentation-roster-add {
+  margin-top: 14px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  cursor: pointer;
+  color: var(--theme-accent, #c9a84c);
+  background: color-mix(in srgb, var(--theme-accent, #c9a84c) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--theme-accent, #c9a84c) 30%, transparent);
+  transition: background 0.18s var(--codex-ease), border-color 0.18s var(--codex-ease);
+}
+.presentation-roster-add:hover {
+  background: color-mix(in srgb, var(--theme-accent, #c9a84c) 16%, transparent);
+  border-color: color-mix(in srgb, var(--theme-accent, #c9a84c) 60%, transparent);
+}
+
+/* ---- Carte portrait ---- */
+.presentation-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 8px;
+  text-align: center;
+  background: linear-gradient(160deg, rgba(20, 15, 8, 0.8) 0%, rgba(10, 8, 4, 0.6) 100%);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  transition: border-color 0.25s var(--codex-ease), box-shadow 0.25s var(--codex-ease),
+    filter 0.3s var(--codex-ease), background 0.3s var(--codex-ease);
+}
+.presentation-card-ennemi {
+  background: linear-gradient(160deg, rgba(46, 14, 14, 0.8) 0%, rgba(20, 7, 7, 0.6) 100%);
+  border-color: rgba(220, 38, 38, 0.3);
+}
+
+/* Équerres dorées aux coins (haut-gauche + bas-droite). */
+.presentation-card-corner {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  pointer-events: none;
+  border-color: rgba(201, 168, 76, 0.55);
+}
+.presentation-card-ennemi .presentation-card-corner {
+  border-color: rgba(220, 38, 38, 0.5);
+}
+.presentation-card-corner.tl {
+  top: 5px;
+  left: 5px;
+  border-top: 1px solid;
+  border-left: 1px solid;
+}
+.presentation-card-corner.br {
+  bottom: 5px;
+  right: 5px;
+  border-bottom: 1px solid;
+  border-right: 1px solid;
+}
+
+/* Portrait circulaire. */
+.presentation-card-portrait {
+  width: 60px;
+  height: 60px;
+  border-radius: 9999px;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 2px solid #c9a84c;
+  background: radial-gradient(circle at 50% 35%, #2a2012 0%, #120c06 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.presentation-card-ennemi .presentation-card-portrait {
+  border-color: #dc5b5b;
+  background: radial-gradient(circle at 50% 35%, #3a1414 0%, #160707 100%);
+}
+.presentation-card-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.presentation-card-initials {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #c9a84c;
+}
+.presentation-card-ennemi .presentation-card-initials {
+  color: #ffb0b0;
+}
+
+.presentation-card-name {
+  margin: 6px 0 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.2;
+  color: #f0e8d0;
+}
+.presentation-card-ennemi .presentation-card-name {
+  color: #ffb0b0;
+}
+.presentation-card-sub {
+  margin: 0;
+  font-size: 9px;
+  font-style: italic;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: rgba(232, 232, 236, 0.5);
+}
+
+/* Barre de HP : gradient doré (PJ) / rouge (ennemi) + léger glow. */
+.presentation-card-hp-track {
+  width: 100%;
+  height: 7px;
+  margin-top: 6px;
+  border-radius: 9999px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.4);
+}
+.presentation-card-hp-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #8b6914 0%, #c9a84c 55%, #ffdd88 100%);
+  box-shadow: 0 0 8px rgba(201, 168, 76, 0.5);
+  transition: width 0.4s var(--codex-ease);
+}
+.presentation-card-ennemi .presentation-card-hp-fill {
+  background: linear-gradient(90deg, #6a1212 0%, #dc2626 55%, #ff6b6b 100%);
+  box-shadow: 0 0 8px rgba(220, 38, 38, 0.5);
+}
+.presentation-card-hp-text {
+  margin: 3px 0 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 12px;
+  color: #e8e0c8;
+}
+.presentation-card-hp-unknown {
+  font-style: italic;
+  color: rgba(232, 232, 236, 0.45);
+}
+
+/* Pastilles de conditions D&D. */
+.presentation-card-conditions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  justify-content: center;
+  margin-top: 6px;
+}
+.presentation-condition-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 9999px;
+  font-size: 11px;
+  line-height: 1;
+  cursor: help;
+  background: rgba(220, 38, 38, 0.18);
+  border: 1px solid rgba(220, 38, 38, 0.4);
+}
+.presentation-condition-pill.is-more {
+  font-size: 9px;
+  font-weight: 700;
+  color: #e8e0c8;
+  background: rgba(201, 168, 76, 0.18);
+  border-color: rgba(201, 168, 76, 0.4);
+}
+
+/* ---- États dynamiques ---- */
+
+/* Tour en cours : bordure dorée vive + glow pulsant. */
+@keyframes presentation-turn-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 1px rgba(201, 168, 76, 0.5), 0 0 14px rgba(201, 168, 76, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 0 1px rgba(201, 168, 76, 0.95), 0 0 26px rgba(201, 168, 76, 0.5);
+  }
+}
+.presentation-card.is-turn {
+  border-color: #ffdd88;
+  animation: presentation-turn-glow 2.4s ease-in-out infinite;
+}
+
+/* HP bas (<25 %) : la barre clignote doucement. */
+@keyframes presentation-hp-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.presentation-card.is-low .presentation-card-hp-fill {
+  animation: presentation-hp-blink 1s ease-in-out infinite;
+}
+
+/* K.O. : carte grisée / désaturée + overlay « K.O. ». */
+.presentation-card.is-ko {
+  filter: grayscale(1) brightness(0.55);
+  border-color: rgba(120, 120, 120, 0.4);
+}
+.presentation-card-ko-badge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-12deg);
+  z-index: 2;
+  padding: 2px 12px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #fff;
+  background: rgba(120, 0, 0, 0.85);
+  border: 1px solid rgba(255, 120, 120, 0.7);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+/* Flash de dégât (rouge) / soin (vert) sur changement de HP. */
+@keyframes presentation-flash-dmg {
+  0% { background-color: rgba(220, 38, 38, 0.55); }
+  100% { background-color: rgba(220, 38, 38, 0); }
+}
+@keyframes presentation-flash-heal {
+  0% { background-color: rgba(34, 197, 94, 0.5); }
+  100% { background-color: rgba(34, 197, 94, 0); }
+}
+.presentation-card.flash-dmg::after,
+.presentation-card.flash-heal::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  pointer-events: none;
+  z-index: 1;
+}
+.presentation-card.flash-dmg::after {
+  animation: presentation-flash-dmg 0.7s ease-out;
+}
+.presentation-card.flash-heal::after {
+  animation: presentation-flash-heal 0.7s ease-out;
+}
+
+
+/* ============================================================================
+   MODE PRÉSENTATION — Phase 2 : narration + actions rapides
+   ============================================================================ */
+
+/* Boutons d'actions rapides du panneau MJ. */
+.presentation-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 9px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  color: #e8e0c8;
+  background: linear-gradient(135deg, rgba(20, 15, 8, 0.7) 0%, rgba(10, 8, 4, 0.5) 100%);
+  border: 1px solid rgba(201, 168, 76, 0.3);
+  transition: border-color 0.15s var(--codex-ease), background 0.15s var(--codex-ease),
+    color 0.15s var(--codex-ease);
+}
+.presentation-action-btn:hover:not(:disabled) {
+  border-color: rgba(201, 168, 76, 0.7);
+  background: linear-gradient(135deg, rgba(30, 22, 12, 0.85) 0%, rgba(16, 12, 6, 0.6) 100%);
+  color: #ffe6a8;
+}
+.presentation-action-btn.is-on {
+  border-color: #c9a84c;
+  background: color-mix(in srgb, #c9a84c 18%, transparent);
+  color: #ffe6a8;
+}
+
+/* Zone de narration sur l'écran joueurs : encadré or, fond rouge sombre,
+   citation italique Georgia, fade-in à chaque nouveau texte. */
+@keyframes presentation-narration-in {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.presentation-narration {
+  margin: 0 auto 32px;
+  max-width: 900px;
+  padding: 20px 28px;
+  border-radius: 8px;
+  text-align: center;
+  background: radial-gradient(ellipse at 50% 120%, rgba(150, 30, 30, 0.3) 0%, transparent 70%),
+    linear-gradient(180deg, rgba(40, 10, 10, 0.55) 0%, rgba(20, 6, 6, 0.45) 100%);
+  border: 1px solid rgba(201, 168, 76, 0.5);
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.4);
+  animation: presentation-narration-in 0.5s var(--codex-ease) both;
+}
+.presentation-narration-label {
+  margin: 0 0 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: rgba(201, 168, 76, 0.75);
+}
+.presentation-narration-text {
+  margin: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 18px;
+  line-height: 1.6;
+  color: #f5ecd6;
+}
+.presentation-narration-histo {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(201, 168, 76, 0.18);
+  max-height: 96px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.presentation-narration-histo p {
+  margin: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(232, 232, 236, 0.45);
+}
+
+/* ---- Actions rapides : animations plein écran ---- */
+.presentation-effet {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: none;
+  text-align: center;
+}
+
+/* Critique 20 — explosion dorée épique. */
+@keyframes presentation-crit-bg {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes presentation-crit-text {
+  0% { transform: scale(0.3) rotate(-8deg); opacity: 0; }
+  25% { transform: scale(1.15) rotate(2deg); opacity: 1; }
+  40% { transform: scale(1) rotate(0deg); }
+  80% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+.presentation-effet-crit {
+  background: radial-gradient(circle at 50% 50%, rgba(255, 200, 80, 0.45) 0%, rgba(120, 70, 0, 0.7) 45%, rgba(0, 0, 0, 0.85) 100%);
+  animation: presentation-crit-bg 3.2s ease-out both;
+}
+.presentation-effet-crit-text {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(48px, 12vw, 130px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #fff6d8;
+  text-shadow: 0 0 30px rgba(255, 220, 120, 0.9), 0 0 80px rgba(255, 180, 40, 0.7);
+  animation: presentation-crit-text 3.2s ease-out both;
+}
+.presentation-effet-crit-sub {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: clamp(16px, 3vw, 28px);
+  color: #ffdf9e;
+  animation: presentation-crit-bg 3.2s ease-out both;
+}
+
+/* K.O. — chute sombre. */
+@keyframes presentation-ko-bg {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes presentation-ko-text {
+  0% { transform: translateY(-40px) scale(1.1); opacity: 0; }
+  25% { transform: translateY(0) scale(1); opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.presentation-effet-ko {
+  background: radial-gradient(circle at 50% 45%, rgba(120, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.92) 70%);
+  animation: presentation-ko-bg 3.2s ease-out both;
+}
+.presentation-effet-ko-name {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(34px, 8vw, 88px);
+  font-weight: 700;
+  color: #ff9b9b;
+  text-shadow: 0 0 26px rgba(220, 38, 38, 0.8);
+  animation: presentation-ko-text 3.2s ease-out both;
+}
+.presentation-effet-ko-sub {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: clamp(18px, 4vw, 40px);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.85);
+  animation: presentation-ko-text 3.2s ease-out both;
+}
+
+/* Notif tour — sweep doré rapide. */
+@keyframes presentation-notif-sweep {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.presentation-effet-notif {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(201, 168, 76, 0.35) 0%, transparent 22%, transparent 78%, rgba(201, 168, 76, 0.35) 100%);
+  box-shadow: inset 0 0 120px rgba(201, 168, 76, 0.3);
+  animation: presentation-notif-sweep 1.6s ease-out both;
+}
+
+/* Intermission — overlay soutenu pendant la pause. */
+.presentation-intermission {
+  position: fixed;
+  inset: 0;
+  z-index: 210;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  background: radial-gradient(ellipse at 50% 40%, rgba(40, 24, 60, 0.55) 0%, rgba(5, 4, 8, 0.96) 75%);
+  backdrop-filter: blur(6px);
+  animation: presentation-narration-in 0.4s var(--codex-ease) both;
+}
+.presentation-intermission-label {
+  margin: 0;
+  font-size: clamp(13px, 2.5vw, 18px);
+  font-weight: 700;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: rgba(201, 168, 76, 0.8);
+}
+.presentation-intermission-timer {
+  margin: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(56px, 14vw, 150px);
+  font-weight: 300;
+  letter-spacing: 0.06em;
+  color: #f5f2e8;
+  text-shadow: 0 0 40px rgba(201, 168, 76, 0.4);
+}
+.presentation-intermission-sub {
+  margin: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: clamp(13px, 2.5vw, 20px);
+  color: rgba(232, 232, 236, 0.55);
+}
+
+
+/* ============================================================================
+   MODE PRÉSENTATION — Phase 4 : galerie d'images, ambiance sonore, particules
+   ============================================================================ */
+
+/* Image poussée par le MJ — plein écran, fondu à l'apparition. */
+@keyframes presentation-image-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+.presentation-image-plein {
+  position: fixed;
+  inset: 0;
+  /* Sous les boutons d'UI fixes (sortie, plein écran ≈ 120) et sous les
+     animations d'actions rapides (≈ 200), mais au-dessus du contenu. */
+  z-index: 90;
+  background-color: #05060a;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  animation: presentation-image-in 0.6s ease both;
+}
+
+/* Bouton « Activer le son » (affiché si l'autoplay est bloqué). */
+.presentation-son-activer {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 160;
+  padding: 8px 16px;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: #0a0b0d;
+  background: #c9a84c;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+.presentation-son-activer:hover {
+  background: #d8b85a;
+}
+
+/* Particules dorées subtiles en arrière-plan (pur CSS, sans JS). */
+@keyframes presentation-particles-drift {
+  0% { background-position: 0 0, 0 0, 0 0; }
+  100% { background-position: 0 -900px, 0 -1400px, 0 -2000px; }
+}
+.presentation-particles {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image:
+    radial-gradient(circle, rgba(201, 168, 76, 0.5) 0.7px, transparent 1.4px),
+    radial-gradient(circle, rgba(201, 168, 76, 0.35) 0.6px, transparent 1.3px),
+    radial-gradient(circle, rgba(255, 221, 136, 0.3) 0.5px, transparent 1.2px);
+  background-size: 220px 220px, 340px 340px, 500px 500px;
+  background-position: 0 0, 60px 80px, 130px 30px;
+  animation: presentation-particles-drift 60s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .presentation-particles {
+    animation: none;
   }
 }
 

@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { CONDITIONS_MAP, isConditionKey } from '@/app/data/conditions'
 
 // ============================================================================
 // Mode Présentation
@@ -18,14 +19,25 @@ import { supabase } from '@/lib/supabase'
 //   - personnages + ennemis (HP en temps réel via les pages MJ)
 // ============================================================================
 
-type ScenarioActif = {
+// NB : ces types + le composant DisplayView sont aussi importés par la route
+// publique /presentation/[sessionId] (écran joueurs sans login). Ils sont donc
+// exportés depuis ce fichier de page — Next.js ne traite que l'export default
+// comme la page, les exports nommés restent de simples exports de module.
+export type ScenarioActif = {
   id: string
   nom: string
   description: string | null
   mj_id: string
 }
 
-type EtatPresentation = {
+export type NarrationEntry = { texte: string; ts: number }
+export type EffetRapide = {
+  type: 'crit' | 'ko' | 'notif'
+  cible?: string | null
+  ts: number
+}
+
+export type EtatPresentation = {
   scenario_id: string
   lieu_nom: string | null
   lieu_description: string | null
@@ -36,11 +48,31 @@ type EtatPresentation = {
     | null
   personnages_ids: string[]
   ennemis_ids: string[]
+  // Phase 2 — narration temps réel + actions rapides MJ.
+  narration: string | null
+  narration_historique: NarrationEntry[]
+  effet: EffetRapide | null
+  en_pause: boolean
+  // Phase 4 — galerie d'images, ambiance sonore, ambiance visuelle.
+  image_plein_ecran: string | null
+  lieu_son: string | null
+  lieu_son_volume: number
+  ambiance: string
 }
+
+// Image utilisable dans la galerie « à pousser à l'écran ».
+type ImageGalerie = { url: string; label: string }
+
+// Templates de narration pré-faits (boutons de remplissage rapide).
+const NARRATION_TEMPLATES = [
+  'Vous entrez dans…',
+  'Soudain…',
+  'Le silence retombe…'
+]
 
 type ScenarioLite = { id: string; nom: string; actif: boolean }
 
-type CombatLite = {
+export type CombatLite = {
   scenario_id: string
   round: number
   tour_actuel: number
@@ -48,7 +80,7 @@ type CombatLite = {
   actif: boolean
 }
 
-type Persona = {
+export type Persona = {
   id: string
   nom: string
   classe: string | null
@@ -56,14 +88,16 @@ type Persona = {
   hp_actuel: number
   hp_max: number
   image_url: string | null
+  conditions: string[]
 }
 
-type Ennemi = {
+export type Ennemi = {
   id: string
   nom: string
   hp_actuel: number
   hp_max: number
   image_url: string | null
+  conditions: string[]
 }
 
 // ----------------------------------------------------------------------------
@@ -95,8 +129,18 @@ function PresentationInner() {
   const [draftLieuNom, setDraftLieuNom] = useState('')
   const [draftLieuDesc, setDraftLieuDesc] = useState('')
   const [draftChapitre, setDraftChapitre] = useState('')
+  // Phase 2 — narration à pousser + cible de l'action « K.O. »
+  const [draftNarration, setDraftNarration] = useState('')
+  const [koCible, setKoCible] = useState('')
+  // Phase 4 — galerie d'images poussables + URL d'ambiance sonore en cours
+  // de saisie.
+  const [galerie, setGalerie] = useState<ImageGalerie[]>([])
+  const [draftSon, setDraftSon] = useState('')
   const [statusMsg, setStatusMsg] = useState('')
   const [isFullscreen, setIsFullscreen] = useState(false)
+  // Diffusion multi-écran : session publique partagée aux joueurs (sans login).
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [diffusionMsg, setDiffusionMsg] = useState('')
   // Picker modal pour ajouter des PJ / ennemis depuis la bibliothèque
   const [picker, setPicker] = useState<'pj' | 'ennemi' | null>(null)
   const [libPersos, setLibPersos] = useState<Persona[]>([])
@@ -186,13 +230,31 @@ function PresentationInner() {
           ennemis_visibles: false,
           dernier_jet: null,
           personnages_ids: [],
-          ennemis_ids: []
+          ennemis_ids: [],
+          narration: null,
+          narration_historique: [],
+          effet: null,
+          en_pause: false,
+          image_plein_ecran: null,
+          lieu_son: null,
+          lieu_son_volume: 50,
+          ambiance: 'auto'
         })
       } else if (pres) {
         setEtat({
           ...(pres as EtatPresentation),
           personnages_ids: (pres.personnages_ids as string[] | null) ?? [],
-          ennemis_ids: (pres.ennemis_ids as string[] | null) ?? []
+          ennemis_ids: (pres.ennemis_ids as string[] | null) ?? [],
+          narration: (pres.narration as string | null) ?? null,
+          narration_historique: Array.isArray(pres.narration_historique)
+            ? (pres.narration_historique as NarrationEntry[])
+            : [],
+          effet: (pres.effet as EffetRapide | null) ?? null,
+          en_pause: (pres.en_pause as boolean | null) ?? false,
+          image_plein_ecran: (pres.image_plein_ecran as string | null) ?? null,
+          lieu_son: (pres.lieu_son as string | null) ?? null,
+          lieu_son_volume: (pres.lieu_son_volume as number | null) ?? 50,
+          ambiance: (pres.ambiance as string | null) ?? 'auto'
         })
       }
 
@@ -224,22 +286,22 @@ function PresentationInner() {
       const [linkedP, addedP, linkedE, addedE] = await Promise.all([
         supabase
           .from('personnages')
-          .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url')
+          .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions')
           .eq('scenario_id', scenario.id),
         idsP.length > 0
           ? supabase
               .from('personnages')
-              .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url')
+              .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions')
               .in('id', idsP)
           : Promise.resolve({ data: [] }),
         supabase
           .from('ennemis')
-          .select('id, nom, hp_actuel, hp_max, image_url')
+          .select('id, nom, hp_actuel, hp_max, image_url, conditions')
           .eq('scenario_id', scenario.id),
         idsE.length > 0
           ? supabase
               .from('ennemis')
-              .select('id, nom, hp_actuel, hp_max, image_url')
+              .select('id, nom, hp_actuel, hp_max, image_url, conditions')
               .in('id', idsE)
           : Promise.resolve({ data: [] })
       ])
@@ -347,7 +409,14 @@ function PresentationInner() {
         .update(patch)
         .eq('scenario_id', scenario.id)
       if (error) {
-        console.error('[presentation] save :', error)
+        // PostgrestError se sérialise mal en objet vide via console.error :
+        // on extrait explicitement les champs utiles.
+        console.error('[presentation] save :', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        })
         setStatusMsg('Erreur')
         return
       }
@@ -355,6 +424,41 @@ function PresentationInner() {
       setTimeout(() => setStatusMsg(''), 1500)
     },
     [scenario, isMj]
+  )
+
+  // --------------------------------------------------------------------------
+  // Phase 2 — narration temps réel + actions rapides MJ
+  // --------------------------------------------------------------------------
+
+  // Pousse un texte narratif à l'écran et l'empile dans l'historique (3 max).
+  const pousserNarration = useCallback(async () => {
+    const texte = draftNarration.trim()
+    if (!texte) return
+    const histo: NarrationEntry[] = [
+      { texte, ts: Date.now() },
+      ...(etat?.narration_historique ?? [])
+    ].slice(0, 3)
+    await sauverChamp({ narration: texte, narration_historique: histo })
+    setDraftNarration('')
+  }, [draftNarration, etat?.narration_historique, sauverChamp])
+
+  const effacerNarration = useCallback(
+    () => sauverChamp({ narration: null }),
+    [sauverChamp]
+  )
+
+  // Déclenche une action rapide transitoire (crit / ko / notif). On change le
+  // `ts` à chaque fois pour que l'écran joueurs rejoue l'animation même si le
+  // type est identique au précédent.
+  const declencherEffet = useCallback(
+    (type: EffetRapide['type'], cible?: string) =>
+      sauverChamp({ effet: { type, cible: cible ?? null, ts: Date.now() } }),
+    [sauverChamp]
+  )
+
+  const togglePause = useCallback(
+    () => sauverChamp({ en_pause: !etat?.en_pause }),
+    [etat?.en_pause, sauverChamp]
   )
 
   // --------------------------------------------------------------------------
@@ -445,12 +549,12 @@ function PresentationInner() {
         myScenarioIds.length > 0
           ? supabase
               .from('personnages')
-              .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url')
+              .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions')
               .in('scenario_id', myScenarioIds)
           : Promise.resolve({ data: [] }),
         supabase
           .from('personnages')
-          .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url')
+          .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions')
           .eq('joueur_id', user.id)
       ])
       const map = new Map<string, Persona>()
@@ -463,7 +567,7 @@ function PresentationInner() {
     } else {
       const { data } = await supabase
         .from('ennemis')
-        .select('id, nom, hp_actuel, hp_max, image_url')
+        .select('id, nom, hp_actuel, hp_max, image_url, conditions')
         .eq('mj_id', user.id)
         .order('nom')
       setLibEnnemis((data ?? []) as Ennemi[])
@@ -483,6 +587,113 @@ function PresentationInner() {
     typeof window !== 'undefined'
       ? `${window.location.origin}/dashboard/presentation?display=1`
       : ''
+
+  // URL publique de l'écran joueurs (aucun login requis) — disponible une fois
+  // la diffusion lancée.
+  const sessionUrl =
+    sessionId && typeof window !== 'undefined'
+      ? `${window.location.origin}/presentation/${sessionId}`
+      : ''
+
+  // --------------------------------------------------------------------------
+  // Diffusion multi-écran : crée une session publique et y pousse en continu
+  // un snapshot complet. La route publique (non authentifiée) ne peut lire QUE
+  // sessions_presentation — d'où le snapshot plutôt qu'un accès direct aux
+  // tables protégées par RLS.
+  // --------------------------------------------------------------------------
+  const lancerDiffusion = useCallback(async () => {
+    if (!scenario || !isMj) return
+    setDiffusionMsg('Création de la session…')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    // Réutilise la session existante de ce scénario s'il y en a une.
+    const { data: existante } = await supabase
+      .from('sessions_presentation')
+      .select('id')
+      .eq('mj_id', user.id)
+      .eq('scenario_id', scenario.id)
+      .maybeSingle()
+    if (existante) {
+      setSessionId(existante.id as string)
+      setDiffusionMsg('')
+      return
+    }
+    const code = Math.random().toString(36).slice(2, 8).toUpperCase()
+    const { data, error } = await supabase
+      .from('sessions_presentation')
+      .insert({
+        mj_id: user.id,
+        scenario_id: scenario.id,
+        code_session: code,
+        etat_jeu: {}
+      })
+      .select('id')
+      .single()
+    if (error || !data) {
+      console.error('[presentation] lancer diffusion :', error)
+      setDiffusionMsg('Erreur — exécute supabase/sessions_presentation.sql dans Supabase.')
+      return
+    }
+    setSessionId(data.id as string)
+    setDiffusionMsg('')
+  }, [scenario, isMj])
+
+  const arreterDiffusion = useCallback(async () => {
+    if (!sessionId) return
+    await supabase.from('sessions_presentation').delete().eq('id', sessionId)
+    setSessionId(null)
+    setDiffusionMsg('')
+  }, [sessionId])
+
+  // Pousse le snapshot complet à chaque changement d'état pendant la diffusion.
+  useEffect(() => {
+    if (!sessionId || !scenario) return
+    const snapshot = { scenario, etat, combat, personnages, ennemis }
+    supabase
+      .from('sessions_presentation')
+      .update({ etat_jeu: snapshot })
+      .eq('id', sessionId)
+      .then(({ error }) => {
+        if (error) console.error('[presentation] snapshot :', error)
+      })
+  }, [sessionId, scenario, etat, combat, personnages, ennemis])
+
+  // --------------------------------------------------------------------------
+  // Phase 4 — galerie d'images poussables : portraits PNJ / ennemis, items,
+  // cartes. Chargée une fois pour le MJ courant.
+  // --------------------------------------------------------------------------
+  useEffect(() => {
+    if (!isMj || !scenario) return
+    let cancel = false
+    const charger = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const [pnj, enn, items, maps] = await Promise.all([
+        supabase.from('pnj').select('nom, image_url').eq('mj_id', user.id),
+        supabase.from('ennemis').select('nom, image_url').eq('mj_id', user.id),
+        supabase.from('items').select('nom, image_url').eq('mj_id', user.id),
+        supabase.from('maps').select('nom, image_url').eq('mj_id', user.id)
+      ])
+      if (cancel) return
+      const out: ImageGalerie[] = []
+      const ajouter = (rows: unknown, prefixe: string) => {
+        ;(
+          (rows as Array<{ nom: string; image_url: string | null }> | null) ?? []
+        ).forEach((r) => {
+          if (r.image_url) out.push({ url: r.image_url, label: `${prefixe} ${r.nom}` })
+        })
+      }
+      ajouter(pnj.data, '🧑')
+      ajouter(enn.data, '👹')
+      ajouter(items.data, '🎒')
+      ajouter(maps.data, '🗺')
+      setGalerie(out)
+    }
+    charger()
+    return () => {
+      cancel = true
+    }
+  }, [isMj, scenario])
 
   // --------------------------------------------------------------------------
   // Rendus
@@ -668,34 +879,252 @@ function PresentationInner() {
                 />
               </div>
 
-              <div className="flex items-center justify-between gap-3 p-3 bg-gray-900 rounded border border-gray-700">
-                <div>
-                  <p className="text-sm font-bold text-white">
-                    {etat?.ennemis_visibles ? '👁 Ennemis visibles' : '🔒 Ennemis masqués'}
-                  </p>
-                  <p className="text-[11px] text-gray-400 italic mt-0.5">
-                    {etat?.ennemis_visibles
-                      ? 'Les joueurs voient les vrais noms et HP.'
-                      : 'Les joueurs voient « Créature obscure » et « ?? » au lieu des stats.'}
-                  </p>
+              {/* === Narration temps réel === */}
+              <div>
+                <label className="text-xs uppercase tracking-wider text-gray-400 block mb-1">
+                  Pousser à l&apos;écran (narration)
+                </label>
+                <textarea
+                  value={draftNarration}
+                  onChange={(e) => setDraftNarration(e.target.value)}
+                  placeholder="« Une lueur pâle filtre entre les colonnes brisées… »"
+                  className="w-full p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none focus:border-yellow-500 text-sm min-h-[80px]"
+                />
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {NARRATION_TEMPLATES.map((tpl) => (
+                    <button
+                      key={tpl}
+                      type="button"
+                      onClick={() =>
+                        setDraftNarration((v) => (v.trim() ? v.trimEnd() + ' ' : '') + tpl)
+                      }
+                      className="px-2 py-1 text-[10px] rounded border border-gray-700 text-gray-300 hover:border-yellow-600 hover:text-yellow-300 transition"
+                    >
+                      {tpl}
+                    </button>
+                  ))}
                 </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={etat?.ennemis_visibles ?? false}
-                  onClick={() =>
-                    sauverChamp({ ennemis_visibles: !etat?.ennemis_visibles })
-                  }
-                  className={`relative inline-flex items-center h-6 w-11 rounded-full transition-colors flex-shrink-0 ${
-                    etat?.ennemis_visibles ? 'bg-yellow-500' : 'bg-gray-600'
-                  }`}
-                >
-                  <span
-                    className={`inline-block w-5 h-5 transform rounded-full bg-white shadow transition-transform ${
-                      etat?.ennemis_visibles ? 'translate-x-5' : 'translate-x-0.5'
+                <div className="flex gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={pousserNarration}
+                    disabled={!draftNarration.trim()}
+                    className="flex-1 px-3 py-2 bg-yellow-500 text-gray-900 font-bold rounded hover:bg-yellow-400 text-xs uppercase tracking-wider disabled:opacity-40"
+                  >
+                    📜 Pousser à l&apos;écran
+                  </button>
+                  {etat?.narration && (
+                    <button
+                      type="button"
+                      onClick={effacerNarration}
+                      className="px-3 py-2 border border-gray-700 text-gray-400 rounded hover:border-red-600 hover:text-red-300 text-xs flex-shrink-0"
+                      title="Retirer la narration de l'écran"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                {etat?.narration && (
+                  <p className="text-[10px] text-gray-500 italic mt-1.5 truncate">
+                    À l&apos;écran : « {etat.narration} »
+                  </p>
+                )}
+              </div>
+
+              {/* === Actions rapides === */}
+              <div>
+                <label className="text-xs uppercase tracking-wider text-gray-400 block mb-2">
+                  Actions rapides
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => declencherEffet('crit')}
+                    className="presentation-action-btn"
+                  >
+                    ⚔ Critique 20
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => declencherEffet('notif')}
+                    className="presentation-action-btn"
+                  >
+                    🔔 Notif tour
+                  </button>
+                  <button
+                    type="button"
+                    onClick={togglePause}
+                    className={`presentation-action-btn${etat?.en_pause ? ' is-on' : ''}`}
+                  >
+                    {etat?.en_pause ? '▶ Reprendre' : '⏸ Pause'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      sauverChamp({ ennemis_visibles: !etat?.ennemis_visibles })
+                    }
+                    className={`presentation-action-btn${
+                      etat?.ennemis_visibles ? ' is-on' : ''
                     }`}
+                  >
+                    {etat?.ennemis_visibles ? '👁 Ennemis révélés' : '🌫 Voile mystère'}
+                  </button>
+                </div>
+                {/* K.O. — choisir une cible puis déclencher l'animation */}
+                <div className="flex gap-2 mt-2">
+                  <select
+                    value={koCible}
+                    onChange={(e) => setKoCible(e.target.value)}
+                    className="flex-1 min-w-0 p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none focus:border-yellow-500 text-xs"
+                  >
+                    <option value="">— Cible du K.O. —</option>
+                    {[...personnages, ...ennemis].map((c) => (
+                      <option key={c.id} value={c.nom}>
+                        {c.nom}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (koCible) declencherEffet('ko', koCible)
+                    }}
+                    disabled={!koCible}
+                    className="presentation-action-btn flex-shrink-0 disabled:opacity-40"
+                  >
+                    💀 K.O.
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-500 italic mt-1.5">
+                  « Voile mystère » masque noms et HP des ennemis côté joueurs.
+                </p>
+              </div>
+
+              {/* === Galerie d'images à pousser plein écran === */}
+              <div>
+                <label className="text-xs uppercase tracking-wider text-gray-400 block mb-2">
+                  Galerie — image plein écran
+                </label>
+                {etat?.image_plein_ecran && (
+                  <button
+                    type="button"
+                    onClick={() => sauverChamp({ image_plein_ecran: null })}
+                    className="w-full mb-2 px-3 py-2 border border-red-700/50 text-red-300 rounded hover:bg-red-900/20 text-xs uppercase tracking-wider"
+                  >
+                    ✕ Retirer l&apos;image de l&apos;écran
+                  </button>
+                )}
+                {galerie.length === 0 ? (
+                  <p className="text-[10px] text-gray-500 italic">
+                    Aucune image — ajoute des portraits/visuels à tes PNJ,
+                    ennemis, items ou cartes.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-4 gap-1.5 max-h-44 overflow-y-auto">
+                    {galerie.map((img) => {
+                      const actif = etat?.image_plein_ecran === img.url
+                      return (
+                        <button
+                          key={img.url}
+                          type="button"
+                          onClick={() =>
+                            sauverChamp({ image_plein_ecran: img.url })
+                          }
+                          title={`Afficher : ${img.label}`}
+                          className={`relative aspect-square rounded overflow-hidden border transition ${
+                            actif
+                              ? 'border-yellow-500 ring-1 ring-yellow-500'
+                              : 'border-gray-700 hover:border-yellow-600'
+                          }`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={img.url}
+                            alt={img.label}
+                            loading="lazy"
+                            className="w-full h-full object-cover"
+                          />
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* === Ambiance sonore en boucle === */}
+              <div>
+                <label className="text-xs uppercase tracking-wider text-gray-400 block mb-1">
+                  Ambiance sonore (URL en boucle)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={draftSon}
+                    onChange={(e) => setDraftSon(e.target.value)}
+                    placeholder="https://… .mp3"
+                    className="flex-1 min-w-0 p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none focus:border-yellow-500 text-xs font-mono"
                   />
-                </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      sauverChamp({ lieu_son: draftSon.trim() || null })
+                    }
+                    className="presentation-action-btn flex-shrink-0"
+                  >
+                    ▶ Lancer
+                  </button>
+                </div>
+                {etat?.lieu_son && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-[10px] text-green-400 italic flex-shrink-0">
+                      ♪ En boucle
+                    </span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={etat.lieu_son_volume}
+                      onChange={(e) =>
+                        sauverChamp({ lieu_son_volume: Number(e.target.value) })
+                      }
+                      className="flex-1 accent-yellow-500"
+                      aria-label="Volume de l'ambiance sonore"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => sauverChamp({ lieu_son: null })}
+                      className="text-[10px] text-red-300 hover:text-red-200 flex-shrink-0"
+                    >
+                      ✕ Couper
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* === Ambiance visuelle du fond === */}
+              <div>
+                <label className="text-xs uppercase tracking-wider text-gray-400 block mb-2">
+                  Ambiance visuelle du fond
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { key: 'auto', label: '✨ Auto' },
+                    { key: 'combat', label: '⚔ Combat' },
+                    { key: 'mystere', label: '🔮 Mystère' },
+                    { key: 'exploration', label: '🧭 Exploration' }
+                  ].map((a) => (
+                    <button
+                      key={a.key}
+                      type="button"
+                      onClick={() => sauverChamp({ ambiance: a.key })}
+                      className={`presentation-action-btn${
+                        (etat?.ambiance ?? 'auto') === a.key ? ' is-on' : ''
+                      }`}
+                    >
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -756,6 +1185,74 @@ function PresentationInner() {
                 Scanne ce QR depuis un téléphone connecté au compte joueur.
               </p>
             </div>
+
+            {/* Diffusion multi-écran : lien public sans login */}
+            {isMj && (
+              <div className="border-t border-gray-700 pt-4">
+                <p className="text-xs uppercase tracking-wider text-gray-400 mb-2">
+                  🎮 Diffusion multi-écran
+                </p>
+                {!sessionId ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={lancerDiffusion}
+                      className="w-full px-4 py-3 bg-yellow-500 text-gray-900 font-bold rounded hover:bg-yellow-400 text-sm uppercase tracking-wider"
+                    >
+                      🎮 Lancer la diffusion
+                    </button>
+                    <p className="text-[10px] text-gray-500 italic mt-2">
+                      Génère un lien public — les joueurs ouvrent l&apos;écran sur
+                      n&apos;importe quel appareil, sans compte.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 mb-3">
+                      <input
+                        type="text"
+                        readOnly
+                        value={sessionUrl}
+                        className="flex-1 p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none text-xs font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => navigator.clipboard?.writeText(sessionUrl)}
+                        className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded"
+                        title="Copier le lien public"
+                      >
+                        📋
+                      </button>
+                    </div>
+                    <div className="flex justify-center mb-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(sessionUrl)}`}
+                        alt="QR code de l'écran joueurs public"
+                        className="rounded bg-white p-2"
+                        width={200}
+                        height={200}
+                      />
+                    </div>
+                    <p className="text-[10px] text-green-400 italic text-center mb-2">
+                      ● Diffusion active — synchro temps réel
+                    </p>
+                    <button
+                      type="button"
+                      onClick={arreterDiffusion}
+                      className="w-full px-3 py-2 border border-red-700/50 text-red-300 rounded hover:bg-red-900/20 text-xs uppercase tracking-wider"
+                    >
+                      ⏹ Arrêter la diffusion
+                    </button>
+                  </>
+                )}
+                {diffusionMsg && (
+                  <p className="text-[10px] text-yellow-300 italic mt-2">
+                    {diffusionMsg}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -910,11 +1407,55 @@ function PickerModal({
   )
 }
 
+// Bip discret pour la « Notif tour » — généré via Web Audio, aucun asset son
+// requis. Échoue silencieusement si l'audio est indisponible.
+function jouerBipNotif() {
+  try {
+    const Ctx = window.AudioContext
+    if (!Ctx) return
+    const ctx = new Ctx()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = 'sine'
+    osc.frequency.value = 880
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.16, ctx.currentTime + 0.02)
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.34)
+    osc.connect(gain).connect(ctx.destination)
+    osc.start()
+    osc.stop(ctx.currentTime + 0.36)
+    osc.onended = () => ctx.close()
+  } catch {
+    /* audio indisponible : le flash visuel suffit */
+  }
+}
+
+// Formate des secondes en mm:ss.
+function formatSecs(total: number): string {
+  const m = Math.floor(total / 60)
+  const s = total % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
+// Fonds cinématiques par ambiance (Phase 4). En 'auto', le client retombe sur
+// 'combat' si un combat est actif, sinon 'normal'.
+const AMBIANCE_FONDS: Record<string, string> = {
+  normal:
+    'radial-gradient(ellipse at 50% 0%, rgba(201,168,76,0.10) 0%, transparent 55%), linear-gradient(180deg, #08090c 0%, #05060a 100%)',
+  combat:
+    'radial-gradient(ellipse at 50% 0%, rgba(201,168,76,0.07) 0%, transparent 50%), radial-gradient(ellipse at 50% 110%, rgba(150,30,30,0.24) 0%, transparent 60%), linear-gradient(180deg, #0c0607 0%, #07050a 100%)',
+  mystere:
+    'radial-gradient(ellipse at 50% 0%, rgba(150,90,220,0.13) 0%, transparent 55%), radial-gradient(ellipse at 50% 110%, rgba(60,20,110,0.32) 0%, transparent 65%), linear-gradient(180deg, #0a0712 0%, #06040c 100%)',
+  exploration:
+    'radial-gradient(ellipse at 50% 0%, rgba(80,130,210,0.13) 0%, transparent 55%), radial-gradient(ellipse at 50% 110%, rgba(20,40,90,0.32) 0%, transparent 65%), linear-gradient(180deg, #060a12 0%, #05070c 100%)'
+}
+
 // ============================================================================
 // DisplayView — vue plein écran "TV" pour les joueurs.
+// Exporté : réutilisé tel quel par la route publique /presentation/[sessionId].
 // ============================================================================
 
-function DisplayView({
+export function DisplayView({
   root,
   scenario,
   etat,
@@ -943,15 +1484,90 @@ function DisplayView({
       ? combat.ordre_initiative[combat.tour_actuel]
       : null
 
+  // Action rapide transitoire : on rejoue l'animation chaque fois que
+  // `effet.ts` change (même si le type est identique).
+  const [effetActif, setEffetActif] = useState<EffetRapide | null>(null)
+  const effetTsRef = useRef<number | null>(etat?.effet?.ts ?? null)
+  useEffect(() => {
+    const effet = etat?.effet
+    if (!effet || effet.ts === effetTsRef.current) return
+    effetTsRef.current = effet.ts
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setEffetActif(effet)
+    if (effet.type === 'notif') jouerBipNotif()
+    const duree = effet.type === 'notif' ? 1600 : 3200
+    const timer = setTimeout(() => setEffetActif(null), duree)
+    return () => clearTimeout(timer)
+  }, [etat?.effet])
+
+  // Intermission : minuteur qui compte depuis la mise en pause.
+  const enPause = etat?.en_pause ?? false
+  const [pauseSecs, setPauseSecs] = useState(0)
+  useEffect(() => {
+    if (!enPause) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPauseSecs(0)
+    const t = setInterval(() => setPauseSecs((s) => s + 1), 1000)
+    return () => clearInterval(t)
+  }, [enPause])
+
+  // Ambiance visuelle (Phase 4) : 'auto' retombe sur combat / normal.
+  const ambianceChoisie = etat?.ambiance && etat.ambiance !== 'auto'
+    ? etat.ambiance
+    : combat?.actif
+    ? 'combat'
+    : 'normal'
+  const fond = AMBIANCE_FONDS[ambianceChoisie] ?? AMBIANCE_FONDS.normal
+
+  // Ambiance sonore en boucle (Phase 4). L'autoplay peut être bloqué par le
+  // navigateur tant qu'il n'y a pas eu d'interaction : on propose alors un
+  // bouton « Activer le son ».
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [audioBloque, setAudioBloque] = useState(false)
+  const lieuSon = etat?.lieu_son ?? null
+  const lieuSonVolume = etat?.lieu_son_volume ?? 50
+  useEffect(() => {
+    const a = audioRef.current
+    if (!a) return
+    a.volume = Math.max(0, Math.min(1, lieuSonVolume / 100))
+  }, [lieuSon, lieuSonVolume])
+  useEffect(() => {
+    const a = audioRef.current
+    if (!a || !lieuSon) return
+    a.play().catch(() => setAudioBloque(true))
+  }, [lieuSon])
+
   return (
     <div
       ref={root}
       className={`min-h-screen text-white relative ${compact ? 'min-h-0' : ''}`}
       style={{
-        background:
-          'radial-gradient(ellipse at 50% 0%, rgba(201,168,76,0.10) 0%, transparent 55%), linear-gradient(180deg, #08090c 0%, #05060a 100%)'
+        // Fond cinématique piloté par l'ambiance choisie par le MJ.
+        background: fond,
+        transition: 'background 0.6s ease'
       }}
     >
+      {/* Couche de particules dorées subtiles (optionnel, pur CSS). */}
+      {!compact && <div className="presentation-particles" aria-hidden="true" />}
+
+      {/* Ambiance sonore en boucle. */}
+      {lieuSon && (
+        <audio ref={audioRef} src={lieuSon} loop autoPlay preload="auto" />
+      )}
+      {!compact && lieuSon && audioBloque && (
+        <button
+          type="button"
+          onClick={() => {
+            audioRef.current
+              ?.play()
+              .then(() => setAudioBloque(false))
+              .catch(() => {})
+          }}
+          className="presentation-son-activer"
+        >
+          🔊 Activer le son
+        </button>
+      )}
       {/* Bouton retour — toujours visible, même en plein écran. Positionné
           absolument pour rester en place quand le parent passe en fullscreen.
           Style or 50% au repos, plus marqué au hover. */}
@@ -1054,6 +1670,31 @@ function DisplayView({
           </section>
         )}
 
+        {/* Narration poussée par le MJ — encadré or, citation italique, et
+            historique des 2 textes précédents. `key` sur le ts pour rejouer
+            l'animation de fade-in à chaque nouveau texte. */}
+        {etat?.narration && (
+          <section
+            key={etat.narration_historique?.[0]?.ts ?? etat.narration}
+            className="presentation-narration"
+          >
+            <p className="presentation-narration-label">Narration</p>
+            <p
+              className="presentation-narration-text"
+              style={{ fontSize: compact ? 14 : 18 }}
+            >
+              « {etat.narration} »
+            </p>
+            {(etat.narration_historique?.length ?? 0) > 1 && (
+              <div className="presentation-narration-histo">
+                {etat.narration_historique.slice(1).map((h) => (
+                  <p key={h.ts}>« {h.texte} »</p>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
         {/* Tour de combat */}
         {combat?.actif && tourCourant && (
           <section
@@ -1082,18 +1723,21 @@ function DisplayView({
           </section>
         )}
 
-        {/* Grille PJ + Ennemis */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Rosters PJ + Ennemis — empilés, chacun en grille de cartes portraits */}
+        <div className="space-y-6">
           <Roster
             titre="Compagnons"
             icone="🛡"
+            variant="pj"
+            currentTurnId={tourCourant?.id ?? null}
             entries={personnages.map((p) => ({
               id: p.id,
               nom: p.nom,
               sous: [p.classe, `Niv. ${p.niveau}`].filter(Boolean).join(' · '),
               hp: p.hp_actuel,
               hpMax: p.hp_max,
-              image: p.image_url
+              image: p.image_url,
+              conditions: Array.isArray(p.conditions) ? p.conditions : []
             }))}
             compact={compact}
             obscure={false}
@@ -1103,13 +1747,17 @@ function DisplayView({
           <Roster
             titre="Adversaires"
             icone="👹"
+            variant="ennemi"
+            currentTurnId={tourCourant?.id ?? null}
             entries={ennemis.map((e) => ({
               id: e.id,
               nom: ennemisVisibles ? e.nom : 'Créature obscure',
               sous: null,
               hp: ennemisVisibles ? e.hp_actuel : null,
               hpMax: ennemisVisibles ? e.hp_max : null,
-              image: ennemisVisibles ? e.image_url : null
+              image: ennemisVisibles ? e.image_url : null,
+              conditions:
+                ennemisVisibles && Array.isArray(e.conditions) ? e.conditions : []
             }))}
             compact={compact}
             obscure={!ennemisVisibles}
@@ -1149,17 +1797,72 @@ function DisplayView({
           </section>
         )}
       </div>
+
+      {/* Overlays plein écran (image / effets / intermission) : `position:
+          fixed` → ils ne doivent JAMAIS être rendus dans l'aperçu compact du
+          panneau MJ, sinon ils débordent du cadre et recouvrent toute la page
+          du MJ (le bouton « Reprendre » devient alors inatteignable). On les
+          réserve donc à la vraie vue diffusion. */}
+      {!compact && etat?.image_plein_ecran && (
+        <div
+          className="presentation-image-plein"
+          style={{ backgroundImage: `url(${etat.image_plein_ecran})` }}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* === Actions rapides : animations plein écran (transitoires) === */}
+      {!compact && effetActif?.type === 'crit' && (
+        <div className="presentation-effet presentation-effet-crit">
+          <span className="presentation-effet-crit-text">CRITIQUE&nbsp;!</span>
+          <span className="presentation-effet-crit-sub">20 naturel</span>
+        </div>
+      )}
+      {!compact && effetActif?.type === 'ko' && (
+        <div className="presentation-effet presentation-effet-ko">
+          <span className="presentation-effet-ko-name">
+            {effetActif.cible || 'Une créature'}
+          </span>
+          <span className="presentation-effet-ko-sub">est K.O.</span>
+        </div>
+      )}
+      {!compact && effetActif?.type === 'notif' && (
+        <div className="presentation-effet-notif" aria-hidden="true" />
+      )}
+
+      {/* === Intermission (Pause) — overlay soutenu avec minuteur === */}
+      {!compact && enPause && (
+        <div className="presentation-intermission">
+          <p className="presentation-intermission-label">⏸ Intermission</p>
+          <p className="presentation-intermission-timer">{formatSecs(pauseSecs)}</p>
+          <p className="presentation-intermission-sub">
+            La partie reprend dans un instant…
+          </p>
+        </div>
+      )}
     </div>
   )
 }
 
 // ============================================================================
-// Roster — liste compacte de combattants (PJ ou ennemis)
+// Roster — groupe de cartes portraits (PJ ou ennemis)
 // ============================================================================
+
+type RosterEntry = {
+  id: string
+  nom: string
+  sous: string | null
+  hp: number | null
+  hpMax: number | null
+  image: string | null
+  conditions: string[]
+}
 
 function Roster({
   titre,
   icone,
+  variant,
+  currentTurnId,
   entries,
   compact,
   obscure,
@@ -1168,139 +1871,171 @@ function Roster({
 }: {
   titre: string
   icone: string
-  entries: Array<{
-    id: string
-    nom: string
-    sous: string | null
-    hp: number | null
-    hpMax: number | null
-    image: string | null
-  }>
+  variant: 'pj' | 'ennemi'
+  currentTurnId: string | null
+  entries: RosterEntry[]
   compact: boolean
   obscure: boolean
   onAdd?: () => void
   addLabel?: string
 }) {
   return (
-    <div
-      className="rounded-lg p-4 md:p-5"
-      style={{
-        background: 'linear-gradient(135deg, rgba(20,15,8,0.40) 0%, rgba(10,8,4,0.20) 100%)',
-        border: '1px solid rgba(201,168,76,0.15)'
-      }}
-    >
-      <h3
-        className="uppercase tracking-[0.3em] mb-3 flex items-center gap-2"
-        style={{ color: '#C9A84C', fontSize: compact ? 10 : 12, fontWeight: 700 }}
-      >
-        <span>{icone}</span>
+    <div className={`presentation-roster presentation-roster-${variant}`}>
+      <h3 className="presentation-roster-title">
+        <span aria-hidden="true">{icone}</span>
         {titre}
+        <span className="presentation-roster-count">({entries.length})</span>
       </h3>
-      {entries.length === 0 && (
-        <p className="text-gray-500 text-sm italic text-center py-4">
-          Aucun.
-        </p>
-      )}
-      {entries.length > 0 && (
-        <ul className="space-y-2">
-          {entries.map((e) => {
-            const ratio = e.hpMax ? Math.max(0, Math.min(1, (e.hp ?? 0) / e.hpMax)) : 0
-            return (
-              <li
-                key={e.id}
-                className="flex items-center gap-3 p-2 rounded"
-                style={{
-                  background: 'rgba(0,0,0,0.25)',
-                  border: '1px solid rgba(255,255,255,0.04)'
-                }}
-              >
-                {e.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={e.image}
-                    alt=""
-                    loading="lazy"
-                    className="rounded-full object-cover flex-shrink-0"
-                    style={{ width: compact ? 36 : 56, height: compact ? 36 : 56 }}
-                  />
-                ) : (
-                  <span
-                    className="rounded-full bg-gray-800 flex items-center justify-center flex-shrink-0"
-                    style={{ width: compact ? 36 : 56, height: compact ? 36 : 56, fontSize: compact ? 16 : 22 }}
-                  >
-                    {obscure ? '👤' : e.nom.slice(0, 1)}
-                  </span>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p
-                    style={{
-                      fontFamily: 'Georgia, serif',
-                      color: '#f5f2e8',
-                      fontSize: compact ? 14 : 20,
-                      fontWeight: 400
-                    }}
-                    className="truncate"
-                  >
-                    {e.nom}
-                  </p>
-                  {e.sous && (
-                    <p
-                      className="italic text-gray-400 truncate"
-                      style={{ fontSize: compact ? 10 : 12 }}
-                    >
-                      {e.sous}
-                    </p>
-                  )}
-                  {e.hp !== null && e.hpMax !== null ? (
-                    <div className="mt-1">
-                      <div className="flex justify-between text-[10px] text-gray-400">
-                        <span>HP</span>
-                        <span>
-                          {e.hp}/{e.hpMax}
-                        </span>
-                      </div>
-                      <div className="h-1.5 bg-gray-900 rounded-full overflow-hidden mt-0.5">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width: `${ratio * 100}%`,
-                            background:
-                              ratio > 0.5
-                                ? '#22c55e'
-                                : ratio > 0.25
-                                ? '#eab308'
-                                : '#ef4444'
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <p
-                      className="italic text-gray-500 mt-0.5"
-                      style={{ fontSize: compact ? 10 : 12 }}
-                    >
-                      ?? / ??
-                    </p>
-                  )}
-                </div>
-              </li>
-            )
-          })}
-        </ul>
+      {entries.length === 0 ? (
+        <p className="presentation-roster-empty">Aucun.</p>
+      ) : (
+        <div className={`presentation-roster-grid${compact ? ' is-compact' : ''}`}>
+          {entries.map((e) => (
+            <PresentationCard
+              key={e.id}
+              entry={e}
+              variant={variant}
+              obscure={obscure}
+              isCurrentTurn={!!currentTurnId && currentTurnId === e.id}
+            />
+          ))}
+        </div>
       )}
       {onAdd && (
         <button
           type="button"
           onClick={onAdd}
-          className="mt-3 w-full px-3 py-2 text-[11px] uppercase tracking-[0.22em] font-bold rounded transition"
-          style={{
-            color: 'var(--theme-accent, #C9A84C)',
-            background: 'color-mix(in srgb, var(--theme-accent, #C9A84C) 8%, transparent)',
-            border: '1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 30%, transparent)'
-          }}
+          className="presentation-roster-add"
         >
           {addLabel ?? '+ Ajouter'}
         </button>
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
+// PresentationCard — carte portrait d'un combattant
+// ----------------------------------------------------------------------------
+// Portrait circulaire, nom serif, barre HP, pastilles de conditions D&D, et
+// états dynamiques : K.O. (grisé), tour en cours (glow doré), HP bas (barre
+// qui clignote), flash rouge/vert sur dégât/soin.
+// ============================================================================
+
+function PresentationCard({
+  entry,
+  variant,
+  obscure,
+  isCurrentTurn
+}: {
+  entry: RosterEntry
+  variant: 'pj' | 'ennemi'
+  obscure: boolean
+  isCurrentTurn: boolean
+}) {
+  const { hp, hpMax } = entry
+  const hpKnown = hp !== null && hpMax !== null
+  const ratio =
+    hpKnown && (hpMax as number) > 0
+      ? Math.max(0, Math.min(1, (hp as number) / (hpMax as number)))
+      : 0
+  const ko = hpKnown && (hp as number) <= 0
+  const low = hpKnown && !ko && ratio <= 0.25
+
+  // Flash dégât / soin : on compare le HP courant au HP précédent.
+  const prevHpRef = useRef<number | null>(hp)
+  const [flash, setFlash] = useState<'dmg' | 'heal' | null>(null)
+  useEffect(() => {
+    const prev = prevHpRef.current
+    prevHpRef.current = hp
+    if (hp === null || prev === null || hp === prev) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFlash(hp < prev ? 'dmg' : 'heal')
+    const timer = setTimeout(() => setFlash(null), 700)
+    return () => clearTimeout(timer)
+  }, [hp])
+
+  // Conditions D&D résolues (icône + libellé), 3 visibles max.
+  const conds = entry.conditions.filter(isConditionKey).map((k) => CONDITIONS_MAP[k])
+  const condsVisibles = conds.slice(0, 3)
+  const condsReste = conds.length - condsVisibles.length
+
+  const initiales =
+    entry.nom.replace(/[^\p{L}\p{N}]/gu, '').slice(0, 2).toUpperCase() || '?'
+
+  const classes = [
+    'presentation-card',
+    `presentation-card-${variant}`,
+    ko ? 'is-ko' : '',
+    isCurrentTurn && !ko ? 'is-turn' : '',
+    low ? 'is-low' : '',
+    flash === 'dmg' ? 'flash-dmg' : '',
+    flash === 'heal' ? 'flash-heal' : ''
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  return (
+    <div className={classes}>
+      <span className="presentation-card-corner tl" aria-hidden="true" />
+      <span className="presentation-card-corner br" aria-hidden="true" />
+      {ko && <span className="presentation-card-ko-badge">K.O.</span>}
+
+      <div className="presentation-card-portrait">
+        {entry.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={entry.image} alt="" loading="lazy" />
+        ) : (
+          <span className="presentation-card-initials">
+            {obscure ? '👤' : initiales}
+          </span>
+        )}
+      </div>
+
+      <p className="presentation-card-name">{entry.nom}</p>
+      {entry.sous && <p className="presentation-card-sub">{entry.sous}</p>}
+
+      {hpKnown ? (
+        <>
+          <div className="presentation-card-hp-track">
+            <div
+              className="presentation-card-hp-fill"
+              style={{ width: `${ratio * 100}%` }}
+            />
+          </div>
+          <p className="presentation-card-hp-text">
+            {hp}/{hpMax} HP
+          </p>
+        </>
+      ) : (
+        <p className="presentation-card-hp-text presentation-card-hp-unknown">
+          ?? / ?? HP
+        </p>
+      )}
+
+      {condsVisibles.length > 0 && (
+        <div className="presentation-card-conditions">
+          {condsVisibles.map((c) => (
+            <span
+              key={c.key}
+              className="presentation-condition-pill"
+              title={`${c.nom} — ${c.description}`}
+            >
+              {c.icone}
+            </span>
+          ))}
+          {condsReste > 0 && (
+            <span
+              className="presentation-condition-pill is-more"
+              title={conds
+                .slice(3)
+                .map((c) => c.nom)
+                .join(', ')}
+            >
+              +{condsReste}
+            </span>
+          )}
+        </div>
       )}
     </div>
   )

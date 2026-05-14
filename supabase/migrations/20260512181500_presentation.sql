@@ -95,8 +95,20 @@ create policy "presentation_etats_delete" on public.presentation_etats
 -- ----------------------------------------------------------------------------
 -- 3. Realtime : la table est publiée pour la synchro temps réel
 -- ----------------------------------------------------------------------------
+-- Idempotent : on n'ajoute la table à la publication que si elle n'y est pas
+-- déjà (sinon erreur « relation is already member of publication »).
 
-alter publication supabase_realtime add table public.presentation_etats;
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'presentation_etats'
+  ) then
+    execute 'alter publication supabase_realtime add table public.presentation_etats';
+  end if;
+end $$;
 
 
 -- ============================================================================

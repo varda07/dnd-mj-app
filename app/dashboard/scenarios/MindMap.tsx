@@ -128,6 +128,22 @@ type MindNode = {
 // Entité liable telle que listée dans la modale de sélection.
 type EntityLite = { id: string; nom: string }
 
+// Roadmap 1.1 — type de chemin d'un lien et son flag « exploré ».
+type TypeChemin = 'principal' | 'alternatif' | 'secret' | 'echec'
+
+const TYPE_CHEMIN_META: Record<
+  TypeChemin,
+  { label: string; hex: string }
+> = {
+  principal: { label: 'Principal', hex: '#eab308' },
+  alternatif: { label: 'Alternatif', hex: '#3b82f6' },
+  secret: { label: 'Secret', hex: '#a855f7' },
+  echec: { label: 'Échec', hex: '#ef4444' }
+}
+
+const isTypeChemin = (v: string | null | undefined): v is TypeChemin =>
+  v === 'principal' || v === 'alternatif' || v === 'secret' || v === 'echec'
+
 type MindLink = {
   id: string
   mindmap_id: string
@@ -136,6 +152,9 @@ type MindLink = {
   label: string | null
   couleur: string | null
   annotation: string | null
+  // Roadmap 1.1 — embranchements visuels.
+  type_chemin: string | null
+  explore: boolean
 }
 
 type Mindmap = {
@@ -346,8 +365,23 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
     | null
   >(null)
   const [linkEditor, setLinkEditor] = useState<
-    | { mode: 'create'; from: string; to: string; couleur: ColorKey; annotation: string }
-    | { mode: 'edit'; link: MindLink; couleur: ColorKey; annotation: string }
+    | {
+        mode: 'create'
+        from: string
+        to: string
+        couleur: ColorKey
+        annotation: string
+        typeChemin: TypeChemin
+        explore: boolean
+      }
+    | {
+        mode: 'edit'
+        link: MindLink
+        couleur: ColorKey
+        annotation: string
+        typeChemin: TypeChemin
+        explore: boolean
+      }
     | null
   >(null)
   const [view, setView] = useState({ x: 0, y: 0, scale: 1 })
@@ -851,8 +885,12 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
       const metaA = resolveNodeMeta(a, customTypes)
       const metaB = resolveNodeMeta(b, customTypes)
       const ck = isColorKey(l.couleur) ? l.couleur : 'auto'
+      // Roadmap 1.1 — un type de chemin « typé » impose sa couleur.
+      const tc = isTypeChemin(l.type_chemin) ? l.type_chemin : 'principal'
       let stroke: string | CanvasGradient
-      if (ck === 'auto') {
+      if (tc !== 'principal') {
+        stroke = TYPE_CHEMIN_META[tc].hex
+      } else if (ck === 'auto') {
         if (metaA.color === metaB.color) {
           stroke = metaA.color
         } else {
@@ -870,8 +908,8 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
         stroke = LINK_COLORS[ck].hex
       }
       ctx.strokeStyle = stroke
-      ctx.lineWidth = 2
-      ctx.globalAlpha = 0.85
+      ctx.lineWidth = l.explore ? 4 : 2
+      ctx.globalAlpha = l.explore ? 1 : 0.85
       ctx.beginPath()
       ctx.moveTo(a.position_x, a.position_y)
       ctx.lineTo(b.position_x, b.position_y)
@@ -985,7 +1023,9 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
         noeud_from: l.noeud_from,
         noeud_to: l.noeud_to,
         couleur: l.couleur,
-        annotation: l.annotation
+        annotation: l.annotation,
+        type_chemin: l.type_chemin,
+        explore: l.explore
       }))
     }
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
@@ -1139,6 +1179,8 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
         noeud_to: string
         couleur: string
         annotation: string
+        type_chemin: string
+        explore: boolean
       }> = []
       for (const raw of data.links ?? []) {
         const from = idMap.get(String(raw.noeud_from))
@@ -1152,7 +1194,11 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
           annotation:
             typeof raw.annotation === 'string'
               ? raw.annotation.slice(0, ANNOTATION_MAX)
-              : ''
+              : '',
+          type_chemin: isTypeChemin(raw.type_chemin as string)
+            ? (raw.type_chemin as string)
+            : 'principal',
+          explore: raw.explore === true
         })
       }
       if (linkPayloads.length > 0) {
@@ -1191,7 +1237,9 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
       from,
       to,
       couleur: 'auto',
-      annotation: ''
+      annotation: '',
+      typeChemin: 'principal',
+      explore: false
     })
   }, [])
 
@@ -1199,6 +1247,8 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
     if (!linkEditor) return
     const couleur = linkEditor.couleur
     const annotation = linkEditor.annotation.slice(0, ANNOTATION_MAX)
+    const type_chemin = linkEditor.typeChemin
+    const explore = linkEditor.explore
     if (linkEditor.mode === 'create') {
       if (!mindmapId) return
       const { data, error } = await supabase
@@ -1208,7 +1258,9 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
           noeud_from: linkEditor.from,
           noeud_to: linkEditor.to,
           couleur,
-          annotation
+          annotation,
+          type_chemin,
+          explore
         })
         .select()
         .single()
@@ -1221,14 +1273,18 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
       const id = linkEditor.link.id
       const { error } = await supabase
         .from('mindmap_liens')
-        .update({ couleur, annotation })
+        .update({ couleur, annotation, type_chemin, explore })
         .eq('id', id)
       if (error) {
         console.error('[mindmap] update lien échec :', error)
         return
       }
       setLinks((ls) =>
-        ls.map((l) => (l.id === id ? { ...l, couleur, annotation } : l))
+        ls.map((l) =>
+          l.id === id
+            ? { ...l, couleur, annotation, type_chemin, explore }
+            : l
+        )
       )
     }
     setLinkEditor(null)
@@ -1239,7 +1295,9 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
       mode: 'edit',
       link,
       couleur: isColorKey(link.couleur) ? link.couleur : 'auto',
-      annotation: link.annotation ?? ''
+      annotation: link.annotation ?? '',
+      typeChemin: isTypeChemin(link.type_chemin) ? link.type_chemin : 'principal',
+      explore: !!link.explore
     })
     setContextMenu(null)
   }
@@ -2279,6 +2337,55 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
                 )}
               </div>
 
+              {/* Roadmap 1.1 — type de chemin (embranchement) */}
+              <div>
+                <label className="text-[11px] uppercase tracking-[0.18em] text-gray-400 block mb-2">
+                  Type de chemin
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(Object.keys(TYPE_CHEMIN_META) as TypeChemin[]).map((tc) => {
+                    const actif = linkEditor.typeChemin === tc
+                    const meta = TYPE_CHEMIN_META[tc]
+                    return (
+                      <button
+                        key={tc}
+                        type="button"
+                        onClick={() =>
+                          setLinkEditor((prev) =>
+                            prev ? { ...prev, typeChemin: tc } : prev
+                          )
+                        }
+                        className={`flex items-center gap-2 px-2 py-1.5 rounded text-sm font-bold border-2 transition ${
+                          actif
+                            ? 'border-yellow-400'
+                            : 'border-gray-700 hover:border-gray-500'
+                        }`}
+                        style={{ color: meta.hex }}
+                      >
+                        <span
+                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: meta.hex }}
+                        />
+                        {meta.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                <label className="flex items-center gap-2 mt-2 text-sm text-gray-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={linkEditor.explore}
+                    onChange={(e) =>
+                      setLinkEditor((prev) =>
+                        prev ? { ...prev, explore: e.target.checked } : prev
+                      )
+                    }
+                    className="accent-yellow-500"
+                  />
+                  Chemin déjà exploré (trait plus épais)
+                </label>
+              </div>
+
               <div>
                 <label className="text-[11px] uppercase tracking-[0.18em] text-gray-400 block mb-1">
                   Annotation (optionnel)
@@ -2782,16 +2889,27 @@ const MindLinkView = memo(function MindLinkView({
   const metaA = resolveNodeMeta(a, customTypes)
   const metaB = resolveNodeMeta(b, customTypes)
   const colorKey = isColorKey(link.couleur) ? link.couleur : 'auto'
+  // Roadmap 1.1 — un type de chemin « typé » (alternatif/secret/échec) impose
+  // sa couleur ; 'principal' (défaut) laisse la logique de couleur habituelle.
+  const typeChemin = isTypeChemin(link.type_chemin) ? link.type_chemin : 'principal'
+  const typeColorOverride =
+    typeChemin !== 'principal' ? TYPE_CHEMIN_META[typeChemin].hex : null
   // Pour le gradient on compare les couleurs résolues plutôt que les types
   // bruts (deux types custom différents = gradient).
   const sameColor = metaA.color === metaB.color
-  const usesGradient = colorKey === 'auto' && !sameColor
+  const usesGradient = !typeColorOverride && colorKey === 'auto' && !sameColor
   let stroke: string
-  if (colorKey === 'auto') {
+  if (typeColorOverride) {
+    stroke = typeColorOverride
+  } else if (colorKey === 'auto') {
     stroke = sameColor ? metaA.color : `url(#mindmap-grad-${link.id})`
   } else {
     stroke = LINK_COLORS[colorKey].hex
   }
+  // Un chemin exploré est tracé plus épais et plus opaque.
+  const explore = !!link.explore
+  const traitLargeur = explore ? 4 : 2
+  const traitOpacite = explore ? 1 : 0.85
   const mx = (a.position_x + b.position_x) / 2
   const my = (a.position_y + b.position_y) / 2
   const annotation = (link.annotation ?? '').trim()
@@ -2834,8 +2952,8 @@ const MindLinkView = memo(function MindLinkView({
         x2={b.position_x}
         y2={b.position_y}
         stroke={stroke}
-        strokeWidth={2}
-        strokeOpacity={0.85}
+        strokeWidth={traitLargeur}
+        strokeOpacity={traitOpacite}
         vectorEffect="non-scaling-stroke"
         style={{ pointerEvents: 'none' }}
       />

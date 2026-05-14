@@ -6,6 +6,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
+import LikeButton from '@/app/components/LikeButton'
+import NotationsScenario from '@/app/components/NotationsScenario'
 
 type Onglet = 'scenarios' | 'personnages' | 'ennemis' | 'items' | 'maps' | 'sorts' | 'pnj'
 
@@ -439,10 +441,18 @@ export default function Communaute() {
     chargerTout()
   }
 
-  const meta = (auteur: string | null, copies: number) => (
+  // Roadmap 9.2 — `meta` reçoit désormais le type+id de l'entité pour afficher
+  // le bouton de like à côté de l'auteur et du compteur de copies.
+  const meta = (
+    entiteType: string,
+    entiteId: string,
+    auteur: string | null,
+    copies: number
+  ) => (
     <div className="flex items-center gap-3 text-[11px] text-gray-400 mt-1 flex-wrap">
       <span>👤 {auteur ?? t('anonymous')}</span>
       <span>📥 {copies} {t('copies')}</span>
+      <LikeButton entiteType={entiteType} entiteId={entiteId} />
     </div>
   )
 
@@ -512,7 +522,8 @@ export default function Communaute() {
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex-1 min-w-0">
                     <h3 className="text-lg font-bold text-white">{s.nom}</h3>
-                    {meta(s.auteur_username, s.nb_copies)}
+                    {meta('scenario', s.id, s.auteur_username, s.nb_copies)}
+                    <NotationsScenario scenarioId={s.id} />
                     {s.description && (
                       <p className="text-gray-400 text-sm mt-2 line-clamp-3">{s.description}</p>
                     )}
@@ -549,7 +560,7 @@ export default function Communaute() {
                     <p className="text-gray-400 text-xs">
                       {[p.race, p.classe, p.niveau ? `Niv. ${p.niveau}` : null].filter(Boolean).join(' · ')}
                     </p>
-                    {meta(p.auteur_username, p.nb_copies)}
+                    {meta('personnage', p.id, p.auteur_username, p.nb_copies)}
                   </div>
                   {boutonCopier(p.id, () => copierPersonnage(p))}
                 </div>
@@ -579,7 +590,7 @@ export default function Communaute() {
                     <p className="text-gray-400 text-xs">
                       ❤️ {e.hp_max ?? '?'} · 🛡️ {e.armure ?? '?'}
                     </p>
-                    {meta(e.auteur_username, e.nb_copies)}
+                    {meta('ennemi', e.id, e.auteur_username, e.nb_copies)}
                     {e.notes && (
                       <p className="text-gray-500 text-xs italic mt-2 line-clamp-2">{e.notes}</p>
                     )}
@@ -612,7 +623,7 @@ export default function Communaute() {
                     <p className="text-gray-400 text-xs">
                       📦 {i.type ?? '?'} · ✨ {i.rarete ?? '?'}
                     </p>
-                    {meta(i.auteur_username, i.nb_copies)}
+                    {meta('item', i.id, i.auteur_username, i.nb_copies)}
                     {i.description && (
                       <p className="text-gray-500 text-xs italic mt-2 line-clamp-2">{i.description}</p>
                     )}
@@ -634,7 +645,7 @@ export default function Communaute() {
                 <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
                   <div>
                     <h3 className="text-lg font-bold text-white break-words">{m.nom}</h3>
-                    {meta(m.auteur_username, m.nb_copies)}
+                    {meta('map', m.id, m.auteur_username, m.nb_copies)}
                   </div>
                   {boutonCopier(m.id, () => copierMap(m))}
                 </div>
@@ -698,7 +709,7 @@ export default function Communaute() {
                       {s.portee && <span>🎯 {s.portee}</span>}
                       {s.duree && <span>⌛ {s.duree}</span>}
                     </div>
-                    {meta(s.auteur_username, s.nb_copies)}
+                    {meta('sort', s.id, s.auteur_username, s.nb_copies)}
                     {s.description && (
                       <p className="text-gray-500 text-xs italic mt-2 line-clamp-3">{s.description}</p>
                     )}
@@ -735,7 +746,7 @@ export default function Communaute() {
                     <p className="text-gray-400 text-xs">
                       {[p.race, p.role].filter(Boolean).join(' · ') || '—'}
                     </p>
-                    {meta(p.auteur_username, p.nb_copies)}
+                    {meta('pnj', p.id, p.auteur_username, p.nb_copies)}
                     {p.description && (
                       <p className="text-gray-500 text-xs italic mt-2 line-clamp-2">{p.description}</p>
                     )}

@@ -23,6 +23,11 @@ import {
   type CategoriePnj,
   type PnjTemplate
 } from '@/app/data/pnj_templates'
+import { CULTURES_NOMS, genererNomPnj, type GenrePnj } from '@/app/data/noms_pnj'
+import {
+  genererPersonnalitePnj,
+  formaterPersonnalitePnj
+} from '@/app/data/personnalites_pnj'
 import StarFavori from '@/app/components/StarFavori'
 import { useFavoris } from '@/app/lib/favoris'
 
@@ -76,6 +81,9 @@ export default function PnjPage() {
   const [cropperKey, setCropperKey] = useState(0)
   const [importerOuvert, setImporterOuvert] = useState(false)
   const [favorisOnly, setFavorisOnly] = useState(false)
+  // Roadmap 2.1 — générateur de noms : culture + genre sélectionnés.
+  const [cultureNom, setCultureNom] = useState('humain')
+  const [genreNom, setGenreNom] = useState<GenrePnj>('n')
   const { est: estFavori } = useFavoris()
   const t = useTranslations('pnj')
   const tc = useTranslations('common')
@@ -283,6 +291,39 @@ export default function PnjPage() {
               onChange={(e) => setNom(e.target.value)}
               className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none"
             />
+            {/* Roadmap 2.1 — générateur de noms PNJ par culture */}
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={cultureNom}
+                onChange={(e) => setCultureNom(e.target.value)}
+                className="flex-1 min-w-[120px] p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm"
+                aria-label="Culture du nom"
+              >
+                {CULTURES_NOMS.map((c) => (
+                  <option key={c.cle} value={c.cle}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={genreNom}
+                onChange={(e) => setGenreNom(e.target.value as GenrePnj)}
+                className="p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm"
+                aria-label="Genre du nom"
+              >
+                <option value="n">Neutre</option>
+                <option value="h">Masculin</option>
+                <option value="f">Féminin</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => setNom(genererNomPnj(cultureNom, genreNom))}
+                className="px-3 py-2 rounded bg-gray-800 border border-yellow-600/50 text-yellow-300 hover:bg-gray-700 text-sm font-bold whitespace-nowrap"
+                title="Générer un nom selon la culture"
+              >
+                🎲 Générer un nom
+              </button>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="text-gray-400 text-sm">{t('race')}</label>
@@ -315,7 +356,22 @@ export default function PnjPage() {
             </div>
 
             <div>
-              <label className="text-gray-400 text-sm">{t('personnalite')}</label>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <label className="text-gray-400 text-sm">{t('personnalite')}</label>
+                {/* Roadmap 2.2 — générateur de personnalité aléatoire */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPersonnalite(
+                      formaterPersonnalitePnj(genererPersonnalitePnj())
+                    )
+                  }
+                  className="px-2 py-1 rounded bg-gray-800 border border-yellow-600/50 text-yellow-300 hover:bg-gray-700 text-xs font-bold"
+                  title="Générer trait / idéal / lien / défaut / manie / motivation / peur"
+                >
+                  🎲 Générer une personnalité
+                </button>
+              </div>
               <textarea
                 placeholder={t('personnalite_ph')}
                 value={personnalite}

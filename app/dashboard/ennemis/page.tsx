@@ -29,6 +29,7 @@ import {
   type TypeMonstre,
   type TailleMonstre
 } from '@/app/data/bestiaire_dnd5e'
+import { genererLoot, formaterLoot, type PalierCR } from '@/app/data/loot_tables'
 
 type Ennemi = {
   id: string
@@ -48,9 +49,110 @@ type Ennemi = {
   public: boolean
   nb_copies: number
   auteur_username: string | null
+  // Roadmap 2.5 — id du monstre d'origine si cet ennemi est une variante.
+  variant_de?: string | null
+  // Roadmap 6.3 — comportement tactique.
+  comportement_tactique?: string
+  // Roadmap 6.4 — combat de masse.
+  est_groupe?: boolean
+  taille_groupe?: number
 }
 
 type ScenarioOption = { id: string; nom: string }
+
+// Roadmap 6.3 — suggestion de comportement tactique selon l'INT du monstre.
+function suggestionTactique(int: number): string {
+  if (int < 6)
+    return 'Attaque la cible la plus proche. Fuit en désordre si grièvement blessé (≤ 25 % PV).'
+  if (int <= 12)
+    return 'Cible la proie la plus faible ou isolée. Se replie de façon coordonnée sous 25 % PV.'
+  return 'Stratégie complexe : vise en priorité les lanceurs de sorts et les soigneurs, exploite le terrain et les couverts, garde une porte de sortie.'
+}
+
+// Roadmap 2.5 — archétypes de variante : modifient les stats du monstre source.
+type VariantArchetype = {
+  cle: string
+  label: string
+  desc: string
+  appliquer: (e: Ennemi) => {
+    hp: number
+    armure: number
+    force: number
+    dexterite: number
+    constitution: number
+    intelligence: number
+    sagesse: number
+    charisme: number
+    note: string
+  }
+}
+
+const VARIANT_ARCHETYPES: VariantArchetype[] = [
+  {
+    cle: 'chef',
+    label: '👑 Chef',
+    desc: '+25 % HP · attaque supplémentaire',
+    appliquer: (e) => ({
+      hp: Math.round(e.hp_max * 1.25),
+      armure: e.armure,
+      force: e.force,
+      dexterite: e.dexterite,
+      constitution: e.constitution,
+      intelligence: e.intelligence,
+      sagesse: e.sagesse,
+      charisme: e.charisme,
+      note: '— Variante Chef — Attaque supplémentaire (Multiattaque), commande les sbires.'
+    })
+  },
+  {
+    cle: 'elite',
+    label: '⭐ Élite',
+    desc: '+25 % HP · +2 armure · +2 à toutes les stats',
+    appliquer: (e) => ({
+      hp: Math.round(e.hp_max * 1.25),
+      armure: e.armure + 2,
+      force: e.force + 2,
+      dexterite: e.dexterite + 2,
+      constitution: e.constitution + 2,
+      intelligence: e.intelligence + 2,
+      sagesse: e.sagesse + 2,
+      charisme: e.charisme + 2,
+      note: '— Variante Élite — Combattant aguerri, toutes les stats renforcées.'
+    })
+  },
+  {
+    cle: 'mage',
+    label: '🔮 Mage',
+    desc: '+3 INT · sorts de niveau 1 à 3',
+    appliquer: (e) => ({
+      hp: e.hp_max,
+      armure: e.armure,
+      force: e.force,
+      dexterite: e.dexterite,
+      constitution: e.constitution,
+      intelligence: e.intelligence + 3,
+      sagesse: e.sagesse,
+      charisme: e.charisme,
+      note: '— Variante Mage — Connaît des sorts de niveau 1 à 3 (à détailler).'
+    })
+  },
+  {
+    cle: 'ancien',
+    label: '🐉 Ancien',
+    desc: '+50 % HP · +2 armure · +3 à toutes les stats · sorts puissants',
+    appliquer: (e) => ({
+      hp: Math.round(e.hp_max * 1.5),
+      armure: e.armure + 2,
+      force: e.force + 3,
+      dexterite: e.dexterite + 3,
+      constitution: e.constitution + 3,
+      intelligence: e.intelligence + 3,
+      sagesse: e.sagesse + 3,
+      charisme: e.charisme + 3,
+      note: '— Variante Ancien — Créature légendaire, sorts de haut niveau.'
+    })
+  }
+]
 
 export default function Ennemis() {
   const router = useRouter()
@@ -65,6 +167,11 @@ export default function Ennemis() {
   const [sagesse, setSagesse] = useState('10')
   const [charisme, setCharisme] = useState('10')
   const [notes, setNotes] = useState('')
+  // Roadmap 6.3 — comportement tactique (texte libre + suggestion selon INT).
+  const [comportementTactique, setComportementTactique] = useState('')
+  // Roadmap 6.4 — combat de masse : ennemi représentant un groupe d'unités.
+  const [estGroupe, setEstGroupe] = useState(false)
+  const [tailleGroupe, setTailleGroupe] = useState('1')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -75,6 +182,61 @@ export default function Ennemis() {
   const [cropperKey, setCropperKey] = useState(0)
   const [bestiaireOuvert, setBestiaireOuvert] = useState(false)
   const [favorisOnly, setFavorisOnly] = useState(false)
+  // Roadmap 2.3 — palier de CR choisi pour le générateur de loot.
+  const [lootPalier, setLootPalier] = useState<PalierCR>('cr_0_4')
+  // Roadmap 2.4 — vue compacte / détaillée des fiches ennemi (localStorage).
+  const [vueCompacte, setVueCompacte] = useState(false)
+  // Roadmap 2.5 — id du monstre source quand on crée une variante.
+  const [variantDe, setVariantDe] = useState<string | null>(null)
+  const [variantSource, setVariantSource] = useState<Ennemi | null>(null)
+
+  // Restaure la préférence de vue compacte/détaillée.
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setVueCompacte(window.localStorage.getItem('ennemis_vue_compacte') === '1')
+    } catch {
+      /* localStorage indisponible : on garde la vue détaillée par défaut */
+    }
+  }, [])
+
+  const togglerVue = () => {
+    setVueCompacte((v) => {
+      const next = !v
+      try {
+        window.localStorage.setItem('ennemis_vue_compacte', next ? '1' : '0')
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+  }
+
+  // Pré-remplit le formulaire avec une variante du monstre source.
+  const creerVariante = (ennemi: Ennemi, archetype: VariantArchetype) => {
+    const m = archetype.appliquer(ennemi)
+    setEditingId(null)
+    setVariantDe(ennemi.id)
+    setNom(`${ennemi.nom} (${archetype.label.replace(/^\S+\s/, '')})`)
+    setHp(String(m.hp))
+    setArmure(String(m.armure))
+    setForce(String(m.force))
+    setDexterite(String(m.dexterite))
+    setConstitution(String(m.constitution))
+    setIntelligence(String(m.intelligence))
+    setSagesse(String(m.sagesse))
+    setCharisme(String(m.charisme))
+    setNotes(
+      ennemi.notes ? `${ennemi.notes.trimEnd()}\n\n${m.note}` : m.note
+    )
+    setScenarioId(ennemi.scenario_id ?? '')
+    setFile(null)
+    setImageActuelle(ennemi.image_url ?? '')
+    setCropperKey((k) => k + 1)
+    setVariantSource(null)
+    setMessage('')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
   const { est: estFavori } = useFavoris()
   const t = useTranslations('enemies')
   const tc = useTranslations('common')
@@ -107,15 +269,20 @@ export default function Ennemis() {
     setSagesse('10')
     setCharisme('10')
     setNotes('')
+    setComportementTactique('')
+    setEstGroupe(false)
+    setTailleGroupe('1')
     setEditingId(null)
     setScenarioId('')
     setFile(null)
     setImageActuelle('')
     setCropperKey((k) => k + 1)
+    setVariantDe(null)
   }
 
   const commencerEdition = (ennemi: Ennemi) => {
     setEditingId(ennemi.id)
+    setVariantDe(null)
     setNom(ennemi.nom)
     setHp(String(ennemi.hp_max))
     setArmure(String(ennemi.armure))
@@ -126,6 +293,9 @@ export default function Ennemis() {
     setSagesse(String(ennemi.sagesse))
     setCharisme(String(ennemi.charisme))
     setNotes(ennemi.notes ?? '')
+    setComportementTactique(ennemi.comportement_tactique ?? '')
+    setEstGroupe(!!ennemi.est_groupe)
+    setTailleGroupe(String(ennemi.taille_groupe ?? 1))
     setScenarioId(ennemi.scenario_id ?? '')
     setFile(null)
     setImageActuelle(ennemi.image_url ?? '')
@@ -175,6 +345,9 @@ export default function Ennemis() {
       sagesse: parseInt(sagesse),
       charisme: parseInt(charisme),
       notes,
+      comportement_tactique: comportementTactique,
+      est_groupe: estGroupe,
+      taille_groupe: estGroupe ? Math.max(1, parseInt(tailleGroupe) || 1) : 1,
       scenario_id: scenarioId || null,
       image_url: imageUrl
     }
@@ -191,7 +364,8 @@ export default function Ennemis() {
       const { error } = await supabase.from('ennemis').insert({
         ...payload,
         hp_actuel: parseInt(hp),
-        mj_id: user?.id
+        mj_id: user?.id,
+        variant_de: variantDe
       })
       if (error) setMessage(error.message)
       else {
@@ -317,6 +491,92 @@ export default function Ennemis() {
               </div>
             </div>
             <textarea placeholder={t('notes_ph')} value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none h-24" />
+            {/* Roadmap 2.3 — générateur de loot par palier de CR (résultat
+                ajouté aux notes de l'ennemi). */}
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={lootPalier}
+                onChange={(e) => setLootPalier(e.target.value as PalierCR)}
+                className="flex-1 min-w-[140px] p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm"
+                aria-label="Palier de CR pour le loot"
+              >
+                <option value="cr_0_4">CR 0–4</option>
+                <option value="cr_5_10">CR 5–10</option>
+                <option value="cr_11_16">CR 11–16</option>
+                <option value="cr_17_plus">CR 17+</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => {
+                  const loot = formaterLoot(genererLoot(lootPalier))
+                  setNotes((n) =>
+                    n.trim()
+                      ? `${n.trimEnd()}\n\n— Butin généré —\n${loot}`
+                      : `— Butin généré —\n${loot}`
+                  )
+                }}
+                className="px-3 py-2 rounded bg-gray-800 border border-yellow-600/50 text-yellow-300 hover:bg-gray-700 text-sm font-bold whitespace-nowrap"
+                title="Générer un butin et l'ajouter aux notes"
+              >
+                🎲 Générer le loot
+              </button>
+            </div>
+            {/* Roadmap 6.3 — comportement tactique + suggestion selon l'INT. */}
+            <div className="rounded border border-gray-700 bg-gray-900/40 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-sm font-bold text-yellow-300">
+                  🧠 Comportement tactique
+                </label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setComportementTactique(
+                      suggestionTactique(parseInt(intelligence) || 10)
+                    )
+                  }
+                  className="px-2 py-1 rounded bg-gray-800 border border-yellow-600/50 text-yellow-300 hover:bg-gray-700 text-xs font-bold"
+                  title="Suggérer un comportement selon l'Intelligence du monstre"
+                >
+                  💡 Suggérer (INT {intelligence})
+                </button>
+              </div>
+              <textarea
+                value={comportementTactique}
+                onChange={(e) => setComportementTactique(e.target.value)}
+                placeholder="Comment ce monstre se bat, ses priorités de cible, sa condition de fuite…"
+                className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm h-20"
+              />
+            </div>
+
+            {/* Roadmap 6.4 — combat de masse. */}
+            <div className="rounded border border-gray-700 bg-gray-900/40 p-3 space-y-2">
+              <label className="flex items-center gap-2 text-sm font-bold text-yellow-300 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={estGroupe}
+                  onChange={(e) => setEstGroupe(e.target.checked)}
+                  className="accent-yellow-500"
+                />
+                👥 Combat de masse (groupe d&apos;unités identiques)
+              </label>
+              {estGroupe && (
+                <div className="flex items-center gap-2">
+                  <label className="text-gray-400 text-xs">Nombre d&apos;unités</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={tailleGroupe}
+                    onChange={(e) => setTailleGroupe(e.target.value)}
+                    className="w-24 p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm"
+                  />
+                  <span className="text-[11px] text-gray-500">
+                    PV agrégés : {(parseInt(hp) || 0) * (parseInt(tailleGroupe) || 1)} ·
+                    initiative et fiche uniques pour tout le groupe
+                  </span>
+                </div>
+              )}
+            </div>
+
             <ImageCropper
               key={cropperKey}
               inputId="ennemi-file"
@@ -359,15 +619,26 @@ export default function Ennemis() {
             </div>
           </div>
           {ennemis.length === 0 && <p className="text-gray-400">{t('empty')}</p>}
-          <label className="inline-flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={favorisOnly}
-              onChange={(e) => setFavorisOnly(e.target.checked)}
-              className="accent-yellow-500"
-            />
-            ⭐ Afficher uniquement les favoris
-          </label>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <label className="inline-flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={favorisOnly}
+                onChange={(e) => setFavorisOnly(e.target.checked)}
+                className="accent-yellow-500"
+              />
+              ⭐ Afficher uniquement les favoris
+            </label>
+            {/* Roadmap 2.4 — bascule vue compacte / détaillée */}
+            <button
+              type="button"
+              onClick={togglerVue}
+              className="px-3 py-1 rounded border border-gray-700 text-gray-300 hover:border-yellow-600 hover:text-yellow-300 text-xs font-bold transition"
+              title="Basculer entre vue compacte (combat) et détaillée"
+            >
+              {vueCompacte ? '🔎 Vue détaillée' : '📋 Vue compacte'}
+            </button>
+          </div>
           {ennemis
             .filter((e) => !favorisOnly || estFavori('ennemis', e.id))
             .map((ennemi) => (
@@ -396,6 +667,15 @@ export default function Ennemis() {
                       >
                         {ennemi.public ? `🌍 Public (${ennemi.nb_copies})` : '🔒 Privé'}
                       </button>
+                      {/* Roadmap 2.5 — créer une variante de ce monstre */}
+                      <button
+                        type="button"
+                        onClick={() => setVariantSource(ennemi)}
+                        className="text-purple-300 hover:text-purple-200 text-sm"
+                        title="Créer une variante (Chef, Élite, Mage, Ancien)"
+                      >
+                        ⎘ Variante
+                      </button>
                       <button type="button" onClick={() => commencerEdition(ennemi)} className="text-blue-400 text-sm">
                         {tc('modify')}
                       </button>
@@ -412,17 +692,64 @@ export default function Ennemis() {
                       </button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-sm text-gray-400">
-                    <span>❤️ HP: {ennemi.hp_actuel}/{ennemi.hp_max}</span>
-                    <span>🛡️ Armure: {ennemi.armure}</span>
-                    <span>💪 Force: {ennemi.force}</span>
-                    <span>🏃 Dex: {ennemi.dexterite}</span>
-                    <span>🫀 Con: {ennemi.constitution}</span>
-                    <span>🧠 Int: {ennemi.intelligence}</span>
-                    <span>🙏 Sag: {ennemi.sagesse}</span>
-                    <span>✨ Cha: {ennemi.charisme}</span>
-                  </div>
-                  {ennemi.notes && <p className="text-gray-500 text-sm mt-2 italic">{ennemi.notes}</p>}
+                  {/* Roadmap 2.5 — badge si cet ennemi est une variante */}
+                  {ennemi.variant_de && (
+                    <p className="text-[11px] text-purple-300/80 italic mb-1">
+                      ↳ variante de{' '}
+                      {ennemis.find((e) => e.id === ennemi.variant_de)?.nom ??
+                        'un monstre supprimé'}
+                    </p>
+                  )}
+                  {/* Roadmap 2.4 — vue compacte (combat) vs détaillée */}
+                  {vueCompacte ? (
+                    <div className="flex gap-4 text-sm text-gray-300">
+                      <span>❤️ HP: {ennemi.hp_actuel}/{ennemi.hp_max}</span>
+                      <span>🛡️ Armure: {ennemi.armure}</span>
+                      <span className="text-gray-600 italic">
+                        … détails masqués
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-3 gap-2 text-sm text-gray-400">
+                        <span>❤️ HP: {ennemi.hp_actuel}/{ennemi.hp_max}</span>
+                        <span>🛡️ Armure: {ennemi.armure}</span>
+                        <span>💪 Force: {ennemi.force}</span>
+                        <span>🏃 Dex: {ennemi.dexterite}</span>
+                        <span>🫀 Con: {ennemi.constitution}</span>
+                        <span>🧠 Int: {ennemi.intelligence}</span>
+                        <span>🙏 Sag: {ennemi.sagesse}</span>
+                        <span>✨ Cha: {ennemi.charisme}</span>
+                      </div>
+                      {ennemi.est_groupe && (ennemi.taille_groupe ?? 1) > 1 && (
+                        <p className="text-sm mt-2">
+                          <span
+                            className="inline-block px-2 py-0.5 rounded-full text-xs font-bold"
+                            style={{
+                              background: 'rgba(248,113,113,0.15)',
+                              color: '#f87171',
+                              border: '1px solid rgba(248,113,113,0.3)'
+                            }}
+                          >
+                            👥 Groupe — {ennemi.taille_groupe} unités · PV agrégés{' '}
+                            {ennemi.hp_actuel * (ennemi.taille_groupe ?? 1)}/
+                            {ennemi.hp_max * (ennemi.taille_groupe ?? 1)}
+                          </span>
+                        </p>
+                      )}
+                      {ennemi.comportement_tactique && (
+                        <p className="text-sm mt-2 text-yellow-200/80 whitespace-pre-wrap">
+                          🧠 <span className="text-gray-400">Tactique :</span>{' '}
+                          {ennemi.comportement_tactique}
+                        </p>
+                      )}
+                      {ennemi.notes && (
+                        <p className="text-gray-500 text-sm mt-2 italic whitespace-pre-wrap">
+                          {ennemi.notes}
+                        </p>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -438,6 +765,51 @@ export default function Ennemis() {
             fetchEnnemis()
           }}
         />
+      )}
+
+      {/* Roadmap 2.5 — choix de l'archétype de variante */}
+      {variantSource && (
+        <div
+          className="fixed inset-0 z-[120] bg-black/70 flex items-center justify-center p-4"
+          onClick={() => setVariantSource(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Créer une variante"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-gray-800 border-2 border-yellow-600 rounded-lg shadow-2xl w-full max-w-md p-4 space-y-3"
+          >
+            <h3 className="text-yellow-500 font-bold">
+              ⎘ Variante de « {variantSource.nom} »
+            </h3>
+            <p className="text-gray-400 text-xs">
+              Choisis un archétype : le formulaire sera pré-rempli avec les stats
+              du monstre, modifiées en conséquence. Tu pourras tout ajuster avant
+              d&apos;enregistrer.
+            </p>
+            <div className="space-y-2">
+              {VARIANT_ARCHETYPES.map((a) => (
+                <button
+                  key={a.cle}
+                  type="button"
+                  onClick={() => creerVariante(variantSource, a)}
+                  className="w-full text-left p-3 rounded border border-gray-700 hover:border-yellow-500 hover:bg-yellow-500/[0.06] transition"
+                >
+                  <p className="text-sm font-bold text-gray-100">{a.label}</p>
+                  <p className="text-[11px] text-gray-400">{a.desc}</p>
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setVariantSource(null)}
+              className="w-full p-2 bg-gray-700 text-white rounded hover:bg-gray-600 text-sm"
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
       )}
     </main>
   )
