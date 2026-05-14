@@ -308,7 +308,7 @@ export default function Scenarios() {
           <button type="button" onClick={() => router.back()} className="text-gray-400 hover:text-white">
             {tc('back')}
           </button>
-          <h1 className="text-2xl font-bold text-yellow-500">{t('title')}</h1>
+          <h1 className="text-2xl grim-title">{t('title')}</h1>
         </div>
         <div className="flex bg-gray-800 rounded-lg p-1 mb-6 w-fit">
           <button
@@ -334,8 +334,8 @@ export default function Scenarios() {
           <MindMap scenarios={scenarios.map((s) => ({ id: s.id, nom: s.nom }))} />
         ) : (
         <>
-        <div className="bg-gray-800 p-6 rounded-lg mb-6">
-          <h2 className="text-lg font-bold text-yellow-500 mb-4">{editingId ? t('edit_title') : t('create_title')}</h2>
+        <div className="grim-card p-6 mb-6">
+          <h2 className="text-lg grim-h2 mb-4">{editingId ? t('edit_title') : t('create_title')}</h2>
           <div className="space-y-3">
             <input type="text" placeholder={t('scenario_name_ph')} value={nom} onChange={(e) => setNom(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
             <textarea placeholder={tc('description')} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none h-24" />
@@ -354,8 +354,8 @@ export default function Scenarios() {
           </div>
         </div>
 
-        <div className="bg-gray-800 p-4 rounded-lg mb-6">
-          <h2 className="text-lg font-bold text-yellow-500 mb-2">{t('add_player_title')}</h2>
+        <div className="grim-card p-4 mb-6">
+          <h2 className="text-lg grim-h2 mb-2">{t('add_player_title')}</h2>
           <p className="text-gray-400 text-sm mb-3">
             {t('add_player_desc')}
           </p>
@@ -390,7 +390,7 @@ export default function Scenarios() {
 
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <h2 className="text-lg font-bold text-yellow-500">{t('my_scenarios')}</h2>
+            <h2 className="text-lg grim-h2">{t('my_scenarios')}</h2>
             <button
               type="button"
               onClick={importerScenario}
@@ -412,7 +412,7 @@ export default function Scenarios() {
           {scenarios
             .filter((s) => !favorisOnly || estFavori('scenarios', s.id))
             .map((scenario) => (
-            <div key={scenario.id} className="bg-gray-800 p-4 rounded-lg">
+            <div key={scenario.id} className="grim-card grim-card-hover p-4">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-3 flex-wrap min-w-0">
                   <StarFavori type="scenarios" id={scenario.id} />

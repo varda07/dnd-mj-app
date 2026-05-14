@@ -191,7 +191,7 @@ export default function CustomThemesPage() {
           >
             ← Retour
           </button>
-          <h1 className="text-2xl font-bold text-yellow-500">Thème personnalisé</h1>
+          <h1 className="text-2xl grim-title">Thème personnalisé</h1>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-4">

@@ -276,11 +276,11 @@ export default function PnjPage() {
           <button type="button" onClick={() => router.back()} className="text-gray-400 hover:text-white">
             {tc('back')}
           </button>
-          <h1 className="text-2xl font-bold text-yellow-500">{t('title')}</h1>
+          <h1 className="text-2xl grim-title">{t('title')}</h1>
         </div>
 
-        <div className="bg-gray-800 p-6 rounded-lg mb-6">
-          <h2 className="text-lg font-bold text-yellow-500 mb-4">
+        <div className="grim-card p-6 mb-6">
+          <h2 className="text-lg grim-h2 mb-4">
             {editingId ? t('edit_title') : t('create_title')}
           </h2>
           <div className="space-y-3">
@@ -477,7 +477,7 @@ export default function PnjPage() {
 
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <h2 className="text-lg font-bold text-yellow-500">{t('my_pnj')}</h2>
+            <h2 className="text-lg grim-h2">{t('my_pnj')}</h2>
             <div className="flex items-center gap-2 flex-wrap">
               <button
                 type="button"
@@ -508,7 +508,7 @@ export default function PnjPage() {
           {pnjs
             .filter((p) => !favorisOnly || estFavori('pnj', p.id))
             .map((p) => (
-            <div key={p.id} className="bg-gray-800 p-4 rounded-lg">
+            <div key={p.id} className="grim-card grim-card-hover p-4">
               <div className="flex gap-4">
                 {p.image_url ? (
                   <img

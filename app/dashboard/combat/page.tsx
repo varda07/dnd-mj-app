@@ -1442,7 +1442,7 @@ function CombatInner() {
           >
             {tc('back')}
           </button>
-          <h1 className="text-2xl font-bold text-yellow-500">{tCombat('title')}</h1>
+          <h1 className="text-2xl grim-title">{tCombat('title')}</h1>
           {/* Roadmap 2.6 — accès au calculateur de rencontre */}
           <button
             type="button"
@@ -1453,7 +1453,7 @@ function CombatInner() {
           </button>
         </div>
 
-        <div className="bg-gray-800 p-4 rounded-lg mb-4">
+        <div className="grim-card p-4 mb-4">
           <label className="text-gray-400 text-sm">{tCombat('scenario_active')}</label>
           {scenarios.length === 0 ? (
             <div className="mt-2 p-3 rounded border border-red-500 bg-red-900/30 text-red-200 text-sm">
@@ -1477,8 +1477,8 @@ function CombatInner() {
         </div>
 
         {scenarioId && !combatDemarre && (
-          <div className="bg-gray-800 p-4 rounded-lg mb-4">
-            <h2 className="text-lg font-bold text-yellow-500 mb-3">{tCombat('selection_title')}</h2>
+          <div className="grim-card p-4 mb-4">
+            <h2 className="text-lg grim-h2 mb-3">{tCombat('selection_title')}</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
@@ -1611,10 +1611,10 @@ function CombatInner() {
 
         {combatDemarre && (
           <div className="space-y-4">
-              <div className="bg-gray-800 p-4 rounded-lg">
+              <div className="grim-card p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-3 flex-wrap">
-                    <h2 className="text-lg font-bold text-yellow-500">{tCombat('initiative')}</h2>
+                    <h2 className="text-lg grim-h2">{tCombat('initiative')}</h2>
                     {ordreSauvegarde.length > 0 && (
                       <>
                         <span className="text-2xl font-black text-yellow-400 leading-none">
@@ -2052,9 +2052,9 @@ function CombatInner() {
                 onToggleSortDispo={toggleSortDispo}
               />
 
-              <div className="bg-gray-800 p-4 rounded-lg">
+              <div className="grim-card p-4">
                 <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                  <h2 className="text-lg font-bold text-yellow-500">{tCombat('grid_title')}</h2>
+                  <h2 className="text-lg grim-h2">{tCombat('grid_title')}</h2>
                   <span className="text-gray-400 text-xs">{tCombat('grid_legend')}</span>
                 </div>
 
@@ -2227,7 +2227,7 @@ function CombatInner() {
                 </div>
               </div>
 
-              <div className="bg-gray-800 p-4 rounded-lg">
+              <div className="grim-card p-4">
                 <h2 className="text-lg font-bold text-yellow-500 mb-3">{tCombat('rewards')}</h2>
                 {items.length === 0 ? (
                   <p className="text-gray-400 text-sm">

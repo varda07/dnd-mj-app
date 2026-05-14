@@ -577,11 +577,11 @@ export default function Sorts() {
           <button type="button" onClick={() => router.back()} className="text-gray-400 hover:text-white text-sm">
             ← {tc('back')}
           </button>
-          <h1 className="text-xl md:text-2xl font-bold text-yellow-500 tracking-wider">{ts('title')}</h1>
+          <h1 className="text-xl md:text-2xl grim-title">{ts('title')}</h1>
         </div>
 
         {/* Bloc création/édition : aperçu live + formulaire */}
-        <div className="bg-gray-800 rounded-lg mb-8 overflow-hidden">
+        <div className="grim-card mb-8 overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-700 flex items-center justify-between">
             <h2 className="text-[13px] tracking-[0.18em] uppercase text-yellow-500">
               {editingId ? ts('edit_title') : ts('create_title')}

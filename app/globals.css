@@ -1631,6 +1631,203 @@ html[data-theme="eclipsed"] ::-webkit-scrollbar-thumb:hover {
 }
 
 
+/* ============================================================================
+   Interface Joueur — habillage grimoire (vue « Joueur » du dashboard)
+   ========================================================================== */
+.joueur-screen {
+  background:
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--theme-accent, #C9A84C) 10%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 130%, rgba(120, 30, 40, 0.16) 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 100%, rgba(74, 26, 92, 0.16) 0%, transparent 58%),
+    #050608;
+  border: 1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 12%, transparent);
+  border-radius: 12px;
+  padding: 26px 18px 30px;
+}
+@media (min-width: 768px) {
+  .joueur-screen { padding: 36px 32px; }
+}
+
+/* Titre de section « INTERFACE JOUEUR » — serif or, bien visible */
+.joueur-title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 300;
+  font-size: 21px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--theme-accent, #C9A84C);
+  margin: 0 0 6px;
+  text-shadow:
+    0 0 16px color-mix(in srgb, var(--theme-accent, #C9A84C) 32%, transparent),
+    0 0 32px color-mix(in srgb, var(--theme-accent, #C9A84C) 14%, transparent);
+}
+@media (min-width: 768px) {
+  .joueur-title { font-size: 27px; letter-spacing: 0.30em; }
+}
+
+.joueur-subtitle {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--theme-text-secondary, #8a8276) 80%, var(--theme-accent, #C9A84C));
+  margin: 0 0 4px;
+}
+
+/* Séparateur fin or à 10 % */
+.joueur-divider {
+  height: 1px;
+  margin: 20px 0;
+  background: color-mix(in srgb, var(--theme-accent, #C9A84C) 10%, transparent);
+}
+
+/* Carte joueur — fond gradient sombre, filet gauche or, padding généreux */
+.joueur-card {
+  position: relative;
+  background: linear-gradient(135deg, rgba(20, 15, 8, 0.6) 0%, rgba(10, 8, 4, 0.4) 100%);
+  border: 1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 12%, transparent);
+  border-left: 2px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 45%, transparent);
+  border-radius: 8px;
+  padding: 18px 20px;
+  transition: border-color 0.2s var(--codex-ease),
+              transform 0.2s var(--codex-ease),
+              box-shadow 0.2s var(--codex-ease);
+}
+.joueur-card-interactive { cursor: pointer; }
+.joueur-card-interactive:hover {
+  border-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 30%, transparent);
+  border-left-color: var(--theme-accent, #C9A84C);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--theme-accent, #C9A84C) 12%, transparent);
+  transform: translateY(-1px);
+}
+.joueur-card-interactive:active {
+  transform: translateY(0) scale(0.997);
+  transition-duration: 80ms;
+}
+
+.joueur-card-title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  color: var(--theme-accent, #C9A84C);
+  margin: 0;
+}
+@media (min-width: 768px) {
+  .joueur-card-title { font-size: 17px; }
+}
+.joueur-card-desc {
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.55;
+  color: var(--theme-text-secondary, #8a8276);
+  margin: 7px 0 0;
+}
+
+/* Bouton « Explorer » — filet or fin, fond transparent, hover doré */
+.joueur-btn-explore {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 7px 14px;
+  border-radius: 4px;
+  background: transparent;
+  color: color-mix(in srgb, var(--theme-accent, #C9A84C) 90%, transparent);
+  border: 1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 28%, transparent);
+  transition: border-color 0.18s var(--codex-ease),
+              background 0.18s var(--codex-ease),
+              color 0.18s var(--codex-ease);
+  cursor: pointer;
+}
+.joueur-btn-explore:hover {
+  background: color-mix(in srgb, var(--theme-accent, #C9A84C) 8%, transparent);
+  border-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 55%, transparent);
+  color: var(--theme-accent, #C9A84C);
+}
+
+/* Bouton « Quitter » — rouge tempéré, même grammaire que le bouton Explorer */
+.joueur-btn-leave {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 7px 14px;
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(216, 110, 100, 0.85);
+  border: 1px solid rgba(170, 60, 52, 0.42);
+  transition: border-color 0.18s var(--codex-ease),
+              background 0.18s var(--codex-ease),
+              color 0.18s var(--codex-ease);
+  cursor: pointer;
+}
+.joueur-btn-leave:hover {
+  background: rgba(150, 42, 36, 0.16);
+  border-color: rgba(200, 78, 68, 0.7);
+  color: rgba(238, 138, 128, 1);
+}
+
+
+/* ============================================================================
+   Grimoire — classes utilitaires de restyling appliquées aux pages CRUD
+   ========================================================================== */
+/* Titre de page : serif or, letter-spacing large */
+.grim-title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 300;
+  letter-spacing: 0.16em;
+  color: var(--theme-accent, #C9A84C);
+  text-shadow: 0 0 16px color-mix(in srgb, var(--theme-accent, #C9A84C) 28%, transparent);
+}
+/* Sous-titre / titre de section : serif or */
+.grim-h2 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+  letter-spacing: 0.10em;
+  color: var(--theme-accent, #C9A84C);
+}
+/* Carte grimoire : gradient sombre + filet gauche or */
+.grim-card {
+  position: relative;
+  background: linear-gradient(135deg, rgba(20, 15, 8, 0.6) 0%, rgba(10, 8, 4, 0.4) 100%);
+  border: 1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 12%, transparent);
+  border-left: 2px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 45%, transparent);
+  border-radius: 8px;
+  transition: border-color 0.2s var(--codex-ease),
+              box-shadow 0.2s var(--codex-ease),
+              transform 0.2s var(--codex-ease);
+}
+/* Variante interactive (cartes cliquables) */
+.grim-card-hover { cursor: pointer; }
+.grim-card-hover:hover {
+  border-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 30%, transparent);
+  border-left-color: var(--theme-accent, #C9A84C);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--theme-accent, #C9A84C) 10%, transparent);
+  transform: translateY(-1px);
+}
+/* Bouton grimoire : filet or fin, transparent, hover doré */
+.grim-btn {
+  background: transparent;
+  color: color-mix(in srgb, var(--theme-accent, #C9A84C) 90%, transparent);
+  border: 1px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 28%, transparent);
+  transition: border-color 0.18s var(--codex-ease),
+              background 0.18s var(--codex-ease),
+              color 0.18s var(--codex-ease);
+}
+.grim-btn:hover {
+  background: color-mix(in srgb, var(--theme-accent, #C9A84C) 8%, transparent);
+  border-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 55%, transparent);
+  color: var(--theme-accent, #C9A84C);
+}
+/* Ornement diamant */
+.grim-diamond {
+  color: color-mix(in srgb, var(--theme-accent, #C9A84C) 55%, transparent);
+  font-size: 10px;
+  line-height: 1;
+}
+
+
 /* === Mode Aventure : sélecteur de scénario + grille de cartes d'activité === */
 .grimoire-aventure-picker {
   display: flex;

@@ -421,10 +421,10 @@ export default function Bibliotheque() {
           >
             {tc('back')}
           </button>
-          <h1 className="text-2xl font-bold text-yellow-500">{t('title')}</h1>
+          <h1 className="text-2xl grim-title">{t('title')}</h1>
         </div>
 
-        <div className="bg-gray-800 p-4 rounded-lg mb-4">
+        <div className="grim-card p-4 mb-4">
           <div className="relative">
             <span
               className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg"
@@ -508,7 +508,7 @@ export default function Bibliotheque() {
           <div className="space-y-3">
             {onglet === 'scenarios' && (
               scenariosFiltres.length === 0 ? vide : scenariosFiltres.map((s) => (
-                <div key={s.id} className="bg-gray-800 p-4 rounded-lg flex gap-4">
+                <div key={s.id} className="grim-card grim-card-hover p-4 flex gap-4">
                   {s.bg_image_url ? (
                     <img
                       src={s.bg_image_url}
@@ -533,7 +533,7 @@ export default function Bibliotheque() {
 
             {onglet === 'personnages' && (
               personnagesFiltres.length === 0 ? vide : personnagesFiltres.map((p) => (
-                <div key={p.id} className="bg-gray-800 p-4 rounded-lg flex gap-4">
+                <div key={p.id} className="grim-card grim-card-hover p-4 flex gap-4">
                   {p.image_url ? (
                     <img
                       src={p.image_url}
@@ -563,7 +563,7 @@ export default function Bibliotheque() {
 
             {onglet === 'ennemis' && (
               ennemisFiltres.length === 0 ? vide : ennemisFiltres.map((e) => (
-                <div key={e.id} className="bg-gray-800 p-4 rounded-lg flex gap-4">
+                <div key={e.id} className="grim-card grim-card-hover p-4 flex gap-4">
                   {e.image_url ? (
                     <img
                       src={e.image_url}
@@ -592,7 +592,7 @@ export default function Bibliotheque() {
 
             {onglet === 'items' && (
               itemsFiltres.length === 0 ? vide : itemsFiltres.map((i) => (
-                <div key={i.id} className="bg-gray-800 p-4 rounded-lg flex gap-4">
+                <div key={i.id} className="grim-card grim-card-hover p-4 flex gap-4">
                   {i.image_url ? (
                     <img
                       src={i.image_url}
@@ -622,7 +622,7 @@ export default function Bibliotheque() {
 
             {onglet === 'maps' && (
               mapsFiltres.length === 0 ? vide : mapsFiltres.map((m) => (
-                <div key={m.id} className="bg-gray-800 p-4 rounded-lg flex gap-4">
+                <div key={m.id} className="grim-card grim-card-hover p-4 flex gap-4">
                   {m.image_url ? (
                     <img
                       src={m.image_url}
@@ -681,7 +681,7 @@ export default function Bibliotheque() {
 
             {onglet === 'pnj' && (
               pnjFiltres.length === 0 ? vide : pnjFiltres.map((p) => (
-                <div key={p.id} className="bg-gray-800 p-4 rounded-lg flex gap-4">
+                <div key={p.id} className="grim-card grim-card-hover p-4 flex gap-4">
                   {p.image_url ? (
                     <img
                       src={p.image_url}

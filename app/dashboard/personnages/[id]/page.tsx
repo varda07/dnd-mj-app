@@ -1027,7 +1027,7 @@ export default function FichePersonnage() {
           >
             Retour
           </button>
-          <h1 className="text-2xl font-bold text-yellow-500 tracking-wide">
+          <h1 className="text-2xl grim-title">
             📜 Fiche de personnage
           </h1>
           <span
@@ -2768,8 +2768,9 @@ function SortLigne({
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-stone-800/70 border-2 border-yellow-700/60 rounded-lg p-4 shadow-lg">
-      <h2 className="text-sm uppercase tracking-widest text-yellow-500 font-bold mb-3 border-b border-yellow-800/50 pb-1">
+    <div className="grim-card p-4 shadow-lg">
+      <h2 className="grim-h2 text-sm uppercase tracking-[0.18em] mb-3 border-b border-yellow-800/40 pb-1.5 flex items-center gap-2">
+        <span className="grim-diamond">◆</span>
         {title}
       </h2>
       {children}

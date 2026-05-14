@@ -481,7 +481,7 @@ export default function Communaute() {
           >
             ← {tc('back')}
           </button>
-          <h1 className="text-2xl font-bold text-yellow-500">{t('title')}</h1>
+          <h1 className="text-2xl grim-title">{t('title')}</h1>
           <p className="text-gray-400 text-sm w-full md:w-auto md:ml-2">
             {t('subtitle')}
           </p>
@@ -518,7 +518,7 @@ export default function Communaute() {
               <p className="text-gray-400 text-sm italic">{t('empty_scenarios')}</p>
             )}
             {scenarios.map((s) => (
-              <div key={s.id} className="bg-gray-800 p-4 rounded-lg">
+              <div key={s.id} className="grim-card grim-card-hover p-4">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex-1 min-w-0">
                     <h3 className="text-lg font-bold text-white">{s.nom}</h3>
@@ -541,7 +541,7 @@ export default function Communaute() {
               <p className="text-gray-400 text-sm italic">{t('empty_characters')}</p>
             )}
             {personnages.map((p) => (
-              <div key={p.id} className="bg-gray-800 p-4 rounded-lg">
+              <div key={p.id} className="grim-card grim-card-hover p-4">
                 <div className="flex items-start gap-3 flex-wrap">
                   {p.image_url ? (
                     <img
@@ -575,7 +575,7 @@ export default function Communaute() {
               <p className="text-gray-400 text-sm italic">{t('empty_enemies')}</p>
             )}
             {ennemis.map((e) => (
-              <div key={e.id} className="bg-gray-800 p-4 rounded-lg">
+              <div key={e.id} className="grim-card grim-card-hover p-4">
                 <div className="flex items-start gap-3 flex-wrap">
                   {e.image_url && (
                     <img
@@ -608,7 +608,7 @@ export default function Communaute() {
               <p className="text-gray-400 text-sm italic">{t('empty_items')}</p>
             )}
             {items.map((i) => (
-              <div key={i.id} className="bg-gray-800 p-4 rounded-lg">
+              <div key={i.id} className="grim-card grim-card-hover p-4">
                 <div className="flex items-start gap-3 flex-wrap">
                   {i.image_url && (
                     <img
@@ -641,7 +641,7 @@ export default function Communaute() {
               <p className="text-gray-400 text-sm italic">{t('empty_maps')}</p>
             )}
             {maps.map((m) => (
-              <div key={m.id} className="bg-gray-800 p-4 rounded-lg">
+              <div key={m.id} className="grim-card grim-card-hover p-4">
                 <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
                   <div>
                     <h3 className="text-lg font-bold text-white break-words">{m.nom}</h3>
@@ -694,7 +694,7 @@ export default function Communaute() {
               <p className="text-gray-400 text-sm italic">{t('empty_spells')}</p>
             )}
             {sorts.map((s) => (
-              <div key={s.id} className="bg-gray-800 p-4 rounded-lg">
+              <div key={s.id} className="grim-card grim-card-hover p-4">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex-1 min-w-0">
                     <h3 className="text-lg font-bold text-white break-words">
@@ -727,7 +727,7 @@ export default function Communaute() {
               <p className="text-gray-400 text-sm italic">{t('empty_pnj')}</p>
             )}
             {pnj.map((p) => (
-              <div key={p.id} className="bg-gray-800 p-4 rounded-lg">
+              <div key={p.id} className="grim-card grim-card-hover p-4">
                 <div className="flex items-start gap-3 flex-wrap">
                   {p.image_url ? (
                     <img

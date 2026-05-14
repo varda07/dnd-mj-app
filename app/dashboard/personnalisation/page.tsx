@@ -237,7 +237,7 @@ export default function PersonnalisationPage() {
           >
             ← Retour
           </button>
-          <h1 className="text-xl md:text-2xl font-bold text-yellow-500">
+          <h1 className="text-xl md:text-2xl grim-title">
             🎨 Personnaliser l&apos;accueil
           </h1>
           {statusMsg && (
@@ -326,7 +326,7 @@ export default function PersonnalisationPage() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
             {/* Grille principale */}
-            <div className="bg-gray-800 rounded-lg p-3">
+            <div className="grim-card p-3">
               <p className="text-[10px] uppercase tracking-[0.22em] text-gray-500 font-bold mb-2">
                 Aperçu — {GRID_COLS} × {GRID_ROWS}
               </p>
@@ -398,7 +398,7 @@ export default function PersonnalisationPage() {
             </div>
 
             {/* Palette */}
-            <aside className="bg-gray-800 rounded-lg p-3 max-h-[calc(100vh-200px)] overflow-y-auto [scrollbar-width:thin]">
+            <aside className="grim-card p-3 max-h-[calc(100vh-200px)] overflow-y-auto [scrollbar-width:thin]">
               <p className="text-[10px] uppercase tracking-[0.22em] text-gray-500 font-bold mb-3">
                 Widgets disponibles
               </p>

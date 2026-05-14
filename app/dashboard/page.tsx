@@ -705,46 +705,71 @@ export default function Dashboard() {
 
       {interface_ === 'joueur' && (
         <div className="px-2 sm:px-3 md:px-4 py-3 md:py-5">
-          <h2 className="hidden md:flex codex-section-title codex-section-title-left text-yellow-500" style={{ fontSize: 11 }}>{t('player_welcome_title')}</h2>
-          <p className="hidden md:block text-gray-400 mb-4">{t('player_welcome_msg')}</p>
-          <div className="grid grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-6">
-            <button type="button" onClick={() => router.push('/dashboard/personnages')} className="codex-tile codex-press p-3 md:p-5 text-left">
-              <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">{t('characters_tab')}</h3>
-              <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1.5 leading-relaxed">{t('player_characters_manage_desc')}</p>
-            </button>
-            <button type="button" onClick={() => router.push('/dashboard/sorts')} className="codex-tile codex-press p-3 md:p-5 text-left">
-              <h3 className="text-[13px] md:text-lg font-medium md:font-bold text-yellow-500 tracking-wider">{t('menu_spells')}</h3>
-              <p className="text-[10px] md:text-sm text-[#6a6a72] md:text-gray-400 mt-1.5 leading-relaxed">{t('player_spells_manage_desc')}</p>
-            </button>
-          </div>
+          <div className="joueur-screen codex-fade-in">
+            <h2 className="joueur-title">{t('player_welcome_title')}</h2>
+            <p className="joueur-subtitle">{t('player_welcome_msg')}</p>
+            <div className="joueur-divider" />
 
-          <div className="bg-gray-800 p-4 rounded-lg">
-            <h3 className="text-lg font-bold text-yellow-500 mb-2">{t('joined_scenarios_title')}</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+              <button
+                type="button"
+                onClick={() => router.push('/dashboard/personnages')}
+                className="joueur-card joueur-card-interactive text-left"
+              >
+                <h3 className="joueur-card-title">{t('characters_tab')}</h3>
+                <p className="joueur-card-desc">{t('player_characters_manage_desc')}</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push('/dashboard/sorts')}
+                className="joueur-card joueur-card-interactive text-left"
+              >
+                <h3 className="joueur-card-title">{t('menu_spells')}</h3>
+                <p className="joueur-card-desc">{t('player_spells_manage_desc')}</p>
+              </button>
+            </div>
+
+            <div className="joueur-divider" />
+
+            <h3 className="joueur-card-title mb-3" style={{ letterSpacing: '0.12em' }}>
+              {t('joined_scenarios_title')}
+            </h3>
             {scenariosRejoints.length === 0 ? (
-              <p className="text-gray-400 text-sm">{t('no_scenarios_joined')}</p>
+              <p className="joueur-subtitle" style={{ margin: 0 }}>
+                {t('no_scenarios_joined')}
+              </p>
             ) : (
-              <ul className="flex gap-3 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-2 [scrollbar-width:thin]">
+              <ul className="flex gap-3 overflow-x-auto snap-x snap-mandatory -mx-2 px-2 pb-2 [scrollbar-width:thin]">
                 {scenariosRejoints.map((s) => (
                   <li
                     key={s.id}
-                    className="snap-start flex-shrink-0 w-64 p-4 rounded-lg bg-gray-900/50 border border-gray-700 text-white flex flex-col justify-between gap-3"
+                    className="joueur-card snap-start flex-shrink-0 w-64 flex flex-col justify-between gap-3"
                   >
                     <div className="flex items-start gap-2 min-w-0">
                       <span className="text-xl flex-shrink-0">📖</span>
-                      <span className="font-bold truncate">{s.nom}</span>
+                      <span
+                        className="truncate"
+                        style={{
+                          fontFamily: 'Georgia, serif',
+                          color: 'var(--theme-accent, #C9A84C)',
+                          letterSpacing: '0.04em'
+                        }}
+                      >
+                        {s.nom}
+                      </span>
                     </div>
                     <div className="flex gap-2 justify-end">
                       <button
                         type="button"
                         onClick={() => router.push('/dashboard/exploration')}
-                        className="px-3 py-1.5 text-xs font-bold bg-gray-800 border border-yellow-600 text-yellow-500 rounded hover:bg-gray-700 transition"
+                        className="joueur-btn-explore"
                       >
                         {t('explore')}
                       </button>
                       <button
                         type="button"
                         onClick={() => quitterScenario(s.id)}
-                        className="px-3 py-1.5 text-xs font-bold bg-red-600 text-white rounded hover:bg-red-500 transition"
+                        className="joueur-btn-leave"
                       >
                         {t('leave')}
                       </button>

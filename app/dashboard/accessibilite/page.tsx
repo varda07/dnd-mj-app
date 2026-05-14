@@ -36,7 +36,7 @@ export default function AccessibilitePage() {
           >
             ← Retour
           </button>
-          <h1 className="text-xl md:text-2xl font-bold text-yellow-500">
+          <h1 className="text-xl md:text-2xl grim-title">
             ♿ Accessibilité
           </h1>
           <button
@@ -56,7 +56,7 @@ export default function AccessibilitePage() {
 
         <div className="space-y-4">
           {/* ---- 1. Mode daltonien ---- */}
-          <section className="bg-gray-800 rounded-lg p-4 md:p-5">
+          <section className="grim-card p-4 md:p-5">
             <header className="flex items-center justify-between flex-wrap gap-2 mb-3">
               <h2 className="text-base font-bold text-yellow-500">
                 🎨 Mode daltonien
@@ -88,7 +88,7 @@ export default function AccessibilitePage() {
           </section>
 
           {/* ---- 2. Police dyslexique ---- */}
-          <section className="bg-gray-800 rounded-lg p-4 md:p-5">
+          <section className="grim-card p-4 md:p-5">
             <header className="flex items-center justify-between flex-wrap gap-2">
               <div>
                 <h2 className="text-base font-bold text-yellow-500">
@@ -107,7 +107,7 @@ export default function AccessibilitePage() {
           </section>
 
           {/* ---- 3. Taille de police ---- */}
-          <section className="bg-gray-800 rounded-lg p-4 md:p-5">
+          <section className="grim-card p-4 md:p-5">
             <header className="mb-3">
               <div className="flex items-baseline justify-between">
                 <h2 className="text-base font-bold text-yellow-500">
@@ -139,7 +139,7 @@ export default function AccessibilitePage() {
           </section>
 
           {/* ---- 4. Haut contraste ---- */}
-          <section className="bg-gray-800 rounded-lg p-4 md:p-5">
+          <section className="grim-card p-4 md:p-5">
             <header className="flex items-center justify-between flex-wrap gap-2">
               <div>
                 <h2 className="text-base font-bold text-yellow-500">
@@ -157,7 +157,7 @@ export default function AccessibilitePage() {
           </section>
 
           {/* ---- 5. Réduction des animations ---- */}
-          <section className="bg-gray-800 rounded-lg p-4 md:p-5">
+          <section className="grim-card p-4 md:p-5">
             <header className="flex items-center justify-between flex-wrap gap-2">
               <div>
                 <h2 className="text-base font-bold text-yellow-500">
@@ -179,7 +179,7 @@ export default function AccessibilitePage() {
           <EmojisConditionsSection />
 
           {/* ---- 6. Lecteur d'écran amélioré ---- */}
-          <section className="bg-gray-800 rounded-lg p-4 md:p-5">
+          <section className="grim-card p-4 md:p-5">
             <header className="flex items-center justify-between flex-wrap gap-2">
               <div>
                 <h2 className="text-base font-bold text-yellow-500">
@@ -247,7 +247,7 @@ function EmojisConditionsSection() {
   }
 
   return (
-    <section className="bg-gray-800 rounded-lg p-4 md:p-5">
+    <section className="grim-card p-4 md:p-5">
       <header className="flex items-center justify-between flex-wrap gap-2 mb-3">
         <div>
           <h2 className="text-base font-bold text-yellow-500">

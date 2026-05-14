@@ -757,12 +757,12 @@ export default function ExplorationPage() {
           >
             ← Retour
           </button>
-          <h1 className="text-2xl font-bold text-yellow-500">🗺️ Exploration</h1>
+          <h1 className="text-2xl grim-title">🗺️ Exploration</h1>
         </div>
 
         <div className="flex flex-col md:flex-row gap-4">
           <aside className="space-y-3 md:w-[300px] md:flex-shrink-0">
-            <div className="bg-gray-800 rounded-lg p-3 space-y-2">
+            <div className="grim-card p-3 space-y-2">
               <label className="text-gray-400 text-xs">Scénario</label>
               <select
                 value={scenarioId}
@@ -782,7 +782,7 @@ export default function ExplorationPage() {
             </div>
 
             {isMJ && (
-              <div className="bg-gray-800 rounded-lg p-3 space-y-2">
+              <div className="grim-card p-3 space-y-2">
                 <label className="text-gray-400 text-xs">Carte</label>
                 <select
                   value={exploration?.map_image_url ?? ''}
@@ -815,7 +815,7 @@ export default function ExplorationPage() {
 
             {isMJ && exploration?.map_image_url && (
               <>
-                <div className="bg-gray-800 rounded-lg p-3 space-y-2">
+                <div className="grim-card p-3 space-y-2">
                   <div className="text-gray-400 text-xs font-bold">Brouillard</div>
                   <div className="grid grid-cols-3 gap-1">
                     <button
@@ -857,7 +857,7 @@ export default function ExplorationPage() {
                   />
                 </div>
 
-                <div className="bg-gray-800 rounded-lg p-3 space-y-2">
+                <div className="grim-card p-3 space-y-2">
                   <div className="text-gray-400 text-xs font-bold">Placer</div>
                   <div className="grid grid-cols-3 gap-1">
                     <button
@@ -920,7 +920,7 @@ export default function ExplorationPage() {
                   )}
                 </div>
 
-                <div className="bg-gray-800 rounded-lg p-3 space-y-2">
+                <div className="grim-card p-3 space-y-2">
                   <label className="flex items-center gap-2 text-gray-200 text-sm cursor-pointer">
                     <input
                       type="checkbox"

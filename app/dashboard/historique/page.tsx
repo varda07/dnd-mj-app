@@ -90,7 +90,7 @@ export default function HistoriquePage() {
           >
             ← Dashboard
           </button>
-          <h1 className="text-2xl font-bold text-yellow-500">Historique</h1>
+          <h1 className="text-2xl grim-title">Historique</h1>
           {total > 0 && (
             <button
               type="button"
@@ -119,7 +119,7 @@ export default function HistoriquePage() {
                 return (
                   <li
                     key={e.id}
-                    className="flex items-start gap-3 rounded-lg border border-gray-700 bg-gray-800 p-3"
+                    className="flex items-start gap-3 grim-card p-3"
                   >
                     <span className="text-lg flex-shrink-0">{meta.emoji}</span>
                     <div className="flex-1 min-w-0">

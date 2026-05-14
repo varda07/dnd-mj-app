@@ -750,7 +750,7 @@ export default function Personnages() {
           <button type="button" onClick={() => router.back()} className="text-gray-400 hover:text-white">
             {tc('back')}
           </button>
-          <h1 className="text-2xl font-bold text-yellow-500">{t('title')}</h1>
+          <h1 className="text-2xl grim-title">{t('title')}</h1>
           <button
             type="button"
             onClick={() => setAideOuverte(true)}
@@ -761,9 +761,9 @@ export default function Personnages() {
           </button>
         </div>
 
-        <div className="bg-gray-800 p-5 md:p-6 rounded-lg mb-6">
+        <div className="grim-card p-5 md:p-6 mb-6">
           <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
-            <h2 className="text-lg font-bold text-yellow-500">
+            <h2 className="text-lg grim-h2">
               {editingId ? t('edit_title') : t('create_title')}
             </h2>
             {!editingId && (
@@ -1312,7 +1312,7 @@ export default function Personnages() {
 
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <h2 className="text-lg font-bold text-yellow-500">{t('my_characters')}</h2>
+            <h2 className="text-lg grim-h2">{t('my_characters')}</h2>
             <button
               type="button"
               onClick={importerPersonnage}
@@ -1334,7 +1334,7 @@ export default function Personnages() {
           {personnages
             .filter((pp) => !favorisOnly || estFavori('personnages', pp.id))
             .map((perso) => (
-            <div key={perso.id} className="bg-gray-800 p-4 rounded-lg">
+            <div key={perso.id} className="grim-card grim-card-hover p-4">
               <div className="flex gap-3">
                 {perso.image_url && (
                   <img

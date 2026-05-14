@@ -90,7 +90,7 @@ export default function AchievementsPage() {
           >
             ← Dashboard
           </button>
-          <h1 className="text-2xl font-bold text-yellow-500">🏆 Achievements</h1>
+          <h1 className="text-2xl grim-title">🏆 Achievements</h1>
         </div>
         <p className="text-gray-400 text-sm mb-6">
           {loading
@@ -116,7 +116,7 @@ export default function AchievementsPage() {
                 className={`text-left rounded-lg p-4 border transition ${
                   ok
                     ? 'bg-yellow-500/10 border-yellow-500'
-                    : 'bg-gray-800 border-gray-700 opacity-60 hover:opacity-90'
+                    : 'grim-card opacity-60 hover:opacity-90'
                 }`}
               >
                 <div className="flex items-start gap-3">

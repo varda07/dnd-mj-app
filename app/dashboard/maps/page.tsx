@@ -189,7 +189,7 @@ export default function Maps() {
           <button type="button" onClick={() => router.back()} className="text-gray-400 hover:text-white">
             {tc('back')}
           </button>
-          <h1 className="text-2xl font-bold text-yellow-500">{t('title')}</h1>
+          <h1 className="text-2xl grim-title">{t('title')}</h1>
           <button
             type="button"
             onClick={() => router.push('/dashboard/maps/generer-donjon')}
@@ -215,8 +215,8 @@ export default function Maps() {
             🎨 Créer une map
           </button>
         </div>
-        <div className="bg-gray-800 p-6 rounded-lg mb-6">
-          <h2 className="text-lg font-bold text-yellow-500 mb-4">{editingId ? t('edit_title') : t('create_title')}</h2>
+        <div className="grim-card p-6 mb-6">
+          <h2 className="text-lg grim-h2 mb-4">{editingId ? t('edit_title') : t('create_title')}</h2>
           <div className="space-y-3">
             <input type="text" placeholder={t('name_ph')} value={nom} onChange={(e) => setNom(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
             <textarea placeholder={tc('description')} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none h-24" />
@@ -242,7 +242,7 @@ export default function Maps() {
         </div>
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <h2 className="text-lg font-bold text-yellow-500">{t('my_maps')}</h2>
+            <h2 className="text-lg grim-h2">{t('my_maps')}</h2>
             <button
               type="button"
               onClick={importerMap}
@@ -264,7 +264,7 @@ export default function Maps() {
           {maps
             .filter((m) => !favorisOnly || estFavori('maps', m.id))
             .map((map) => (
-            <div key={map.id} className="bg-gray-800 p-4 rounded-lg">
+            <div key={map.id} className="grim-card grim-card-hover p-4">
               <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <StarFavori type="maps" id={map.id} />
