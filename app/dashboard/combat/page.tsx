@@ -18,6 +18,8 @@ import {
   labelCD
 } from '@/app/data/dnd5e'
 import NumberInput from '@/app/components/NumberInput'
+import WildMagicRoller from '@/app/components/WildMagicRoller'
+import SituationsRandom from '@/app/components/SituationsRandom'
 
 type Scenario = { id: string; nom: string; bg_image_url: string | null; mj_id: string }
 
@@ -132,6 +134,8 @@ function CombatInner() {
   const [items, setItems] = useState<Item[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [combatDemarre, setCombatDemarre] = useState(false)
+  // Roadmap Phase 4 — modale de situation random.
+  const [situationsOuvert, setSituationsOuvert] = useState(false)
   const [initiatives, setInitiatives] = useState<Record<string, number>>({})
   const [turnIndex, setTurnIndex] = useState(0)
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({})
@@ -230,11 +234,42 @@ function CombatInner() {
   }, [])
 
   useEffect(() => {
+    // Roadmap 1.2 — scenarioId persiste via URL (?scenario_id=) ET localStorage
+    // pour que le combat ne se "réinitialise" pas lorsqu'on ouvre une fiche
+    // puis fait "retour". Roadmap 2.2 — fallback sur le scénario actif ou le
+    // dernier scénario utilisé.
+    if (scenarios.length === 0) return
     const sid = searchParams.get('scenario_id')
     if (sid && scenarios.some((s) => s.id === sid)) {
       setScenarioId(sid)
+      try { window.localStorage.setItem('combat_last_scenario_id', sid) } catch {}
+      return
+    }
+    try {
+      const last = window.localStorage.getItem('combat_last_scenario_id')
+      if (last && scenarios.some((s) => s.id === last)) {
+        setScenarioId(last)
+        return
+      }
+    } catch {}
+    const actif = scenarios.find((s) => (s as { actif?: boolean }).actif === true)
+    if (actif) {
+      setScenarioId(actif.id)
+      try { window.localStorage.setItem('combat_last_scenario_id', actif.id) } catch {}
     }
   }, [scenarios, searchParams])
+
+  // Roadmap 1.2 — propage scenarioId dans l'URL pour qu'un router.back() depuis
+  // une fiche ennemi/perso restitue le bon contexte de combat.
+  useEffect(() => {
+    if (!scenarioId) return
+    const current = searchParams.get('scenario_id')
+    if (current === scenarioId) return
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('scenario_id', scenarioId)
+    router.replace(`/dashboard/combat?${params.toString()}`)
+    try { window.localStorage.setItem('combat_last_scenario_id', scenarioId) } catch {}
+  }, [scenarioId, searchParams, router])
 
   useEffect(() => {
     if (scenarioId) fetchCombatData()
@@ -1289,8 +1324,32 @@ function CombatInner() {
     prevHpRef.current = {}
   }
 
+  // Roadmap 1.3 — Retire toutes les conditions actives des PJ et ennemis du
+  // combat en cours. Appelée à la fin de combat (auto) et via le bouton MJ
+  // "🗑️ Retirer toutes les conditions".
+  const retirerToutesConditions = async () => {
+    const persoIds = personnages.filter((p) => p.conditions.length > 0).map((p) => p.id)
+    const ennIds = ennemis.filter((e) => e.conditions.length > 0).map((e) => e.id)
+    if (persoIds.length > 0) {
+      await supabase.from('personnages').update({ conditions: [] }).in('id', persoIds)
+    }
+    if (ennIds.length > 0) {
+      await supabase.from('ennemis').update({ conditions: [] }).in('id', ennIds)
+    }
+    setPersonnages((ps) => ps.map((p) => ({ ...p, conditions: [] })))
+    setEnnemis((es) => es.map((e) => ({ ...e, conditions: [] })))
+  }
+
+  // Bouton MJ pendant le combat : confirmation puis clear.
+  const retirerToutesConditionsAvecConfirm = async () => {
+    if (!window.confirm('Retirer TOUTES les conditions actives sur tous les participants ?')) return
+    await retirerToutesConditions()
+  }
+
   const terminerCombat = async () => {
     await saveCombatState({ actif: false, ordre_initiative: [], round: 1, tour_actuel: 0, etats_combat: {} })
+    // Roadmap 1.3 — reset auto de toutes les conditions à la fin du combat.
+    await retirerToutesConditions()
     setXpDistributed(false)
     setShowVictory(true)
   }
@@ -1443,11 +1502,21 @@ function CombatInner() {
             {tc('back')}
           </button>
           <h1 className="text-2xl grim-title">{tCombat('title')}</h1>
+          {/* Roadmap Phase 4 — situation random */}
+          <button
+            type="button"
+            onClick={() => setSituationsOuvert(true)}
+            disabled={!scenarioId}
+            title={!scenarioId ? 'Sélectionne un scénario d\'abord' : ''}
+            className="ml-auto px-3 py-1.5 text-xs uppercase tracking-[0.16em] font-bold rounded border border-fuchsia-600/50 text-fuchsia-200 hover:bg-fuchsia-500/10 transition disabled:opacity-40"
+          >
+            🎲 Situation random
+          </button>
           {/* Roadmap 2.6 — accès au calculateur de rencontre */}
           <button
             type="button"
             onClick={() => router.push('/dashboard/combat/encounter-builder')}
-            className="ml-auto px-3 py-1.5 text-xs uppercase tracking-[0.16em] font-bold rounded border border-yellow-600/50 text-yellow-300 hover:bg-yellow-500/10 transition"
+            className="px-3 py-1.5 text-xs uppercase tracking-[0.16em] font-bold rounded border border-yellow-600/50 text-yellow-300 hover:bg-yellow-500/10 transition"
           >
             🧮 Calculateur de rencontre
           </button>
@@ -1540,29 +1609,40 @@ function CombatInner() {
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                   <h3 className="text-red-400 font-bold">
                     {tCombat('enemies')} ({nbEnnemisSel}/{ennemis.length})
                   </h3>
-                  {ennemis.length > 0 && (
-                    <div className="flex gap-2 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => toggleAll('ennemi', true)}
-                        className="text-gray-400 hover:text-white"
-                      >
-                        {tCombat('all')}
-                      </button>
-                      <span className="text-gray-600">|</span>
-                      <button
-                        type="button"
-                        onClick={() => toggleAll('ennemi', false)}
-                        className="text-gray-400 hover:text-white"
-                      >
-                        {tCombat('none')}
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex gap-2 text-xs items-center">
+                    {/* Roadmap 2.1 — Quick add depuis le combat */}
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/dashboard/ennemis?scenario_id=${scenarioId}`)}
+                      className="px-2 py-0.5 rounded border border-red-700/50 text-red-300 hover:bg-red-500/10"
+                      title="Aller créer ou importer des ennemis pour ce scénario"
+                    >
+                      + Ennemi
+                    </button>
+                    {ennemis.length > 0 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => toggleAll('ennemi', true)}
+                          className="text-gray-400 hover:text-white"
+                        >
+                          {tCombat('all')}
+                        </button>
+                        <span className="text-gray-600">|</span>
+                        <button
+                          type="button"
+                          onClick={() => toggleAll('ennemi', false)}
+                          className="text-gray-400 hover:text-white"
+                        >
+                          {tCombat('none')}
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
                 {ennemis.length === 0 ? (
                   <p className="text-gray-500 text-sm italic">
@@ -1678,6 +1758,15 @@ function CombatInner() {
                     className="px-3 py-2 md:px-4 md:py-2.5 bg-orange-700 text-white font-bold rounded hover:bg-orange-600 disabled:opacity-50 text-sm md:text-base"
                   >
                     💥 Dégâts de zone
+                  </button>
+                  <button
+                    type="button"
+                    onClick={retirerToutesConditionsAvecConfirm}
+                    disabled={!isMJ}
+                    title="Retirer toutes les conditions actives sur tous les participants"
+                    className="px-3 py-2 md:px-4 md:py-2.5 bg-purple-700 text-white font-bold rounded hover:bg-purple-600 disabled:opacity-50 text-sm md:text-base"
+                  >
+                    🗑️ Conditions
                   </button>
                   <button
                     type="button"
@@ -3040,6 +3129,21 @@ function CombatInner() {
           ))}
         </div>
       )}
+
+      {/* Roadmap Phase 5 — accès rapide à la table Wild Magic depuis le combat. */}
+      {isMJ && combatDemarre && (
+        <WildMagicRoller scenarioId={scenarioId} />
+      )}
+
+      {/* Roadmap Phase 4 — situations random. */}
+      <SituationsRandom
+        scenarioId={scenarioId || null}
+        ouvert={situationsOuvert}
+        onClose={() => setSituationsOuvert(false)}
+        onCreated={() => {
+          if (scenarioId) fetchCombatData()
+        }}
+      />
     </main>
   )
 }

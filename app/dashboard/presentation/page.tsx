@@ -267,6 +267,35 @@ function PresentationInner() {
       if (cancelled) return
       if (combatData) setCombat(combatData as CombatLite)
       setLoading(false)
+
+      // Roadmap 3.3 — Le MJ qui active le mode présentation envoie une notif
+      // aux joueurs inscrits. On dédup via sessionStorage (1 notif / session
+      // navigateur / scénario) pour éviter le spam à chaque remount.
+      if (userIsMj && activeScn) {
+        try {
+          const key = `presentation_notif_sent:${activeScn.id}`
+          if (typeof window !== 'undefined' && !window.sessionStorage.getItem(key)) {
+            const { data: joueurs } = await supabase
+              .from('scenarios_joueurs')
+              .select('joueur_id')
+              .eq('scenario_id', activeScn.id)
+            const rows = (joueurs ?? [])
+              .filter((j: { joueur_id: string }) => j.joueur_id !== user.id)
+              .map((j: { joueur_id: string }) => ({
+                user_id: j.joueur_id,
+                type: 'info',
+                message: `🎲 Le MJ a lancé la session pour « ${activeScn.nom} »`,
+                lien: '/dashboard/presentation'
+              }))
+            if (rows.length > 0) {
+              await supabase.from('notifications').insert(rows)
+            }
+            window.sessionStorage.setItem(key, '1')
+          }
+        } catch (e) {
+          console.warn('[presentation] notif session :', e)
+        }
+      }
     }
     init()
     return () => {

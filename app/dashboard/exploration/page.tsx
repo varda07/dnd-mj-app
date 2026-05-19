@@ -757,7 +757,12 @@ export default function ExplorationPage() {
           >
             ← Retour
           </button>
-          <h1 className="text-2xl grim-title">🗺️ Exploration</h1>
+          <div>
+            <h1 className="text-2xl grim-title">🗺️ Donjon Builder</h1>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-[#a8a8b0]/60">
+              Outil de préparation MJ — scènes, indices, rencontres
+            </p>
+          </div>
         </div>
 
         <div className="flex flex-col md:flex-row gap-4">

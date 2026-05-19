@@ -1293,8 +1293,10 @@ export default function DiceLauncher() {
 
             {/* Bandeau résultat — placé AU-DESSUS du canvas pour rester
                 visible sans avoir à scroller / regarder en bas. Affiche le
-                total en gros + le détail des dés individuels juste sous. */}
-            {!rolling && results.length > 0 && (count > 1 || rollMode !== 'normal') && (
+                total en gros + le détail des dés individuels juste sous.
+                Roadmap 1.4 — affiché aussi pour 1 seul dé (sinon le résultat
+                n'est lisible que sur la face 3D). */}
+            {!rolling && results.length > 0 && (
               <div
                 className="bg-gray-800 rounded-lg px-4 py-2 flex items-baseline justify-between gap-3 flex-wrap"
                 style={{

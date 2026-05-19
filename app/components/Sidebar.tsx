@@ -458,7 +458,7 @@ export default function Sidebar() {
     }
 
     return (
-      <div className="h-full flex flex-col bg-[#12141a] border-r border-[rgba(201,168,76,0.15)]">
+      <div className="h-full flex flex-col bg-[#12141a] border-l border-[rgba(201,168,76,0.15)]">
         {/* En-tête épuré : juste la recherche. L'identité MASTER SCREEN / La
             Forge Éclipsée est portée par le titre central du dashboard, plus
             par la sidebar. */}
@@ -802,21 +802,22 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Bouton hamburger mobile : fixé en haut à gauche, devant le contenu. */}
+      {/* Bouton hamburger mobile : fixé en haut à droite, devant le contenu.
+          Roadmap 1.7 — la sidebar s'ouvre depuis la droite désormais. */}
       <button
         type="button"
         onClick={() => setDrawerOuvert(true)}
         aria-label={t('open_menu')}
-        className="md:hidden fixed top-1.5 left-1.5 z-[80] w-9 h-9 flex items-center justify-center rounded bg-[#12141a]/90 border border-[rgba(201,168,76,0.3)] text-[#C9A84C] hover:bg-[#1a1d24] active:scale-95 transition-all duration-150"
+        className="md:hidden fixed top-1.5 right-1.5 z-[80] w-9 h-9 flex items-center justify-center rounded bg-[#12141a]/90 border border-[rgba(201,168,76,0.3)] text-[#C9A84C] hover:bg-[#1a1d24] active:scale-95 transition-all duration-150"
       >
         <span aria-hidden="true" className="text-lg leading-none">
           ☰
         </span>
       </button>
 
-      {/* Desktop : sidebar fixe, repliable. La largeur est animée. */}
+      {/* Desktop : sidebar fixe (à droite), repliable. La largeur est animée. */}
       <aside
-        className="hidden md:flex fixed top-0 left-0 bottom-0 z-[70] flex-col transition-[width] duration-200 ease-out"
+        className="hidden md:flex fixed top-0 right-0 bottom-0 z-[70] flex-col transition-[width] duration-200 ease-out"
         aria-label={t('main_nav')}
         style={{ width: replie ? WIDTH_COLLAPSED : WIDTH_EXPANDED }}
       >
@@ -827,13 +828,14 @@ export default function Sidebar() {
           aria-label={replie ? t('expand') : t('collapse')}
           aria-pressed={replie}
           title={replie ? t('expand') : t('collapse')}
-          className="absolute top-3 -right-3 z-[71] w-6 h-6 flex items-center justify-center rounded-full bg-[#12141a] border border-[rgba(201,168,76,0.4)] text-[#C9A84C] hover:bg-[#1a1d24] hover:border-[#C9A84C] shadow-md transition-all duration-150 text-[11px] leading-none"
+          className="absolute top-3 -left-3 z-[71] w-6 h-6 flex items-center justify-center rounded-full bg-[#12141a] border border-[rgba(201,168,76,0.4)] text-[#C9A84C] hover:bg-[#1a1d24] hover:border-[#C9A84C] shadow-md transition-all duration-150 text-[11px] leading-none"
         >
-          {replie ? '▸' : '◂'}
+          {replie ? '◂' : '▸'}
         </button>
       </aside>
 
-      {/* Mobile : drawer + overlay (toujours en mode étendu). */}
+      {/* Mobile : drawer + overlay (toujours en mode étendu). Slide depuis la
+          droite désormais (roadmap 1.7). */}
       <div
         className={`md:hidden fixed inset-0 z-[90] transition-opacity duration-200 ${
           drawerOuvert ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
@@ -845,8 +847,8 @@ export default function Sidebar() {
           onClick={() => setDrawerOuvert(false)}
         />
         <aside
-          className={`absolute top-0 left-0 bottom-0 w-[260px] max-w-[85vw] shadow-2xl transition-transform duration-200 ease-out ${
-            drawerOuvert ? 'translate-x-0' : '-translate-x-full'
+          className={`absolute top-0 right-0 bottom-0 w-[260px] max-w-[85vw] shadow-2xl transition-transform duration-200 ease-out ${
+            drawerOuvert ? 'translate-x-0' : 'translate-x-full'
           }`}
           aria-label={t('main_nav')}
         >
@@ -855,7 +857,7 @@ export default function Sidebar() {
             type="button"
             onClick={() => setDrawerOuvert(false)}
             aria-label={t('close_menu')}
-            className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center rounded text-[#6a6a72] hover:text-white hover:bg-[rgba(255,255,255,0.05)] text-lg transition-all"
+            className="absolute top-2 left-2 w-8 h-8 flex items-center justify-center rounded text-[#6a6a72] hover:text-white hover:bg-[rgba(255,255,255,0.05)] text-lg transition-all"
           >
             ✕
           </button>

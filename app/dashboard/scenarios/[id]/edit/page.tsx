@@ -134,13 +134,20 @@ export default function ScenarioEditPage() {
 
       const { data: scn } = await supabase
         .from('scenarios')
-        .select('id, nom, notes_secretes, wallpaper_url')
+        .select('id, nom, notes_secretes, wallpaper_url, mj_id')
         .eq('id', scenarioId)
         .maybeSingle()
 
       if (!scn) {
         setNotFound(true)
         setLoading(false)
+        return
+      }
+
+      // Roadmap 1.1 — Phase 1 — Les joueurs (non-MJ) ne peuvent pas accéder à
+      // l'édition. On les renvoie vers la page de leur PJ ou le dashboard.
+      if (scn.mj_id !== user.id) {
+        router.replace('/dashboard')
         return
       }
       setScenarioNom(scn.nom)
@@ -938,18 +945,40 @@ export default function ScenarioEditPage() {
               const lst = liensDuScenario.filter((l) => l.element_type === type)
               return (
                 <div key={type}>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
                     <span className="text-xs font-bold text-gray-300">
                       {ICONE[type]} {LABEL[type]} ({lst.length})
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => ouvrirPicker(type, 'scenario')}
-                      className="text-[10px] uppercase tracking-wider text-yellow-500 hover:text-yellow-400"
-                      title="🔗 Lier à ce scénario"
-                    >
-                      🔗 Lier
-                    </button>
+                    <div className="flex gap-1 items-center">
+                      {/* Roadmap 2.1 — Quick create pour chaque type d'élément */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          router.push(
+                            type === 'ennemi'
+                              ? '/dashboard/ennemis'
+                              : type === 'item'
+                              ? '/dashboard/items'
+                              : type === 'map'
+                              ? '/dashboard/maps'
+                              : '/dashboard/pnj'
+                          )
+                        }
+                        className="text-[10px] uppercase tracking-wider text-emerald-400 hover:text-emerald-300"
+                        title="+ Créer un nouvel élément dans la bibliothèque"
+                      >
+                        + Créer
+                      </button>
+                      <span className="text-gray-600 text-[10px]">·</span>
+                      <button
+                        type="button"
+                        onClick={() => ouvrirPicker(type, 'scenario')}
+                        className="text-[10px] uppercase tracking-wider text-yellow-500 hover:text-yellow-400"
+                        title="🔗 Lier à ce scénario"
+                      >
+                        🔗 Lier
+                      </button>
+                    </div>
                   </div>
                   {lst.length === 0 ? (
                     <p className="text-gray-600 text-xs italic">Aucun.</p>
