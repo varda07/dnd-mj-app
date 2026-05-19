@@ -35,25 +35,27 @@ export default function NotificationCenter() {
   const [notifs, setNotifs] = useState<Notif[]>([])
   const [ouvert, setOuvert] = useState(false)
   const [actif, setActif] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
 
-  const charger = useCallback(async () => {
-    let user = null
-    try {
-      const { data } = await supabase.auth.getUser()
-      user = data.user
-    } catch {
-      return
+  const charger = useCallback(async (uid?: string) => {
+    let targetId = uid
+    if (!targetId) {
+      try {
+        const { data } = await supabase.auth.getUser()
+        targetId = data.user?.id
+      } catch {
+        return
+      }
     }
-    if (!user) {
+    if (!targetId) {
       setActif(false)
       return
     }
-    setActif(true)
     const { data, error } = await supabase
       .from('notifications')
       .select('id, type, message, lien, lu, created_at')
-      .eq('user_id', user.id)
+      .eq('user_id', targetId)
       .order('created_at', { ascending: false })
       .limit(30)
     if (error) {
@@ -62,14 +64,62 @@ export default function NotificationCenter() {
       setActif(false)
       return
     }
+    setActif(true)
     setNotifs((data ?? []) as Notif[])
   }, [])
 
+  // Récupère l'utilisateur courant + écoute les changements d'auth.
   useEffect(() => {
-    charger()
-    const interval = setInterval(charger, 60000)
-    return () => clearInterval(interval)
+    let cancel = false
+    supabase.auth.getUser().then(({ data }) => {
+      if (cancel) return
+      const uid = data.user?.id ?? null
+      setUserId(uid)
+      if (uid) void charger(uid)
+      else setActif(false)
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      const uid = session?.user?.id ?? null
+      setUserId(uid)
+      if (uid) void charger(uid)
+      else {
+        setActif(false)
+        setNotifs([])
+      }
+    })
+    return () => {
+      cancel = true
+      sub.subscription.unsubscribe()
+    }
   }, [charger])
+
+  // Realtime : nouvelle ligne, mise à jour, ou suppression. Évite d'attendre
+  // le polling 60s pour voir une notif fraîche.
+  useEffect(() => {
+    if (!userId) return
+    const channel = supabase
+      .channel(`notifications:${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`
+        },
+        () => {
+          void charger(userId)
+        }
+      )
+      .subscribe()
+    // Filet de sécurité : un poll lent (5 min) au cas où le canal realtime
+    // serait coupé (mode offline, navigateur en veille, etc.).
+    const interval = setInterval(() => void charger(userId), 5 * 60 * 1000)
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(interval)
+    }
+  }, [userId, charger])
 
   // Fermeture au clic extérieur.
   useEffect(() => {
@@ -112,13 +162,18 @@ export default function NotificationCenter() {
 
   if (!actif) return null
 
+  // Roadmap UI — cloche en haut à gauche, juste à droite du bouton 🏠
+  // (HomeButton à top-4 left-4 = 16/16, h-9 w-9 = 36px + 8px gap → left-13).
   return (
-    <div ref={panelRef} className="fixed top-3 right-3 z-[120]">
+    <div
+      ref={panelRef}
+      className="fixed top-4 left-[52px] z-[120]"
+    >
       <button
         type="button"
         onClick={() => setOuvert((v) => !v)}
         aria-label="Notifications"
-        className="relative w-9 h-9 rounded-full flex items-center justify-center bg-[#12141a]/90 border border-[rgba(201,168,76,0.3)] hover:border-[#C9A84C] backdrop-blur transition"
+        className="relative w-9 h-9 rounded-full flex items-center justify-center bg-[#12141a]/70 border border-[rgba(201,168,76,0.20)] text-[#C9A84C]/80 hover:text-[#C9A84C] hover:bg-[#12141a]/95 hover:border-[#C9A84C] backdrop-blur-sm transition-all duration-150"
       >
         <span className="text-base">🔔</span>
         {nonLues > 0 && (
@@ -133,7 +188,7 @@ export default function NotificationCenter() {
 
       {ouvert && (
         <div
-          className="absolute top-11 right-0 w-80 max-h-[70vh] overflow-y-auto rounded-lg shadow-2xl"
+          className="absolute top-11 left-0 w-80 max-w-[calc(100vw-1rem)] max-h-[70vh] overflow-y-auto rounded-lg shadow-2xl"
           style={{
             background: '#12141a',
             border: '1px solid rgba(201,168,76,0.35)'

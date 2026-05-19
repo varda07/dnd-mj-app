@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { notifyOwnerOfEntity, type EntiteNotif } from '@/app/lib/notifications'
 
 export default function LikeButton({
   entiteType,
@@ -80,6 +81,18 @@ export default function LikeButton({
         // Rollback optimiste si l'insert échoue (ex. doublon).
         setLiked(false)
         setCount((c) => Math.max(0, c - 1))
+      } else {
+        // Notifie le propriétaire de l'entité qu'elle a reçu un like. Aucune
+        // notif si on like sa propre création. Erreur silencieuse (RLS,
+        // entité supprimée, …) — un like raté n'est pas critique.
+        notifyOwnerOfEntity({
+          entiteType: entiteType as EntiteNotif,
+          entiteId,
+          type: 'like',
+          message: `❤️ Quelqu'un aime ta création`,
+          lien: `/dashboard/communaute`,
+          exclureUserId: userId
+        }).catch(() => {})
       }
     }
     setBusy(false)

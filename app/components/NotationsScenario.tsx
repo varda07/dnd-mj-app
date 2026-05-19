@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { notifyOwnerOfEntity } from '@/app/lib/notifications'
 
 type Notation = {
   id: string
@@ -92,12 +93,13 @@ export default function NotationsScenario({
   const envoyer = async () => {
     if (!userId) return
     setMessage('')
+    const commTrim = monComm.trim()
     const { error } = await supabase.from('notations_scenarios').upsert(
       {
         scenario_id: scenarioId,
         user_id: userId,
         etoiles: maNote,
-        commentaire: monComm.trim()
+        commentaire: commTrim
       },
       { onConflict: 'scenario_id,user_id' }
     )
@@ -106,6 +108,18 @@ export default function NotationsScenario({
       return
     }
     setMessage('✓ Avis enregistré.')
+    // Notifie le MJ du scénario. Type 'commentaire' si l'avis a un texte,
+    // sinon 'info' (rating seul).
+    notifyOwnerOfEntity({
+      entiteType: 'scenario',
+      entiteId: scenarioId,
+      type: commTrim ? 'commentaire' : 'info',
+      message: commTrim
+        ? `💬 Nouvel avis (${maNote}★) sur ton scénario`
+        : `⭐ Nouvelle note (${maNote}★) sur ton scénario`,
+      lien: '/dashboard/communaute',
+      exclureUserId: userId
+    }).catch(() => {})
     charger()
   }
 

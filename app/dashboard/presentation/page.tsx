@@ -6,6 +6,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { CONDITIONS_MAP, isConditionKey } from '@/app/data/conditions'
+import { notifyUsers } from '@/app/lib/notifications'
 
 // ============================================================================
 // Mode Présentation
@@ -279,16 +280,16 @@ function PresentationInner() {
               .from('scenarios_joueurs')
               .select('joueur_id')
               .eq('scenario_id', activeScn.id)
-            const rows = (joueurs ?? [])
-              .filter((j: { joueur_id: string }) => j.joueur_id !== user.id)
-              .map((j: { joueur_id: string }) => ({
-                user_id: j.joueur_id,
+            const userIds = (joueurs ?? [])
+              .map((j: { joueur_id: string }) => j.joueur_id)
+              .filter((id: string) => id !== user.id)
+            if (userIds.length > 0) {
+              await notifyUsers({
+                userIds,
                 type: 'info',
                 message: `🎲 Le MJ a lancé la session pour « ${activeScn.nom} »`,
                 lien: '/dashboard/presentation'
-              }))
-            if (rows.length > 0) {
-              await supabase.from('notifications').insert(rows)
+              })
             }
             window.sessionStorage.setItem(key, '1')
           }

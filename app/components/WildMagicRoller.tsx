@@ -64,11 +64,25 @@ export default function WildMagicRoller({ scenarioId, flottant = true, ouvert: o
           onClick={() => setOuvertInterne(true)}
           aria-label="Wild Magic — table d'effets"
           title="Wild Magic — roll un effet de magie sauvage"
-          className="fixed bottom-20 right-4 z-[60] h-11 w-11 rounded-full bg-gradient-to-br from-purple-700 to-fuchsia-900 border border-[#C9A84C] text-white shadow-lg hover:scale-105 active:scale-95 transition-all"
+          // Roadmap 1.7 — sidebar à droite : le FAB est en bas-gauche, juste
+          // au-dessus du lanceur de dés (60px de dé + 12px de gap = ~72px).
+          // Mobile : on tient compte de la bottom-bar (56+24+24=104) + dé (72).
+          className="wild-magic-fab fixed z-[60] h-11 w-11 rounded-full bg-gradient-to-br from-purple-700 to-fuchsia-900 border border-[#C9A84C] text-white shadow-lg hover:scale-105 active:scale-95 transition-all"
+          style={{
+            left: 'calc(max(24px, env(safe-area-inset-left)) + 8px)',
+            bottom: `calc(56px + env(safe-area-inset-bottom) + 24px + 60px + 12px)`
+          }}
         >
           <span aria-hidden="true">✨</span>
         </button>
       )}
+      <style>{`
+        @media (min-width: 768px) {
+          .wild-magic-fab {
+            bottom: calc(max(24px, env(safe-area-inset-bottom)) + 60px + 12px) !important;
+          }
+        }
+      `}</style>
 
       {ouvert && (
         <div

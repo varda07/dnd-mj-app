@@ -922,7 +922,9 @@ export default function DiceLauncher() {
         style={{
           width: 60,
           height: 60,
-          right: 'max(24px, env(safe-area-inset-right))',
+          // Roadmap 1.7 — sidebar passée à droite : on déplace le FAB en bas
+          // à gauche pour éviter le chevauchement.
+          left: 'max(24px, env(safe-area-inset-left))',
           // Mobile : laisse de la place à la bottom bar (56px + 24px de marge).
           bottom: `calc(56px + env(safe-area-inset-bottom) + 24px)`
         }}

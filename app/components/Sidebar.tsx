@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl'
 import { openCommandPalette } from './CommandPalette'
 import { useLocale } from '@/app/i18n/IntlProvider'
 import { supabase } from '@/lib/supabase'
+import { notifyOwnerOfEntity } from '@/app/lib/notifications'
 import {
   THEMES,
   THEME_KEYS,
@@ -267,6 +268,21 @@ export default function Sidebar() {
       return setMessageJoindre(td('cannot_join', { message: err2.message }))
     }
     await supabase.from('codes_invitation').update({ utilise: true }).eq('id', invit.id)
+    // Notifie le MJ du scénario qu'un joueur l'a rejoint.
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', user.id)
+      .maybeSingle()
+    const username = (profile?.username as string | undefined) || user.email || 'Un joueur'
+    await notifyOwnerOfEntity({
+      entiteType: 'scenario',
+      entiteId: invit.scenario_id,
+      type: 'joueur',
+      message: `🧑‍🤝‍🧑 ${username} a rejoint ton scénario`,
+      lien: `/dashboard/scenarios/${invit.scenario_id}/edit`,
+      exclureUserId: user.id
+    })
     setMessageJoindre(td('scenario_joined_short'))
     setCodeScenario('')
   }
