@@ -44,7 +44,6 @@ export default function Home() {
       })
       setMessage(t('signup_error', { message: error.message }))
     } else {
-      console.log('[auth] signUp succès :', data)
       // Si l'inscription a immédiatement renvoyé une session (confirm email
       // désactivé côté Supabase), bascule directement sur le dashboard.
       if (data.session) {

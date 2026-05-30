@@ -1,6 +1,6 @@
 'use client'
 
-import { GRID_COLS, GRID_ROWS, type WidgetInstance } from '@/app/lib/widgets'
+import { GRID_COLS, type WidgetInstance } from '@/app/lib/widgets'
 import WidgetRender from './widgets/WidgetRender'
 
 // ============================================================================

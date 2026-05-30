@@ -376,9 +376,7 @@ function PresentationInner() {
     if (!etat) return
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraftLieuNom(etat.lieu_nom ?? '')
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraftLieuDesc(etat.lieu_description ?? '')
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraftChapitre(etat.chapitre_actuel ?? '')
   }, [etat?.lieu_nom, etat?.lieu_description, etat?.chapitre_actuel, etat])
 

@@ -195,7 +195,6 @@ export default function Ennemis() {
   // Restaure la préférence de vue compacte/détaillée.
   useEffect(() => {
     try {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVueCompacte(window.localStorage.getItem('ennemis_vue_compacte') === '1')
     } catch {
       /* localStorage indisponible : on garde la vue détaillée par défaut */

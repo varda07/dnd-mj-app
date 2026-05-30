@@ -186,7 +186,6 @@ export default function Personnages() {
     const hp = c.hpNiveau1Base + modificateur(con)
     setHpMax(String(hp))
     setHpActuel(String(hp))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classe, constitution, editingId])
 
   const fetchSortsTemplates = async () => {
