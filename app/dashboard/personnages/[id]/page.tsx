@@ -1982,26 +1982,26 @@ export default function FichePersonnage() {
                         Niv. {lvl}
                       </span>
                       <div className="flex-1 flex items-center gap-1 flex-wrap">
-                        {Array.from({ length: max }).map((_, i) => (
-                          <button
-                            key={i}
-                            type="button"
-                            disabled={!isOwner}
-                            onClick={() =>
-                              i < used ? restaurerSlot(lvl) : consommerSlot(lvl)
-                            }
-                            aria-label={
-                              i < used
-                                ? `Emplacement ${lvl} utilisé`
-                                : `Emplacement ${lvl} disponible`
-                            }
-                            className={`w-5 h-5 rounded-full border-2 transition ${
-                              i < used
-                                ? 'bg-yellow-500 border-yellow-300 shadow-[0_0_6px_rgba(201,168,76,0.5)]'
-                                : 'bg-transparent border-yellow-700/60 hover:border-yellow-400'
-                            }`}
-                          />
-                        ))}
+                        {Array.from({ length: max }).map((_, i) => {
+                          const isUsed = i < used
+                          return (
+                            <button
+                              key={i}
+                              type="button"
+                              disabled={!isOwner}
+                              onClick={() =>
+                                isUsed ? restaurerSlot(lvl) : consommerSlot(lvl)
+                              }
+                              aria-label={
+                                isUsed
+                                  ? `Emplacement ${lvl} utilisé — restaurer`
+                                  : `Emplacement ${lvl} disponible — consommer`
+                              }
+                              title={isUsed ? 'Restaurer cet emplacement' : 'Consommer cet emplacement'}
+                              className={`codex-spell-slot codex-spell-slot-${lvl} ${isUsed ? 'is-used' : 'is-available'}`}
+                            />
+                          )
+                        })}
                         {max === 0 && (
                           <span className="text-stone-500 text-xs italic">
                             (aucun emplacement)

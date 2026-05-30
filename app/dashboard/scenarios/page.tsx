@@ -8,7 +8,9 @@ import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import MindMap from './MindMap'
 import StarFavori from '@/app/components/StarFavori'
+import TemplatesScenariosGallery from '@/app/components/TemplatesScenariosGallery'
 import { useFavoris } from '@/app/lib/favoris'
+import { unlockAchievement } from '@/app/lib/achievements'
 import {
   construireEnveloppe,
   lireFichierJSON,
@@ -47,6 +49,7 @@ export default function Scenarios() {
   const [messageJoueur, setMessageJoueur] = useState('')
   const [vue, setVue] = useState<'liste' | 'carte'>('liste')
   const [favorisOnly, setFavorisOnly] = useState(false)
+  const [templatesOuvert, setTemplatesOuvert] = useState(false)
   const { est: estFavori } = useFavoris()
   const router = useRouter()
   const t = useTranslations('scenarios')
@@ -161,6 +164,8 @@ export default function Scenarios() {
       if (error) setMessage(error.message)
       else {
         setMessage(t('created'))
+        // Roadmap Affinement 2.10 — achievement premier scénario
+        void unlockAchievement('premier_scenario')
         resetForm()
         fetchScenarios()
       }
@@ -335,7 +340,19 @@ export default function Scenarios() {
         ) : (
         <>
         <div className="grim-card p-6 mb-6">
-          <h2 className="text-lg grim-h2 mb-4">{editingId ? t('edit_title') : t('create_title')}</h2>
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <h2 className="text-lg grim-h2">{editingId ? t('edit_title') : t('create_title')}</h2>
+            {!editingId && (
+              <button
+                type="button"
+                onClick={() => setTemplatesOuvert(true)}
+                className="codex-btn-press px-3 py-1.5 rounded bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 text-xs font-bold border border-yellow-500/30"
+                title="Créer depuis un template pré-fait"
+              >
+                📚 Depuis un template…
+              </button>
+            )}
+          </div>
           <div className="space-y-3">
             <input type="text" placeholder={t('scenario_name_ph')} value={nom} onChange={(e) => setNom(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
             <textarea placeholder={tc('description')} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none h-24" />
@@ -522,6 +539,11 @@ export default function Scenarios() {
         </>
         )}
       </div>
+      <TemplatesScenariosGallery
+        open={templatesOuvert}
+        onClose={() => setTemplatesOuvert(false)}
+        onCreated={() => fetchScenarios()}
+      />
     </main>
   )
 }

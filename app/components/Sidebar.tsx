@@ -332,7 +332,9 @@ export default function Sidebar() {
           }
         },
         { label: t('tools_customize'), icon: '🎨', href: '/dashboard/personnalisation' },
-        { label: t('tools_accessibility'), icon: '♿', href: '/dashboard/accessibilite' }
+        { label: t('tools_accessibility'), icon: '♿', href: '/dashboard/accessibilite' },
+        // Roadmap Affinement 4.4 — accès rapide au centre d'aide.
+        { label: 'Aide', icon: '❓', href: '/dashboard/aide' }
       ]
     }
   ]

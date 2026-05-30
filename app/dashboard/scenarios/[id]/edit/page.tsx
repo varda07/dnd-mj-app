@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import MeteoGenerator from '@/app/components/MeteoGenerator'
 
 // ============================================================================
 // Types
@@ -93,6 +94,8 @@ export default function ScenarioEditPage() {
   // Roadmap 1.3 — notes secrètes MJ (jamais affichées en présentation).
   const [notesSecretes, setNotesSecretes] = useState('')
   const [notesSecretesOuvert, setNotesSecretesOuvert] = useState(false)
+  // Roadmap Affinement 2.4 — Météo modale
+  const [meteoOuvert, setMeteoOuvert] = useState(false)
   // Roadmap 11.2 — wallpaper d'ambiance du scénario.
   const [wallpaperUrl, setWallpaperUrl] = useState('')
   const [wallpaperOuvert, setWallpaperOuvert] = useState(false)
@@ -872,6 +875,37 @@ export default function ScenarioEditPage() {
               📌 Memo MJ
             </button>
 
+            {/* Roadmap Affinement 2.3 — Calendrier de campagne */}
+            <button
+              type="button"
+              onClick={() =>
+                router.push(`/dashboard/scenarios/${scenarioId}/calendrier`)
+              }
+              className="w-full px-3 py-2 rounded border border-yellow-700/40 bg-[#171717] text-yellow-400 hover:bg-[#1c1c1c] hover:border-yellow-600 text-xs font-bold uppercase tracking-[0.16em] transition codex-btn-press"
+            >
+              🗓 Calendrier in-game
+            </button>
+
+            {/* Roadmap Affinement 2.4 — Générer la météo */}
+            <button
+              type="button"
+              onClick={() => setMeteoOuvert(true)}
+              className="w-full px-3 py-2 rounded border border-yellow-700/40 bg-[#171717] text-yellow-400 hover:bg-[#1c1c1c] hover:border-yellow-600 text-xs font-bold uppercase tracking-[0.16em] transition codex-btn-press"
+            >
+              🌦 Générer la météo
+            </button>
+
+            {/* Roadmap Affinement 2.9 — Récap automatique de session */}
+            <button
+              type="button"
+              onClick={() =>
+                router.push(`/dashboard/scenarios/${scenarioId}/recap`)
+              }
+              className="w-full px-3 py-2 rounded border border-yellow-700/40 bg-[#171717] text-yellow-400 hover:bg-[#1c1c1c] hover:border-yellow-600 text-xs font-bold uppercase tracking-[0.16em] transition codex-btn-press"
+            >
+              📔 Récap de session
+            </button>
+
             {/* Roadmap 11.2 — Wallpaper d'ambiance du scénario. */}
             <div className="rounded-lg border border-yellow-800/40 bg-[#171717]">
               <button
@@ -1122,6 +1156,8 @@ export default function ScenarioEditPage() {
           </div>
         </div>
       )}
+      {/* Roadmap Affinement 2.4 — Modale météo */}
+      <MeteoGenerator open={meteoOuvert} onClose={() => setMeteoOuvert(false)} />
     </main>
   )
 }

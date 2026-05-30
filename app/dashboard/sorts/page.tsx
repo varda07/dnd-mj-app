@@ -22,6 +22,11 @@ import {
 } from '@/app/data/sorts_dnd5e'
 import StarFavori from '@/app/components/StarFavori'
 import { useFavoris } from '@/app/lib/favoris'
+import {
+  categoriesSort, typesDegatsSort, sauvegardesSort,
+  CATEGORIES_META, TYPES_DEGATS_META, SAUVEGARDES_META,
+  type SortCategorie, type TypeDegats, type Sauvegarde,
+} from '@/app/lib/sort_filters'
 
 type Sort = {
   id: string
@@ -375,6 +380,11 @@ export default function Sorts() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [importerOuvert, setImporterOuvert] = useState(false)
   const [favorisOnly, setFavorisOnly] = useState(false)
+  // Roadmap Affinement 2.8 — filtres avancés (catégorie, type dégâts, sauvegarde)
+  const [filtreCategorie, setFiltreCategorie] = useState<Set<SortCategorie>>(new Set())
+  const [filtreDegats, setFiltreDegats] = useState<Set<TypeDegats>>(new Set())
+  const [filtreSauvegarde, setFiltreSauvegarde] = useState<Set<Sauvegarde>>(new Set())
+  const [filtresOuvert, setFiltresOuvert] = useState(false)
   const { est: estFavori } = useFavoris()
   const ts = useTranslations('spells')
   const tc = useTranslations('common')
@@ -562,9 +572,29 @@ export default function Sorts() {
     else fetchSorts()
   }
 
-  const sortsAffiches = favorisOnly
-    ? sorts.filter((s) => estFavori('sorts', s.id))
-    : sorts
+  // Roadmap Affinement 2.8 — application des filtres avancés (favoris + cat + dégâts + sauvegarde)
+  const sortsAffiches = useMemo(() => {
+    let list = favorisOnly ? sorts.filter((s) => estFavori('sorts', s.id)) : sorts
+    if (filtreCategorie.size > 0) {
+      list = list.filter((s) => {
+        const cats = categoriesSort(s.description, s.nom)
+        return [...filtreCategorie].every((c) => cats.includes(c))
+      })
+    }
+    if (filtreDegats.size > 0) {
+      list = list.filter((s) => {
+        const types = typesDegatsSort(s.description)
+        return [...filtreDegats].some((t) => types.includes(t))
+      })
+    }
+    if (filtreSauvegarde.size > 0) {
+      list = list.filter((s) => {
+        const saves = sauvegardesSort(s.description)
+        return [...filtreSauvegarde].some((sv) => saves.includes(sv))
+      })
+    }
+    return list
+  }, [sorts, favorisOnly, estFavori, filtreCategorie, filtreDegats, filtreSauvegarde])
 
   const inputCls =
     'w-full p-2.5 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm focus:border-yellow-600'
@@ -803,15 +833,87 @@ export default function Sorts() {
             </div>
           </div>
 
-          <label className="inline-flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none mb-2">
-            <input
-              type="checkbox"
-              checked={favorisOnly}
-              onChange={(e) => setFavorisOnly(e.target.checked)}
-              className="accent-yellow-500"
-            />
-            ⭐ Afficher uniquement les favoris
-          </label>
+          <div className="flex items-center gap-3 flex-wrap mb-2">
+            <label className="inline-flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={favorisOnly}
+                onChange={(e) => setFavorisOnly(e.target.checked)}
+                className="accent-yellow-500"
+              />
+              ⭐ Afficher uniquement les favoris
+            </label>
+            {/* Roadmap Affinement 2.8 — bouton filtres avancés */}
+            <button
+              type="button"
+              onClick={() => setFiltresOuvert((v) => !v)}
+              className="text-xs px-2 py-1 rounded bg-gray-800 border border-yellow-500/30 text-yellow-300 hover:bg-gray-700 codex-btn-press"
+            >
+              🎛 Filtres avancés
+              {(filtreCategorie.size + filtreDegats.size + filtreSauvegarde.size) > 0
+                ? <span className="ml-1 bg-yellow-500 text-gray-900 rounded-full px-1.5 text-[10px] font-bold">
+                    {filtreCategorie.size + filtreDegats.size + filtreSauvegarde.size}
+                  </span>
+                : null}
+            </button>
+            {(filtreCategorie.size + filtreDegats.size + filtreSauvegarde.size) > 0 && (
+              <button
+                type="button"
+                onClick={() => { setFiltreCategorie(new Set()); setFiltreDegats(new Set()); setFiltreSauvegarde(new Set()) }}
+                className="text-xs px-2 py-1 rounded text-gray-400 hover:text-white"
+              >Tout effacer</button>
+            )}
+          </div>
+          {filtresOuvert && (
+            <div className="codex-card p-3 mb-3 flex flex-col gap-3 text-xs text-gray-300">
+              <div>
+                <div className="uppercase tracking-wider text-gray-500 mb-1.5">Type d’effet</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {(Object.keys(CATEGORIES_META) as SortCategorie[]).map((cat) => {
+                    const meta = CATEGORIES_META[cat]
+                    const actif = filtreCategorie.has(cat)
+                    return (
+                      <button key={cat} type="button"
+                        onClick={() => setFiltreCategorie((s) => { const n = new Set(s); n.has(cat) ? n.delete(cat) : n.add(cat); return n })}
+                        className={`px-2 py-1 rounded border text-xs flex items-center gap-1 ${actif ? 'bg-yellow-500/15 border-yellow-400' : 'bg-gray-800 border-gray-700 hover:border-yellow-500/40'}`}
+                        style={actif ? { color: meta.color } : undefined}
+                      >{meta.icon} {meta.label}</button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div>
+                <div className="uppercase tracking-wider text-gray-500 mb-1.5">Type de dégâts</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {(Object.keys(TYPES_DEGATS_META) as TypeDegats[]).map((td) => {
+                    const meta = TYPES_DEGATS_META[td]
+                    const actif = filtreDegats.has(td)
+                    return (
+                      <button key={td} type="button"
+                        onClick={() => setFiltreDegats((s) => { const n = new Set(s); n.has(td) ? n.delete(td) : n.add(td); return n })}
+                        className={`px-2 py-1 rounded border text-xs flex items-center gap-1 ${actif ? 'bg-yellow-500/15 border-yellow-400 text-yellow-200' : 'bg-gray-800 border-gray-700 hover:border-yellow-500/40'}`}
+                      >{meta.icon} {meta.label}</button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div>
+                <div className="uppercase tracking-wider text-gray-500 mb-1.5">Jet de sauvegarde requis</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {(Object.keys(SAUVEGARDES_META) as Sauvegarde[]).map((sv) => {
+                    const meta = SAUVEGARDES_META[sv]
+                    const actif = filtreSauvegarde.has(sv)
+                    return (
+                      <button key={sv} type="button"
+                        onClick={() => setFiltreSauvegarde((s) => { const n = new Set(s); n.has(sv) ? n.delete(sv) : n.add(sv); return n })}
+                        className={`px-2 py-1 rounded border text-xs ${actif ? 'bg-yellow-500/15 border-yellow-400 text-yellow-200' : 'bg-gray-800 border-gray-700 hover:border-yellow-500/40'}`}
+                      >{meta.label}</button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
           {sortsAffiches.length === 0 && (
             <p className="text-gray-400 text-sm italic">{ts('empty')}</p>
           )}

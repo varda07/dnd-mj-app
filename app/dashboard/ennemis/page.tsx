@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase'
 import ImageCropper from '@/app/components/ImageCropper'
 import NumberInput from '@/app/components/NumberInput'
 import StarFavori from '@/app/components/StarFavori'
+import TemplatesPicker, { sauvegarderCommeTemplate } from '@/app/components/TemplatesPicker'
 import { useFavoris } from '@/app/lib/favoris'
 import {
   construireEnveloppe,
@@ -189,6 +190,7 @@ export default function Ennemis() {
   // Roadmap 2.5 — id du monstre source quand on crée une variante.
   const [variantDe, setVariantDe] = useState<string | null>(null)
   const [variantSource, setVariantSource] = useState<Ennemi | null>(null)
+  const [mesTemplatesOuvert, setMesTemplatesOuvert] = useState(false)
 
   // Restaure la préférence de vue compacte/détaillée.
   useEffect(() => {
@@ -586,12 +588,39 @@ export default function Ennemis() {
               label={editingId ? "Nouvelle image (laisser vide pour garder l'actuelle)" : "Image de l'ennemi"}
             />
             {message && <p className="text-yellow-400 text-sm">{message}</p>}
-            <div className="flex gap-2">
-              <button type="button" onClick={sauvegarderEnnemi} disabled={loading} className="flex-1 p-3 bg-yellow-500 text-gray-900 font-bold rounded">
+            <div className="flex gap-2 flex-wrap">
+              <button type="button" onClick={sauvegarderEnnemi} disabled={loading} className="flex-1 p-3 bg-yellow-500 text-gray-900 font-bold rounded codex-btn-press">
                 {loading ? tc('loading') : editingId ? tc('modify') : tc('create')}
               </button>
+              {/* Roadmap Affinement 2.2 — save / load personal templates */}
+              <button
+                type="button"
+                onClick={() => sauvegarderCommeTemplate('ennemis', {
+                  nom,
+                  hp_max: parseInt(hp) || 10, armure: parseInt(armure) || 10,
+                  force: parseInt(force) || 10, dexterite: parseInt(dexterite) || 10,
+                  constitution: parseInt(constitution) || 10, intelligence: parseInt(intelligence) || 10,
+                  sagesse: parseInt(sagesse) || 10, charisme: parseInt(charisme) || 10,
+                  notes, image_url: imageActuelle || null,
+                  comportement_tactique: comportementTactique,
+                  est_groupe: estGroupe, taille_groupe: parseInt(tailleGroupe) || 1,
+                }, nom || 'Ennemi sans nom')}
+                disabled={!nom}
+                className="px-3 p-3 rounded bg-gray-800 border border-yellow-600/40 text-yellow-300 hover:bg-gray-700 text-sm font-bold codex-btn-press disabled:opacity-40"
+                title="Sauvegarder comme template réutilisable"
+              >
+                💾 Sauver template
+              </button>
+              <button
+                type="button"
+                onClick={() => setMesTemplatesOuvert(true)}
+                className="px-3 p-3 rounded bg-gray-800 border border-yellow-600/40 text-yellow-300 hover:bg-gray-700 text-sm font-bold codex-btn-press"
+                title="Charger un de mes templates ennemis"
+              >
+                📂 Mes templates
+              </button>
               {editingId && (
-                <button type="button" onClick={resetForm} className="px-4 p-3 bg-gray-700 text-white font-bold rounded hover:bg-gray-600">
+                <button type="button" onClick={resetForm} className="px-4 p-3 bg-gray-700 text-white font-bold rounded hover:bg-gray-600 codex-btn-press">
                   {tc('cancel')}
                 </button>
               )}
@@ -811,6 +840,29 @@ export default function Ennemis() {
           </div>
         </div>
       )}
+      {/* Roadmap Affinement 2.2 — Mes templates ennemis persos */}
+      <TemplatesPicker
+        open={mesTemplatesOuvert}
+        onClose={() => setMesTemplatesOuvert(false)}
+        kind="ennemis"
+        onApply={(c) => {
+          const get = (k: string, d: string) => (typeof c[k] === 'string' || typeof c[k] === 'number') ? String(c[k]) : d
+          setNom(get('nom', ''))
+          setHp(get('hp_max', '10'))
+          setArmure(get('armure', '10'))
+          setForce(get('force', '10'))
+          setDexterite(get('dexterite', '10'))
+          setConstitution(get('constitution', '10'))
+          setIntelligence(get('intelligence', '10'))
+          setSagesse(get('sagesse', '10'))
+          setCharisme(get('charisme', '10'))
+          setNotes(get('notes', ''))
+          setComportementTactique(get('comportement_tactique', ''))
+          setEstGroupe(c.est_groupe === true)
+          setTailleGroupe(get('taille_groupe', '1'))
+          if (typeof c.image_url === 'string') setImageActuelle(c.image_url)
+        }}
+      />
     </main>
   )
 }

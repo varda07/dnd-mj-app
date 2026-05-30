@@ -29,6 +29,7 @@ import {
   formaterPersonnalitePnj
 } from '@/app/data/personnalites_pnj'
 import StarFavori from '@/app/components/StarFavori'
+import TemplatesPicker, { sauvegarderCommeTemplate } from '@/app/components/TemplatesPicker'
 import { useFavoris } from '@/app/lib/favoris'
 
 type Pnj = {
@@ -81,6 +82,7 @@ export default function PnjPage() {
   const [cropperKey, setCropperKey] = useState(0)
   const [importerOuvert, setImporterOuvert] = useState(false)
   const [favorisOnly, setFavorisOnly] = useState(false)
+  const [mesTemplatesOuvert, setMesTemplatesOuvert] = useState(false)
   // Roadmap 2.1 — générateur de noms : culture + genre sélectionnés.
   const [cultureNom, setCultureNom] = useState('humain')
   const [genreNom, setGenreNom] = useState<GenrePnj>('n')
@@ -453,20 +455,45 @@ export default function PnjPage() {
 
             {message && <p className="text-yellow-400 text-sm">{message}</p>}
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <button
                 type="button"
                 onClick={sauvegarder}
                 disabled={loading}
-                className="flex-1 p-3 bg-yellow-500 text-gray-900 font-bold rounded"
+                className="flex-1 p-3 bg-yellow-500 text-gray-900 font-bold rounded codex-btn-press"
               >
                 {loading ? tc('loading') : editingId ? tc('modify') : tc('create')}
+              </button>
+              {/* Roadmap Affinement 2.2 — save current form values as personal template */}
+              <button
+                type="button"
+                onClick={() => sauvegarderCommeTemplate('pnj', {
+                  nom, race, role, description: descriptionTxt, personnalite, secrets,
+                  hp_max: parseInt(hp) || 10, armure: parseInt(armure) || 10,
+                  force: parseInt(force) || 10, dexterite: parseInt(dexterite) || 10,
+                  constitution: parseInt(constitution) || 10, intelligence: parseInt(intelligence) || 10,
+                  sagesse: parseInt(sagesse) || 10, charisme: parseInt(charisme) || 10,
+                  notes, image_url: imageActuelle || null,
+                }, nom || 'PNJ sans nom')}
+                disabled={!nom}
+                className="px-3 p-3 rounded bg-gray-800 border border-yellow-600/40 text-yellow-300 hover:bg-gray-700 text-sm font-bold codex-btn-press disabled:opacity-40"
+                title="Sauvegarder comme template réutilisable"
+              >
+                💾 Sauver template
+              </button>
+              <button
+                type="button"
+                onClick={() => setMesTemplatesOuvert(true)}
+                className="px-3 p-3 rounded bg-gray-800 border border-yellow-600/40 text-yellow-300 hover:bg-gray-700 text-sm font-bold codex-btn-press"
+                title="Charger un de mes templates PNJ"
+              >
+                📂 Mes templates
               </button>
               {editingId && (
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="px-4 p-3 bg-gray-700 text-white font-bold rounded hover:bg-gray-600"
+                  className="px-4 p-3 bg-gray-700 text-white font-bold rounded hover:bg-gray-600 codex-btn-press"
                 >
                   {tc('cancel')}
                 </button>
@@ -609,6 +636,31 @@ export default function PnjPage() {
           }}
         />
       )}
+      {/* Roadmap Affinement 2.2 — Mes templates PNJ persos */}
+      <TemplatesPicker
+        open={mesTemplatesOuvert}
+        onClose={() => setMesTemplatesOuvert(false)}
+        kind="pnj"
+        onApply={(c) => {
+          const get = (k: string, d: string) => (typeof c[k] === 'string' || typeof c[k] === 'number') ? String(c[k]) : d
+          setNom(get('nom', ''))
+          setRace(get('race', ''))
+          setRole(get('role', ''))
+          setDescriptionTxt(get('description', ''))
+          setPersonnalite(get('personnalite', ''))
+          setSecrets(get('secrets', ''))
+          setHp(get('hp_max', '10'))
+          setArmure(get('armure', '10'))
+          setForce(get('force', '10'))
+          setDexterite(get('dexterite', '10'))
+          setConstitution(get('constitution', '10'))
+          setIntelligence(get('intelligence', '10'))
+          setSagesse(get('sagesse', '10'))
+          setCharisme(get('charisme', '10'))
+          setNotes(get('notes', ''))
+          if (typeof c.image_url === 'string') setImageActuelle(c.image_url)
+        }}
+      />
     </main>
   )
 }

@@ -16,6 +16,7 @@ import {
   SOUND_DEFAULT_URLS,
   type SoundKey
 } from '@/app/lib/dice-sounds'
+import { unlockAchievement, incrementCounter } from '@/app/lib/achievements'
 
 // @3d-dice/dice-box est strictement client-side (Babylon.js + AmmoJS via
 // web worker). On charge le wrapper dynamiquement, ssr désactivé.
@@ -587,12 +588,23 @@ export default function DiceLauncher() {
         setCritEffect('success')
         playSound('crit-success')
         setTimeout(() => setCritEffect(null), 2000)
+        // Roadmap Affinement 2.10 — achievement crit
+        void unlockAchievement('premier_crit')
       } else if (valeursPourCrit.includes(1)) {
         setCritEffect('fail')
         playSound('crit-fail')
         setTimeout(() => setCritEffect(null), 2000)
+        void unlockAchievement('premier_fumble')
       }
     }
+
+    // Roadmap Affinement 2.10 — compteur de dés lancés
+    for (let i = 0; i < jets.length; i++) {
+      void incrementCounter('des_lances', 100, 'cent_des')
+      void incrementCounter('des_lances_1000', 1000, 'mille_des')
+    }
+    // Premier dé
+    void unlockAchievement('premier_de')
 
     // ---- Persistance Supabase ----
     let user: { id: string } | null = null
