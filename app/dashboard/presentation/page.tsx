@@ -7,6 +7,12 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { CONDITIONS_MAP, isConditionKey } from '@/app/data/conditions'
 import { notifyUsers } from '@/app/lib/notifications'
+import PresentationTabsBar from '@/app/components/presentation/PresentationTabsBar'
+import SessionTimer from '@/app/components/presentation/SessionTimer'
+import JoueursConnectes from '@/app/components/presentation/JoueursConnectes'
+import HistoriqueSessionPanel from '@/app/components/presentation/HistoriqueSessionPanel'
+import SondageLauncher from '@/app/components/presentation/SondageLauncher'
+import AmbianceSonoreAuto from '@/app/components/presentation/AmbianceSonoreAuto'
 
 // ============================================================================
 // Mode Présentation
@@ -59,6 +65,9 @@ export type EtatPresentation = {
   lieu_son: string | null
   lieu_son_volume: number
   ambiance: string
+  // Roadmap Modes 1.7 — image de fond du lieu (voile sombre par-dessus)
+  lieu_image_fond?: string | null
+  lieu_image_visible?: boolean
 }
 
 // Image utilisable dans la galerie « à pousser à l'écran ».
@@ -204,6 +213,23 @@ function PresentationInner() {
       )
       setIsMj(userIsMj)
 
+      // Restaure une éventuelle session de diffusion existante du MJ.
+      // Le lien public et le QR code restent stables tant que la session existe,
+      // même après un changement de scénario actif (le scenario_id de la
+      // session est mis à jour, pas la session elle-même).
+      if (userIsMj) {
+        const { data: liveSession } = await supabase
+          .from('sessions_presentation')
+          .select('id')
+          .eq('mj_id', user.id)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (!cancelled && liveSession) {
+          setSessionId(liveSession.id as string)
+        }
+      }
+
       if (!activeScn) {
         // Aucun scénario actif → affiche un état vide (le rendu gère
         // cela en proposant de choisir/activer un scénario).
@@ -255,7 +281,9 @@ function PresentationInner() {
           image_plein_ecran: (pres.image_plein_ecran as string | null) ?? null,
           lieu_son: (pres.lieu_son as string | null) ?? null,
           lieu_son_volume: (pres.lieu_son_volume as number | null) ?? 50,
-          ambiance: (pres.ambiance as string | null) ?? 'auto'
+          ambiance: (pres.ambiance as string | null) ?? 'auto',
+          lieu_image_fond: (pres.lieu_image_fond as string | null) ?? null,
+          lieu_image_visible: (pres.lieu_image_visible as boolean | null) ?? true,
         })
       }
 
@@ -532,11 +560,26 @@ function PresentationInner() {
 
   // --------------------------------------------------------------------------
   // Bascule le scénario actif (un seul actif à la fois côté MJ).
+  // Si une diffusion est en cours, met aussi à jour sessions_presentation.scenario_id
+  // pour que les joueurs déjà connectés voient le nouveau scénario sans changer
+  // de lien.
   // --------------------------------------------------------------------------
   const activerScenario = useCallback(
     async (id: string) => {
+      if (id === scenario?.id) return
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+      const cible = mesScenarios.find((s) => s.id === id)
+      // Confirmation si une diffusion est en cours (les joueurs vont voir le
+      // changement en direct).
+      if (sessionId && typeof window !== 'undefined') {
+        const ok = window.confirm(
+          `Une diffusion est en cours.\n\n` +
+          `Changer de scénario va afficher « ${cible?.nom ?? 'le nouveau scénario'} » ` +
+          `aux joueurs déjà connectés. Le lien public reste le même.\n\nContinuer ?`
+        )
+        if (!ok) return
+      }
       setStatusMsg('Activation…')
       // Désactive tous les autres scénarios du MJ
       await supabase
@@ -554,13 +597,26 @@ function PresentationInner() {
         setStatusMsg('Erreur')
         return
       }
+      // Si une diffusion existe, repointe-la sur le nouveau scénario AVANT le
+      // reload — sinon le useEffect snapshot pousserait le mauvais scenario_id
+      // implicitement via la prochaine update.
+      if (sessionId) {
+        const { error: errSess } = await supabase
+          .from('sessions_presentation')
+          .update({ scenario_id: id })
+          .eq('id', sessionId)
+        if (errSess) {
+          console.error('[presentation] retarget session :', errSess)
+        }
+      }
       setStatusMsg('✓ Activé')
       setTimeout(() => setStatusMsg(''), 1500)
-      // Recharge la page pour rafraîchir tout l'état (scénario, etat, etc.)
+      // Recharge la page pour rafraîchir tout l'état (scénario, etat, persos,
+      // ennemis liés). La sessionId sera restaurée par l'init useEffect.
       router.refresh()
       window.location.reload()
     },
-    [router]
+    [router, scenario?.id, sessionId, mesScenarios]
   )
 
   // --------------------------------------------------------------------------
@@ -634,14 +690,24 @@ function PresentationInner() {
     setDiffusionMsg('Création de la session…')
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    // Réutilise la session existante de ce scénario s'il y en a une.
+    // Réutilise une session existante du MJ, quelle que soit son scenario_id.
+    // Cela garde le lien public et le QR code stables entre les changements
+    // de scénario actif. Si le scenario_id de la session diffère du scénario
+    // actif, on le repointe au passage.
     const { data: existante } = await supabase
       .from('sessions_presentation')
-      .select('id')
+      .select('id, scenario_id')
       .eq('mj_id', user.id)
-      .eq('scenario_id', scenario.id)
+      .order('updated_at', { ascending: false })
+      .limit(1)
       .maybeSingle()
     if (existante) {
+      if ((existante as { scenario_id: string | null }).scenario_id !== scenario.id) {
+        await supabase
+          .from('sessions_presentation')
+          .update({ scenario_id: scenario.id })
+          .eq('id', existante.id as string)
+      }
       setSessionId(existante.id as string)
       setDiffusionMsg('')
       return
@@ -668,6 +734,13 @@ function PresentationInner() {
 
   const arreterDiffusion = useCallback(async () => {
     if (!sessionId) return
+    if (typeof window !== 'undefined') {
+      const ok = window.confirm(
+        'Arrêter la diffusion ?\n\nLe lien public actuel deviendra inactif. ' +
+        'Au prochain « Lancer la diffusion », un nouveau lien sera généré.'
+      )
+      if (!ok) return
+    }
     await supabase.from('sessions_presentation').delete().eq('id', sessionId)
     setSessionId(null)
     setDiffusionMsg('')
@@ -822,6 +895,36 @@ function PresentationInner() {
           )}
         </div>
 
+        {/* Indicateur permanent quand une diffusion est active. */}
+        {isMj && sessionId && (
+          <div
+            className="rounded-lg p-3 mb-4 flex items-center gap-3 flex-wrap"
+            style={{
+              background:
+                'linear-gradient(90deg, rgba(74,222,128,0.10) 0%, rgba(74,222,128,0.04) 100%)',
+              border: '1px solid rgba(74,222,128,0.32)'
+            }}
+          >
+            <span className="text-green-400 text-xs font-bold uppercase tracking-[0.18em] flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+              Diffusion active
+            </span>
+            <span className="text-sm text-gray-200">
+              Scénario en diffusion : <strong className="text-green-300">{scenario.nom}</strong>
+            </span>
+            {/* Roadmap Modes 1.2 — Timer de session */}
+            <SessionTimer sessionId={sessionId} />
+            {/* Roadmap Modes 1.3 — Joueurs connectés */}
+            <JoueursConnectes sessionId={sessionId} />
+            {/* Roadmap Modes 1.5 — Sondage rapide */}
+            <SondageLauncher sessionId={sessionId} />
+            <span className="text-[10px] text-gray-500 italic ml-auto">le lien public ne change pas tant que la diffusion n'est pas arrêtée.</span>
+          </div>
+        )}
+
+        {/* Roadmap Modes 1.1 — Tabs bar navigation rapide (sticky) */}
+        {isMj && <PresentationTabsBar />}
+
         {/* Sélecteur de scénario actif (MJ uniquement, et seulement s'il a
             plusieurs scénarios). */}
         {isMj && mesScenarios.length > 1 && (
@@ -836,12 +939,14 @@ function PresentationInner() {
             >
               {mesScenarios.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.nom}
+                  {s.actif ? '● ' : ''}{s.nom}
                 </option>
               ))}
             </select>
             <span className="text-[10px] text-gray-500 italic">
-              Changer recharge la présentation.
+              {sessionId
+                ? 'Le changement est diffusé en direct aux joueurs.'
+                : 'Changer recharge la présentation.'}
             </span>
           </div>
         )}
@@ -861,7 +966,7 @@ function PresentationInner() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Colonne gauche : contrôles MJ */}
           {isMj && (
-            <div className="bg-gray-800 rounded-lg p-4 space-y-4">
+            <div id="mjtab-narration" className="bg-gray-800 rounded-lg p-4 space-y-4 scroll-mt-24">
               <h2 className="codex-section-title codex-section-title-left text-yellow-500" style={{ fontSize: 10 }}>
                 Contrôles MJ
               </h2>
@@ -905,6 +1010,43 @@ function PresentationInner() {
                   placeholder="L'air glacial vous saisit. Des torches vacillantes éclairent…"
                   className="w-full p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none focus:border-yellow-500 text-sm min-h-[120px]"
                 />
+              </div>
+
+              {/* Roadmap Modes 1.7 — Image de fond du lieu */}
+              <div>
+                <label className="text-xs uppercase tracking-wider text-gray-400 block mb-1">
+                  Image de fond du lieu (URL)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={etat?.lieu_image_fond ?? ''}
+                    onChange={(e) => sauverChamp({ lieu_image_fond: e.target.value.trim() || null })}
+                    placeholder="https://… (jpg/png/webp)"
+                    className="flex-1 min-w-0 p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none focus:border-yellow-500 text-xs font-mono"
+                  />
+                  {etat?.lieu_image_fond && (
+                    <button type="button" onClick={() => sauverChamp({ lieu_image_fond: null })}
+                      className="px-2 py-1 border border-red-700/50 text-red-300 rounded text-xs">
+                      ✕
+                    </button>
+                  )}
+                </div>
+                <label className="flex items-center gap-2 mt-1.5 text-[10px] text-gray-400 cursor-pointer">
+                  <input type="checkbox"
+                    checked={etat?.lieu_image_visible !== false}
+                    onChange={(e) => sauverChamp({ lieu_image_visible: e.target.checked })}
+                    className="accent-yellow-500"
+                  />
+                  Afficher aux joueurs (voile sombre 70 %)
+                </label>
+                {etat?.lieu_image_fond && (
+                  <div className="mt-2 relative h-24 rounded overflow-hidden border border-gray-700">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={etat.lieu_image_fond} alt="Aperçu" loading="lazy" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/70" />
+                  </div>
+                )}
               </div>
 
               {/* === Narration temps réel === */}
@@ -960,7 +1102,7 @@ function PresentationInner() {
               </div>
 
               {/* === Actions rapides === */}
-              <div>
+              <div id="mjtab-combat" className="scroll-mt-24">
                 <label className="text-xs uppercase tracking-wider text-gray-400 block mb-2">
                   Actions rapides
                 </label>
@@ -1029,7 +1171,7 @@ function PresentationInner() {
               </div>
 
               {/* === Galerie d'images à pousser plein écran === */}
-              <div>
+              <div id="mjtab-carte" className="scroll-mt-24">
                 <label className="text-xs uppercase tracking-wider text-gray-400 block mb-2">
                   Galerie — image plein écran
                 </label>
@@ -1079,8 +1221,17 @@ function PresentationInner() {
                 )}
               </div>
 
+              {/* Roadmap Modes 1.6 — Mode auto ambiance sonore (bibliothèque sons_user) */}
+              <AmbianceSonoreAuto
+                contexte={
+                  etat?.en_pause ? 'pause'
+                  : combat?.actif ? 'combat'
+                  : 'exploration'
+                }
+              />
+
               {/* === Ambiance sonore en boucle === */}
-              <div>
+              <div id="mjtab-sons" className="scroll-mt-24">
                 <label className="text-xs uppercase tracking-wider text-gray-400 block mb-1">
                   Ambiance sonore (URL en boucle)
                 </label>
@@ -1158,7 +1309,7 @@ function PresentationInner() {
           )}
 
           {/* Colonne droite : partage + lancement plein écran */}
-          <div className="bg-gray-800 rounded-lg p-4 space-y-4">
+          <div id="mjtab-controle" className="bg-gray-800 rounded-lg p-4 space-y-4 scroll-mt-24">
             <h2 className="codex-section-title codex-section-title-left text-yellow-500" style={{ fontSize: 10 }}>
               Diffusion
             </h2>
@@ -1283,6 +1434,13 @@ function PresentationInner() {
             )}
           </div>
         </div>
+
+        {/* Roadmap Modes 1.4 — Historique de session (panneau dépliable) */}
+        {isMj && sessionId && (
+          <div id="mjtab-notes" className="mt-6 scroll-mt-24">
+            <HistoriqueSessionPanel sessionId={sessionId} />
+          </div>
+        )}
 
         {/* Preview de ce que voient les joueurs */}
         <div className="mt-6">
@@ -1565,6 +1723,11 @@ export function DisplayView({
     a.play().catch(() => setAudioBloque(true))
   }, [lieuSon])
 
+  // Roadmap Modes 1.7 — image de fond du lieu (visible si toggle MJ activé)
+  const lieuImageFond = etat?.lieu_image_fond ?? null
+  const lieuImageVisible = etat?.lieu_image_visible !== false
+  const afficherImage = lieuImageFond && lieuImageVisible
+
   return (
     <div
       ref={root}
@@ -1575,8 +1738,32 @@ export function DisplayView({
         transition: 'background 0.6s ease'
       }}
     >
+      {/* Roadmap Modes 1.7 — image de fond du lieu (transition fade) */}
+      {afficherImage && (
+        <>
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute', inset: 0,
+              backgroundImage: `url(${lieuImageFond})`,
+              backgroundSize: 'cover', backgroundPosition: 'center',
+              opacity: 1,
+              transition: 'opacity 0.7s ease, background-image 0.7s ease',
+              zIndex: 0,
+            }}
+          />
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute', inset: 0,
+              background: 'radial-gradient(ellipse at center, rgba(5,6,8,0.55) 0%, rgba(5,6,8,0.85) 100%)',
+              zIndex: 0,
+            }}
+          />
+        </>
+      )}
       {/* Couche de particules dorées subtiles (optionnel, pur CSS). */}
-      {!compact && <div className="presentation-particles" aria-hidden="true" />}
+      {!compact && <div className="presentation-particles" aria-hidden="true" style={{ position: 'relative', zIndex: 1 }} />}
 
       {/* Ambiance sonore en boucle. */}
       {lieuSon && (

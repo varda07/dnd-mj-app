@@ -22,6 +22,7 @@ import {
   type Persona,
   type Ennemi
 } from '@/app/dashboard/presentation/page'
+import SondageViewer from '@/app/components/presentation/SondageViewer'
 
 type Snapshot = {
   scenario?: ScenarioActif
@@ -83,9 +84,36 @@ export default function PresentationPublique() {
       )
       .subscribe()
 
+    // Roadmap Modes 1.3 — Présence joueur sur le channel dédié.
+    // Le pseudo vient du profil si connecté, sinon localStorage ou "Invité".
+    const presenceKey = `viewer-${Math.random().toString(36).slice(2, 10)}`
+    const presenceChannel = supabase.channel(`presentation-presence:${sessionId}`, {
+      config: { presence: { key: presenceKey } }
+    })
+    void (async () => {
+      let name = 'Invité'
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles').select('username').eq('id', user.id).maybeSingle()
+          name = (profile?.username as string | undefined) ?? user.email ?? 'Invité'
+        } else if (typeof window !== 'undefined') {
+          const saved = window.localStorage.getItem('presentation_viewer_name')
+          if (saved) name = saved
+        }
+      } catch { /* noop */ }
+      presenceChannel.subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({ name, joined: Date.now() })
+        }
+      })
+    })()
+
     return () => {
       cancel = true
       supabase.removeChannel(channel)
+      supabase.removeChannel(presenceChannel)
     }
   }, [sessionId])
 
@@ -167,6 +195,8 @@ export default function PresentationPublique() {
         personnages={snapshot?.personnages ?? []}
         ennemis={snapshot?.ennemis ?? []}
       />
+      {/* Roadmap Modes 1.5 — Sondage flottant en haut de l'écran joueurs */}
+      <SondageViewer sessionId={sessionId} />
     </>
   )
 }
