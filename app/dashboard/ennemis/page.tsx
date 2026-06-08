@@ -57,7 +57,19 @@ type Ennemi = {
   // Roadmap 6.4 — combat de masse.
   est_groupe?: boolean
   taille_groupe?: number
+  // Refonte combat diffusion — mitigation des dégâts.
+  resistances?: string[]
+  immunites?: string[]
+  vulnerabilites?: string[]
 }
+
+// Parse "feu, froid" → ["feu","froid"] (et l'inverse pour l'affichage).
+const parseTypes = (s: string): string[] =>
+  s
+    .split(',')
+    .map((x) => x.trim().toLowerCase())
+    .filter(Boolean)
+const joinTypes = (a?: string[] | null): string => (Array.isArray(a) ? a.join(', ') : '')
 
 type ScenarioOption = { id: string; nom: string }
 
@@ -170,6 +182,11 @@ export default function Ennemis() {
   const [notes, setNotes] = useState('')
   // Roadmap 6.3 — comportement tactique (texte libre + suggestion selon INT).
   const [comportementTactique, setComportementTactique] = useState('')
+  // Refonte combat diffusion — résistances / immunités / vulnérabilités
+  // (saisies en texte séparé par des virgules, stockées en array jsonb).
+  const [resistances, setResistances] = useState('')
+  const [immunites, setImmunites] = useState('')
+  const [vulnerabilites, setVulnerabilites] = useState('')
   // Roadmap 6.4 — combat de masse : ennemi représentant un groupe d'unités.
   const [estGroupe, setEstGroupe] = useState(false)
   const [tailleGroupe, setTailleGroupe] = useState('1')
@@ -271,6 +288,9 @@ export default function Ennemis() {
     setCharisme('10')
     setNotes('')
     setComportementTactique('')
+    setResistances('')
+    setImmunites('')
+    setVulnerabilites('')
     setEstGroupe(false)
     setTailleGroupe('1')
     setEditingId(null)
@@ -295,6 +315,9 @@ export default function Ennemis() {
     setCharisme(String(ennemi.charisme))
     setNotes(ennemi.notes ?? '')
     setComportementTactique(ennemi.comportement_tactique ?? '')
+    setResistances(joinTypes(ennemi.resistances))
+    setImmunites(joinTypes(ennemi.immunites))
+    setVulnerabilites(joinTypes(ennemi.vulnerabilites))
     setEstGroupe(!!ennemi.est_groupe)
     setTailleGroupe(String(ennemi.taille_groupe ?? 1))
     setScenarioId(ennemi.scenario_id ?? '')
@@ -347,6 +370,9 @@ export default function Ennemis() {
       charisme: parseInt(charisme),
       notes,
       comportement_tactique: comportementTactique,
+      resistances: parseTypes(resistances),
+      immunites: parseTypes(immunites),
+      vulnerabilites: parseTypes(vulnerabilites),
       est_groupe: estGroupe,
       taille_groupe: estGroupe ? Math.max(1, parseInt(tailleGroupe) || 1) : 1,
       scenario_id: scenarioId || null,
@@ -547,6 +573,49 @@ export default function Ennemis() {
                 placeholder="Comment ce monstre se bat, ses priorités de cible, sa condition de fuite…"
                 className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm h-20"
               />
+            </div>
+
+            {/* Refonte combat diffusion — résistances / immunités / vulnérabilités.
+                Affichées côté cockpit MJ pendant le combat. Séparer par des virgules. */}
+            <div className="rounded border border-gray-700 bg-gray-900/40 p-3 space-y-2">
+              <label className="text-sm font-bold text-yellow-300">
+                🛡 Mitigation des dégâts
+              </label>
+              <p className="text-[11px] text-gray-400 -mt-1">
+                Types de dégâts séparés par des virgules (ex : feu, froid, contondant).
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[11px] text-blue-300 block mb-0.5">Résistances</label>
+                  <input
+                    type="text"
+                    value={resistances}
+                    onChange={(e) => setResistances(e.target.value)}
+                    placeholder="feu, froid"
+                    className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-gray-300 block mb-0.5">Immunités</label>
+                  <input
+                    type="text"
+                    value={immunites}
+                    onChange={(e) => setImmunites(e.target.value)}
+                    placeholder="poison"
+                    className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-red-300 block mb-0.5">Vulnérabilités</label>
+                  <input
+                    type="text"
+                    value={vulnerabilites}
+                    onChange={(e) => setVulnerabilites(e.target.value)}
+                    placeholder="radiant"
+                    className="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Roadmap 6.4 — combat de masse. */}

@@ -662,6 +662,12 @@ export default function Dashboard() {
                             href: `/dashboard/combat?scenario=${scenarioAventureEffectif}`
                           },
                           {
+                            icon: '⚡',
+                            titre: 'Combat rapide',
+                            desc: 'MJ seul — moteur unifié, un écran',
+                            href: `/dashboard/combat-rapide?scenario=${scenarioAventureEffectif}`
+                          },
+                          {
                             icon: '🧭',
                             titre: 'Exploration',
                             desc: 'Carte partagée et brouillard de guerre',

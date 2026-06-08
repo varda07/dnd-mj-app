@@ -399,6 +399,16 @@ type JetRow = {
 export default function DiceLauncher() {
   const [open, setOpen] = useState(false)
   const [shake, setShake] = useState(false)
+  // Mode diffusion MJ : la roue d'action remplace ce FAB. On masque alors le
+  // FAB classique (event `dice:fab-hidden`) pour ne jamais avoir deux boutons.
+  const [fabHidden, setFabHidden] = useState(false)
+  useEffect(() => {
+    const onHidden = (e: Event) => {
+      setFabHidden(!!(e as CustomEvent<boolean>).detail)
+    }
+    window.addEventListener('dice:fab-hidden', onHidden as EventListener)
+    return () => window.removeEventListener('dice:fab-hidden', onHidden as EventListener)
+  }, [])
   const [selectedDice, setSelectedDice] = useState<DiceType>(DICE[5])
   const [count, setCount] = useState(1)
   const [share, setShare] = useState(false)
@@ -922,6 +932,7 @@ export default function DiceLauncher() {
         </div>
       )}
 
+      {!fabHidden && (
       <button
         type="button"
         onClick={() => {
@@ -958,6 +969,7 @@ export default function DiceLauncher() {
           <DiceFabIcon />
         )}
       </button>
+      )}
       <style>{`
         /* Desktop ≥ md : pas de bottom bar, ancre simple à 24px du bord. */
         @media (min-width: 768px) {

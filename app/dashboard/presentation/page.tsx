@@ -7,12 +7,18 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { CONDITIONS_MAP, isConditionKey } from '@/app/data/conditions'
 import { notifyUsers } from '@/app/lib/notifications'
-import PresentationTabsBar from '@/app/components/presentation/PresentationTabsBar'
 import SessionTimer from '@/app/components/presentation/SessionTimer'
 import JoueursConnectes from '@/app/components/presentation/JoueursConnectes'
 import HistoriqueSessionPanel from '@/app/components/presentation/HistoriqueSessionPanel'
 import SondageLauncher from '@/app/components/presentation/SondageLauncher'
 import AmbianceSonoreAuto from '@/app/components/presentation/AmbianceSonoreAuto'
+import type { AttaqueData } from '@/app/components/AttackRoller'
+import CombatCockpitMJ from '@/app/components/presentation/CombatCockpitMJ'
+import CombatVueJoueurs from '@/app/components/presentation/CombatVueJoueurs'
+import ActionWheelMJ, { type ActionWheelKey } from '@/app/components/presentation/ActionWheelMJ'
+import WildMagicRoller from '@/app/components/WildMagicRoller'
+import SituationsRandom from '@/app/components/SituationsRandom'
+import { rollInitiative } from '@/app/lib/combat-engine'
 
 // ============================================================================
 // Mode Présentation
@@ -68,6 +74,8 @@ export type EtatPresentation = {
   // Roadmap Modes 1.7 — image de fond du lieu (voile sombre par-dessus)
   lieu_image_fond?: string | null
   lieu_image_visible?: boolean
+  // Phase 5 — effet de Magie Sauvage poussé à l'écran joueurs (ou null).
+  wild_magic?: { titre: string; description: string } | null
 }
 
 // Image utilisable dans la galerie « à pousser à l'écran ».
@@ -80,14 +88,127 @@ const NARRATION_TEMPLATES = [
   'Le silence retombe…'
 ]
 
+// ----------------------------------------------------------------------------
+// Refonte ergonomique du mode diffusion
+// ----------------------------------------------------------------------------
+// Le cockpit s'adapte au « setup » choisi par le MJ au lancement (mémorisé en
+// localStorage). On garde TOUTES les fonctionnalités : on réorganise juste
+// l'accès en 2 niveaux — essentiels toujours visibles + panneaux ouverts un à
+// la fois.
+
+// Setup de diffusion : combinaison écran MJ / écran joueurs.
+export type SetupMode = 'pc-tv' | 'pc-tel' | 'tel-tel' | 'mj-seul'
+const SETUP_STORAGE_KEY = 'presentation_setup_mode'
+
+const SETUPS: Array<{
+  key: SetupMode
+  icon: string
+  titre: string
+  desc: string
+}> = [
+  {
+    key: 'pc-tv',
+    icon: '🖥️📺',
+    titre: 'PC + TV',
+    desc: 'Cockpit complet sur PC, écran joueurs sur la TV. Le plus complet.'
+  },
+  {
+    key: 'pc-tel',
+    icon: '🖥️📱',
+    titre: 'PC + Téléphones',
+    desc: 'Cockpit sur PC, chaque joueur suit sur son téléphone via QR code.'
+  },
+  {
+    key: 'tel-tel',
+    icon: '📱📱',
+    titre: 'Tél + Tél',
+    desc: 'Cockpit compact sur ton téléphone, joueurs sur leurs téléphones.'
+  },
+  {
+    key: 'mj-seul',
+    icon: '👤',
+    titre: 'MJ seul',
+    desc: 'Juste tes outils de MJ, sans écran joueurs séparé.'
+  }
+]
+
+const SETUP_LABEL: Record<SetupMode, string> = {
+  'pc-tv': '🖥️📺 PC + TV',
+  'pc-tel': '🖥️📱 PC + Tél',
+  'tel-tel': '📱📱 Tél + Tél',
+  'mj-seul': '👤 MJ seul'
+}
+
+// Panneaux du cockpit (niveau « 1 clic »). `needsPlayers` = masqué en MJ seul
+// (pas d'écran joueurs → pas de sondage, historique de diffusion, ni partage).
+type PanelKey =
+  | 'narration'
+  | 'combat'
+  | 'carte'
+  | 'image'
+  | 'sons'
+  | 'sondage'
+  | 'notes'
+  | 'historique'
+  | 'diffusion'
+
+const COCKPIT_PANELS: Array<{
+  key: PanelKey
+  icon: string
+  label: string
+  needsPlayers?: boolean
+}> = [
+  { key: 'narration', icon: '📜', label: 'Narration' },
+  { key: 'combat', icon: '⚔️', label: 'Combat' },
+  { key: 'carte', icon: '🗺️', label: 'Carte' },
+  { key: 'image', icon: '🖼️', label: 'Image' },
+  { key: 'sons', icon: '🎵', label: 'Ambiance' },
+  { key: 'sondage', icon: '📊', label: 'Sondage', needsPlayers: true },
+  { key: 'notes', icon: '📝', label: 'Notes' },
+  { key: 'historique', icon: '📜', label: 'Historique', needsPlayers: true },
+  { key: 'diffusion', icon: '📡', label: 'Diffusion', needsPlayers: true }
+]
+
 type ScenarioLite = { id: string; nom: string; actif: boolean }
+
+// Entrée d'initiative — tolère le schéma riche écrit par la page combat
+// (piece_id / ref_id / init / image_url) ET l'ancien schéma simplifié
+// ({ id }). On résout l'id d'entité via resolveEntiteId().
+export type InitiativeEntry = {
+  kind: 'perso' | 'ennemi'
+  nom: string
+  piece_id?: string
+  ref_id?: string
+  id?: string
+  init?: number
+  image_url?: string | null
+}
+
+// Résout l'UUID de l'entité (perso/ennemi) quel que soit le schéma.
+export function resolveEntiteId(e: InitiativeEntry | null | undefined): string | null {
+  if (!e) return null
+  return e.ref_id ?? e.id ?? (e.piece_id ? e.piece_id.replace(/^(perso|ennemi)-/, '') : null)
+}
+
+export type EtatCombat = {
+  status?: 'inconscient' | 'stabilise' | 'mort' | 'vaincu'
+  death_success?: number
+  death_failure?: number
+  conditions_cachees?: string[]
+}
 
 export type CombatLite = {
   scenario_id: string
   round: number
   tour_actuel: number
-  ordre_initiative: Array<{ kind: 'perso' | 'ennemi'; id: string; nom: string }>
+  ordre_initiative: InitiativeEntry[]
   actif: boolean
+  // Refonte combat diffusion
+  en_pause?: boolean
+  etats_combat?: Record<string, EtatCombat>
+  carte_id?: string | null
+  carte_visible_joueurs?: boolean
+  positions?: Record<string, { x: number; y: number }>
 }
 
 export type Persona = {
@@ -99,6 +220,8 @@ export type Persona = {
   hp_max: number
   image_url: string | null
   conditions: string[]
+  // Refonte combat diffusion — CA pour la vue MJ.
+  ca?: number | null
 }
 
 export type Ennemi = {
@@ -108,6 +231,16 @@ export type Ennemi = {
   hp_max: number
   image_url: string | null
   conditions: string[]
+  // Refonte combat diffusion — stats MJ (jamais montrées telles quelles aux
+  // joueurs : la vue joueurs n'affiche qu'un état qualitatif).
+  // NB : la CA ennemie est la colonne `armure` ; la tactique est
+  // `comportement_tactique` (colonnes déjà existantes).
+  armure?: number | null
+  attaques?: AttaqueData[]
+  resistances?: string[]
+  immunites?: string[]
+  vulnerabilites?: string[]
+  comportement_tactique?: string | null
 }
 
 // ----------------------------------------------------------------------------
@@ -156,7 +289,20 @@ function PresentationInner() {
   const [libPersos, setLibPersos] = useState<Persona[]>([])
   const [libEnnemis, setLibEnnemis] = useState<Ennemi[]>([])
 
+  // Refonte ergonomique — setup de diffusion + panneau actif du cockpit.
+  const [setupMode, setSetupMode] = useState<SetupMode | null>(null)
+  const [setupReady, setSetupReady] = useState(false)
+  const [activePanel, setActivePanel] = useState<PanelKey | null>(null)
+  // Roue d'action MJ — modales Magie Sauvage / Rencontre aléatoire.
+  const [wildMagicOpen, setWildMagicOpen] = useState(false)
+  const [rencontreOpen, setRencontreOpen] = useState(false)
+  // Bloc-notes MJ (📝) — persisté en localStorage par scénario (pas de SQL).
+  const [notesMj, setNotesMj] = useState('')
+
   const rootRef = useRef<HTMLDivElement | null>(null)
+  // Refonte combat diffusion — throttle des écritures de positions de jetons.
+  const positionsTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const latestPositions = useRef<Record<string, { x: number; y: number }>>({})
 
   // --------------------------------------------------------------------------
   // Chargement initial : scénario actif + état presentation + données combat
@@ -290,7 +436,7 @@ function PresentationInner() {
       // 3. État de combat
       const { data: combatData } = await supabase
         .from('combats')
-        .select('scenario_id, round, tour_actuel, ordre_initiative, actif')
+        .select('scenario_id, round, tour_actuel, ordre_initiative, actif, en_pause, etats_combat, carte_id, carte_visible_joueurs, positions')
         .eq('scenario_id', activeScn.id)
         .maybeSingle()
       if (cancelled) return
@@ -344,22 +490,22 @@ function PresentationInner() {
       const [linkedP, addedP, linkedE, addedE] = await Promise.all([
         supabase
           .from('personnages')
-          .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions')
+          .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions, ca')
           .eq('scenario_id', scenario.id),
         idsP.length > 0
           ? supabase
               .from('personnages')
-              .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions')
+              .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions, ca')
               .in('id', idsP)
           : Promise.resolve({ data: [] }),
         supabase
           .from('ennemis')
-          .select('id, nom, hp_actuel, hp_max, image_url, conditions')
+          .select('id, nom, hp_actuel, hp_max, image_url, conditions, armure, attaques, resistances, immunites, vulnerabilites, comportement_tactique')
           .eq('scenario_id', scenario.id),
         idsE.length > 0
           ? supabase
               .from('ennemis')
-              .select('id, nom, hp_actuel, hp_max, image_url, conditions')
+              .select('id, nom, hp_actuel, hp_max, image_url, conditions, armure, attaques, resistances, immunites, vulnerabilites, comportement_tactique')
               .in('id', idsE)
           : Promise.resolve({ data: [] })
       ])
@@ -518,6 +664,172 @@ function PresentationInner() {
   )
 
   // --------------------------------------------------------------------------
+  // Refonte combat diffusion — pilotage du combat depuis le cockpit MJ
+  // --------------------------------------------------------------------------
+
+  // Patch live de la ligne combats (par scenario_id) + maj optimiste locale.
+  const sauverCombat = useCallback(
+    async (patch: Partial<CombatLite>) => {
+      if (!scenario || !isMj) return
+      setCombat((c) => (c ? { ...c, ...patch } : c))
+      const { error } = await supabase
+        .from('combats')
+        .update(patch)
+        .eq('scenario_id', scenario.id)
+      if (error) {
+        console.error('[combat] save :', {
+          message: error.message,
+          code: error.code,
+          details: error.details
+        })
+      }
+    },
+    [scenario, isMj]
+  )
+
+  // Modifie les PV d'un combattant (delta négatif = dégâts). Optimiste + DB.
+  const modifierHpCombat = useCallback(
+    async (kind: 'perso' | 'ennemi', id: string, delta: number) => {
+      if (!isMj) return
+      const table = kind === 'perso' ? 'personnages' : 'ennemis'
+      let nouvelHp = 0
+      if (kind === 'perso') {
+        setPersonnages((list) =>
+          list.map((p) => {
+            if (p.id !== id) return p
+            nouvelHp = Math.max(0, Math.min(p.hp_max, p.hp_actuel + delta))
+            return { ...p, hp_actuel: nouvelHp }
+          })
+        )
+      } else {
+        setEnnemis((list) =>
+          list.map((e) => {
+            if (e.id !== id) return e
+            nouvelHp = Math.max(0, Math.min(e.hp_max, e.hp_actuel + delta))
+            return { ...e, hp_actuel: nouvelHp }
+          })
+        )
+      }
+      const { error } = await supabase
+        .from(table)
+        .update({ hp_actuel: nouvelHp })
+        .eq('id', id)
+      if (error) console.error('[combat] modifierHp :', error.message)
+    },
+    [isMj]
+  )
+
+  // Ajoute/retire une condition sur un combattant. Optimiste + DB.
+  const toggleConditionCombat = useCallback(
+    async (kind: 'perso' | 'ennemi', id: string, condKey: string) => {
+      if (!isMj) return
+      const table = kind === 'perso' ? 'personnages' : 'ennemis'
+      let next: string[] = []
+      const apply = <T extends { id: string; conditions: string[] }>(p: T): T => {
+        if (p.id !== id) return p
+        const cur = Array.isArray(p.conditions) ? p.conditions : []
+        next = cur.includes(condKey) ? cur.filter((c) => c !== condKey) : [...cur, condKey]
+        return { ...p, conditions: next }
+      }
+      if (kind === 'perso') setPersonnages((l) => l.map(apply))
+      else setEnnemis((l) => l.map(apply))
+      const { error } = await supabase.from(table).update({ conditions: next }).eq('id', id)
+      if (error) console.error('[combat] toggleCondition :', error.message)
+    },
+    [isMj]
+  )
+
+  // Retire toutes les conditions d'un combattant.
+  const clearConditionsCombat = useCallback(
+    async (kind: 'perso' | 'ennemi', id: string) => {
+      if (!isMj) return
+      const table = kind === 'perso' ? 'personnages' : 'ennemis'
+      if (kind === 'perso')
+        setPersonnages((l) => l.map((p) => (p.id === id ? { ...p, conditions: [] } : p)))
+      else setEnnemis((l) => l.map((e) => (e.id === id ? { ...e, conditions: [] } : e)))
+      const { error } = await supabase.from(table).update({ conditions: [] }).eq('id', id)
+      if (error) console.error('[combat] clearConditions :', error.message)
+    },
+    [isMj]
+  )
+
+  // Tour suivant / précédent (incrémente le round en bouclant).
+  const tourSuivantCombat = useCallback(() => {
+    if (!combat || !combat.ordre_initiative.length) return
+    const n = combat.ordre_initiative.length
+    const next = combat.tour_actuel + 1
+    if (next >= n) sauverCombat({ tour_actuel: 0, round: combat.round + 1 })
+    else sauverCombat({ tour_actuel: next })
+  }, [combat, sauverCombat])
+
+  const tourPrecedentCombat = useCallback(() => {
+    if (!combat || !combat.ordre_initiative.length) return
+    const prev = combat.tour_actuel - 1
+    if (prev < 0) {
+      if (combat.round > 1)
+        sauverCombat({ tour_actuel: combat.ordre_initiative.length - 1, round: combat.round - 1 })
+    } else sauverCombat({ tour_actuel: prev })
+  }, [combat, sauverCombat])
+
+  // Termine le combat (retour automatique à la narration côté joueurs).
+  const terminerCombat = useCallback(async () => {
+    if (!scenario || !isMj) return
+    if (typeof window !== 'undefined' && !window.confirm('Terminer le combat ?')) return
+    await sauverCombat({ actif: false })
+  }, [scenario, isMj, sauverCombat])
+
+  // Lance un combat : (ré)initialise la ligne combats avec une initiative
+  // tirée pour tous les PJ + ennemis actuellement affichés. Initiative =
+  // d20 + mod. DEX (DEX non chargée ici → d20 simple, le MJ peut ajuster
+  // l'ordre depuis la page Combat dédiée si besoin).
+  const lancerCombat = useCallback(async () => {
+    if (!scenario || !isMj) return
+    // Moteur unifié : l'initiative est tirée par le helper partagé.
+    const ordre = rollInitiative(personnages, ennemis)
+    if (ordre.length === 0) {
+      setStatusMsg('Ajoute des participants avant de lancer le combat.')
+      setTimeout(() => setStatusMsg(''), 2500)
+      return
+    }
+    const patch = { round: 1, tour_actuel: 0, ordre_initiative: ordre, actif: true }
+    setCombat((c) => ({ scenario_id: scenario.id, ...c, ...patch }))
+    // Upsert (la ligne combats peut ne pas exister encore).
+    const { error } = await supabase
+      .from('combats')
+      .upsert({ scenario_id: scenario.id, ...patch }, { onConflict: 'scenario_id' })
+    if (error) console.error('[combat] lancer :', error.message)
+  }, [scenario, isMj, personnages, ennemis])
+
+  // Déplace un jeton sur la carte tactique (maj optimiste + écriture throttlée).
+  const deplacerJeton = useCallback(
+    (pieceId: string, x: number, y: number) => {
+      if (!scenario || !isMj) return
+      setCombat((c) => {
+        const positions = { ...(c?.positions ?? {}), [pieceId]: { x, y } }
+        latestPositions.current = positions
+        return c ? { ...c, positions } : c
+      })
+      if (positionsTimer.current) clearTimeout(positionsTimer.current)
+      positionsTimer.current = setTimeout(() => {
+        supabase
+          .from('combats')
+          .update({ positions: latestPositions.current })
+          .eq('scenario_id', scenario.id)
+          .then(({ error }) => {
+            if (error) console.error('[combat] positions :', error.message)
+          })
+      }, 250)
+    },
+    [scenario, isMj]
+  )
+
+  // Autorise / retire l'affichage de la carte tactique côté joueurs.
+  const toggleCarteVisible = useCallback(
+    () => sauverCombat({ carte_visible_joueurs: !combat?.carte_visible_joueurs }),
+    [combat?.carte_visible_joueurs, sauverCombat]
+  )
+
+  // --------------------------------------------------------------------------
   // Plein écran — toggle (entrer / sortir)
   // --------------------------------------------------------------------------
   const toggleFullscreen = () => {
@@ -633,12 +945,12 @@ function PresentationInner() {
         myScenarioIds.length > 0
           ? supabase
               .from('personnages')
-              .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions')
+              .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions, ca')
               .in('scenario_id', myScenarioIds)
           : Promise.resolve({ data: [] }),
         supabase
           .from('personnages')
-          .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions')
+          .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions, ca')
           .eq('joueur_id', user.id)
       ])
       const map = new Map<string, Persona>()
@@ -651,7 +963,7 @@ function PresentationInner() {
     } else {
       const { data } = await supabase
         .from('ennemis')
-        .select('id, nom, hp_actuel, hp_max, image_url, conditions')
+        .select('id, nom, hp_actuel, hp_max, image_url, conditions, armure, attaques, resistances, immunites, vulnerabilites, comportement_tactique')
         .eq('mj_id', user.id)
         .order('nom')
       setLibEnnemis((data ?? []) as Ennemi[])
@@ -747,9 +1059,45 @@ function PresentationInner() {
   }, [sessionId])
 
   // Pousse le snapshot complet à chaque changement d'état pendant la diffusion.
+  // SÉCURITÉ : les ennemis sont assainis avant l'envoi public — on ne diffuse
+  // JAMAIS aux joueurs les PV exacts, CA, attaques, résistances, immunités…
+  // (cf. roadmap Phase 2). Quand le voile est levé (ennemis_visibles), les PV
+  // exacts redeviennent visibles, mais les stats MJ restent retirées.
   useEffect(() => {
     if (!sessionId || !scenario) return
-    const snapshot = { scenario, etat, combat, personnages, ennemis }
+    const reveal = etat?.ennemis_visibles ?? false
+    const cachees = combat?.etats_combat ?? {}
+    const ennemisPublic: Ennemi[] = ennemis.map((e) => {
+      const condCachees = cachees[`ennemi-${e.id}`]?.conditions_cachees ?? []
+      const conditions = (Array.isArray(e.conditions) ? e.conditions : []).filter(
+        (c) => !condCachees.includes(c)
+      )
+      if (reveal) {
+        // Voile levé : PV exacts OK, mais on retire quand même les stats MJ.
+        return {
+          id: e.id,
+          nom: e.nom,
+          hp_actuel: e.hp_actuel,
+          hp_max: e.hp_max,
+          image_url: e.image_url,
+          conditions
+        }
+      }
+      // Voile actif : on masque identité + valeurs exactes, en conservant le
+      // PALIER de PV (pour l'état qualitatif) via une échelle sur 100.
+      const ratio = e.hp_max > 0 ? e.hp_actuel / e.hp_max : 0
+      const palier =
+        ratio <= 0 ? 0 : ratio >= 0.75 ? 90 : ratio >= 0.5 ? 60 : ratio >= 0.25 ? 35 : 12
+      return {
+        id: e.id,
+        nom: '???',
+        hp_actuel: palier,
+        hp_max: 100,
+        image_url: null,
+        conditions
+      }
+    })
+    const snapshot = { scenario, etat, combat, personnages, ennemis: ennemisPublic }
     supabase
       .from('sessions_presentation')
       .update({ etat_jeu: snapshot })
@@ -795,6 +1143,115 @@ function PresentationInner() {
       cancel = true
     }
   }, [isMj, scenario])
+
+  // --------------------------------------------------------------------------
+  // Refonte ergonomique — setup mémorisé + bloc-notes MJ
+  // --------------------------------------------------------------------------
+  // Charge le setup de diffusion mémorisé au montage (côté client uniquement
+  // pour éviter un mismatch d'hydratation).
+  useEffect(() => {
+    let saved: SetupMode | null = null
+    try {
+      const raw = window.localStorage.getItem(SETUP_STORAGE_KEY)
+      if (raw === 'pc-tv' || raw === 'pc-tel' || raw === 'tel-tel' || raw === 'mj-seul') {
+        saved = raw
+      }
+    } catch {
+      /* localStorage indisponible : on retombera sur le sélecteur de setup */
+    }
+    // Sync external (localStorage) → state au montage : pattern legit flaggé
+    // par react-hooks/set-state-in-effect mais voulu ici.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (saved) setSetupMode(saved)
+    setSetupReady(true)
+  }, [])
+
+  // Mémorise le choix de setup et l'applique immédiatement.
+  const choisirSetup = useCallback((mode: SetupMode) => {
+    setSetupMode(mode)
+    try {
+      window.localStorage.setItem(SETUP_STORAGE_KEY, mode)
+    } catch {
+      /* noop */
+    }
+  }, [])
+
+  // Bloc-notes MJ — chargé / sauvegardé en localStorage par scénario.
+  const scenarioId = scenario?.id
+  useEffect(() => {
+    if (!scenarioId) return
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setNotesMj(window.localStorage.getItem(`presentation_notes_${scenarioId}`) ?? '')
+    } catch {
+      /* noop */
+    }
+  }, [scenarioId])
+
+  const sauverNotes = useCallback(
+    (valeur: string) => {
+      setNotesMj(valeur)
+      if (!scenario) return
+      try {
+        window.localStorage.setItem(`presentation_notes_${scenario.id}`, valeur)
+      } catch {
+        /* noop */
+      }
+    },
+    [scenario]
+  )
+
+  // Ouvre/ferme un panneau — un seul ouvert à la fois.
+  const togglePanel = useCallback(
+    (k: PanelKey) => setActivePanel((cur) => (cur === k ? null : k)),
+    []
+  )
+
+  // Accès rapide au lanceur de dés global (DiceLauncher monté dans le layout).
+  const ouvrirDes = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('dice:open', { detail: { dice: 'd20' } }))
+  }, [])
+
+  // Roue d'action MJ — dispatch vers l'outil choisi (accessible même en combat).
+  const handleWheel = useCallback(
+    (key: ActionWheelKey) => {
+      switch (key) {
+        case 'des':
+          ouvrirDes()
+          break
+        case 'magie':
+          setWildMagicOpen(true)
+          break
+        case 'rencontre':
+          setRencontreOpen(true)
+          break
+        case 'narration':
+          setActivePanel('narration')
+          break
+        case 'sons':
+          setActivePanel('sons')
+          break
+        case 'image':
+          setActivePanel('image')
+          break
+      }
+    },
+    [ouvrirDes]
+  )
+
+  // Masque le FAB dés classique tant que le cockpit MJ (avec sa roue) est actif.
+  const cockpitActif =
+    isMj && !isDisplayView && !!setupMode && !!scenario && !loading
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    document.body.classList.toggle('cockpit-wheel-active', cockpitActif)
+    // Signal fiable (React) au DiceLauncher global pour qu'il masque son FAB.
+    window.dispatchEvent(new CustomEvent('dice:fab-hidden', { detail: cockpitActif }))
+    return () => {
+      document.body.classList.remove('cockpit-wheel-active')
+      window.dispatchEvent(new CustomEvent('dice:fab-hidden', { detail: false }))
+    }
+  }, [cockpitActif])
 
   // --------------------------------------------------------------------------
   // Rendus
@@ -873,11 +1330,109 @@ function PresentationInner() {
     )
   }
 
-  // Vue MJ : contrôles + preview compact
+  // --------------------------------------------------------------------------
+  // Vue lecture seule (joueur authentifié non-MJ) : aperçu uniquement.
+  // --------------------------------------------------------------------------
+  if (!isMj) {
+    return (
+      <main className="codex-fade-in min-h-screen bg-gray-900 text-white p-4 md:p-6 pb-[calc(56px+env(safe-area-inset-bottom))] md:pb-6">
+        <div className="max-w-5xl mx-auto">
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
+            <button
+              type="button"
+              onClick={() => router.push('/dashboard')}
+              className="px-3 py-1.5 text-xs uppercase tracking-[0.18em] text-[#C9A84C] border border-[rgba(201,168,76,0.30)] hover:bg-[rgba(201,168,76,0.08)] hover:border-[#C9A84C] rounded transition"
+            >
+              ← Retour
+            </button>
+            <h1 className="text-xl md:text-2xl font-bold text-yellow-500">
+              📺 Mode présentation
+            </h1>
+          </div>
+          <h2 className="text-base font-bold text-gray-300 mb-4">📖 {scenario.nom}</h2>
+          <div className="bg-gray-800 border border-yellow-700/40 rounded-lg p-3 mb-4">
+            <p className="text-yellow-300 text-sm">
+              Mode lecture seule — seul le MJ peut modifier l&apos;état.
+            </p>
+          </div>
+          <div className="rounded-lg overflow-hidden border border-yellow-700/30">
+            <DisplayView
+              root={{ current: null }}
+              scenario={scenario}
+              etat={etat}
+              combat={combat}
+              personnages={personnages}
+              ennemis={ennemis}
+              compact
+              onExit={handleExit}
+            />
+          </div>
+        </div>
+      </main>
+    )
+  }
+
+  // --------------------------------------------------------------------------
+  // MJ — Sélecteur de setup au lancement (point 1). Mémorisé en localStorage,
+  // re-affichable via « Changer de setup ». Tant que rien n'est choisi, on
+  // l'affiche en plein écran. On attend la lecture du localStorage pour éviter
+  // un flash du sélecteur si un setup est déjà mémorisé.
+  // --------------------------------------------------------------------------
+  if (!setupMode) {
+    if (!setupReady) return null
+    return (
+      <main className="codex-fade-in min-h-screen bg-gray-900 text-white p-4 md:p-6">
+        <div className="max-w-3xl mx-auto">
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard')}
+            className="px-3 py-1.5 text-xs uppercase tracking-[0.18em] text-[#C9A84C] border border-[rgba(201,168,76,0.30)] hover:bg-[rgba(201,168,76,0.08)] hover:border-[#C9A84C] rounded transition mb-5"
+          >
+            ← Retour
+          </button>
+          <h1 className="codex-display text-2xl md:text-3xl mb-1">Mode diffusion</h1>
+          <p className="text-sm text-gray-400 mb-6">
+            Comment veux-tu diffuser «&nbsp;{scenario.nom}&nbsp;» ? Tu pourras changer à tout moment.
+          </p>
+          <div className="cockpit-setup-grid">
+            {SETUPS.map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => choisirSetup(s.key)}
+                className="cockpit-setup-card"
+              >
+                <span className="cockpit-setup-icon" aria-hidden>{s.icon}</span>
+                <span className="cockpit-setup-titre">{s.titre}</span>
+                <span className="cockpit-setup-desc">{s.desc}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </main>
+    )
+  }
+
+  // setupMode est désormais garanti non-null.
+  const compact = setupMode === 'tel-tel'
+  const avecJoueurs = setupMode !== 'mj-seul'
+  const panneaux = COCKPIT_PANELS.filter((p) => !(p.needsPlayers && !avecJoueurs))
+
+  // --------------------------------------------------------------------------
+  // Vue MJ : cockpit épuré (point 2)
+  //   A. Essentiels toujours visibles : dés, PV, timer, joueurs connectés.
+  //   B. Panneaux ouverts un à la fois (narration, combat, carte, image, sons,
+  //      sondage, notes, historique, diffusion).
+  // --------------------------------------------------------------------------
   return (
-    <main className="codex-fade-in min-h-screen bg-gray-900 text-white p-4 md:p-6 pb-[calc(56px+env(safe-area-inset-bottom))] md:pb-6">
+    <main
+      className={`codex-fade-in min-h-screen bg-gray-900 text-white p-3 md:p-6 pb-[calc(56px+env(safe-area-inset-bottom))] md:pb-6${
+        compact ? ' cockpit-compact' : ''
+      }`}
+    >
       <div className="max-w-5xl mx-auto">
-        <div className="flex items-center gap-3 mb-4 flex-wrap">
+        {/* En-tête : retour + titre + setup courant + « Changer de setup ». */}
+        <div className="flex items-center gap-2 md:gap-3 mb-3 flex-wrap">
           <button
             type="button"
             onClick={() => router.push('/dashboard')}
@@ -885,50 +1440,49 @@ function PresentationInner() {
           >
             ← Retour
           </button>
-          <h1 className="text-xl md:text-2xl font-bold text-yellow-500">
-            📺 Mode présentation
-          </h1>
+          <h1 className="text-lg md:text-2xl font-bold text-yellow-500">📺 Diffusion</h1>
           {statusMsg && (
-            <span className="text-xs text-yellow-300 italic ml-1">
-              {statusMsg}
-            </span>
+            <span className="text-xs text-yellow-300 italic ml-1">{statusMsg}</span>
           )}
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-[11px] px-2 py-1 rounded border border-[rgba(201,168,76,0.3)] text-[#e8e0c8] bg-[rgba(201,168,76,0.08)] whitespace-nowrap">
+              {SETUP_LABEL[setupMode]}
+            </span>
+            <button
+              type="button"
+              onClick={() => setSetupMode(null)}
+              className="text-[11px] px-2 py-1 rounded border border-gray-700 text-gray-300 hover:border-yellow-600 hover:text-yellow-300 transition whitespace-nowrap"
+            >
+              Changer de setup
+            </button>
+          </div>
         </div>
 
-        {/* Indicateur permanent quand une diffusion est active. */}
-        {isMj && sessionId && (
+        <h2 className="text-sm font-bold text-gray-300 mb-3">📖 {scenario.nom}</h2>
+
+        {/* Indicateur compact quand une diffusion est active. */}
+        {sessionId && avecJoueurs && (
           <div
-            className="rounded-lg p-3 mb-4 flex items-center gap-3 flex-wrap"
+            className="rounded-lg p-2.5 mb-3 flex items-center gap-2 flex-wrap"
             style={{
               background:
                 'linear-gradient(90deg, rgba(74,222,128,0.10) 0%, rgba(74,222,128,0.04) 100%)',
               border: '1px solid rgba(74,222,128,0.32)'
             }}
           >
-            <span className="text-green-400 text-xs font-bold uppercase tracking-[0.18em] flex items-center gap-1.5">
+            <span className="text-green-400 text-[11px] font-bold uppercase tracking-[0.18em] flex items-center gap-1.5">
               <span className="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse" />
               Diffusion active
             </span>
-            <span className="text-sm text-gray-200">
-              Scénario en diffusion : <strong className="text-green-300">{scenario.nom}</strong>
+            <span className="text-[11px] text-gray-400 italic ml-auto">
+              le lien public reste stable tant que la diffusion n&apos;est pas arrêtée.
             </span>
-            {/* Roadmap Modes 1.2 — Timer de session */}
-            <SessionTimer sessionId={sessionId} />
-            {/* Roadmap Modes 1.3 — Joueurs connectés */}
-            <JoueursConnectes sessionId={sessionId} />
-            {/* Roadmap Modes 1.5 — Sondage rapide */}
-            <SondageLauncher sessionId={sessionId} />
-            <span className="text-[10px] text-gray-500 italic ml-auto">le lien public ne change pas tant que la diffusion n'est pas arrêtée.</span>
           </div>
         )}
 
-        {/* Roadmap Modes 1.1 — Tabs bar navigation rapide (sticky) */}
-        {isMj && <PresentationTabsBar />}
-
-        {/* Sélecteur de scénario actif (MJ uniquement, et seulement s'il a
-            plusieurs scénarios). */}
-        {isMj && mesScenarios.length > 1 && (
-          <div className="bg-gray-800 rounded-lg p-3 mb-4 flex items-center gap-2 flex-wrap">
+        {/* Sélecteur de scénario actif (si plusieurs scénarios). */}
+        {mesScenarios.length > 1 && (
+          <div className="bg-gray-800 rounded-lg p-2.5 mb-3 flex items-center gap-2 flex-wrap">
             <label className="text-[10px] uppercase tracking-[0.22em] text-gray-400 font-bold">
               Scénario actif
             </label>
@@ -943,124 +1497,97 @@ function PresentationInner() {
                 </option>
               ))}
             </select>
-            <span className="text-[10px] text-gray-500 italic">
-              {sessionId
-                ? 'Le changement est diffusé en direct aux joueurs.'
-                : 'Changer recharge la présentation.'}
-            </span>
           </div>
         )}
 
-        <h2 className="text-base font-bold text-gray-300 mb-4">
-          📖 {scenario.nom}
-        </h2>
-
-        {!isMj && (
-          <div className="bg-gray-800 border border-yellow-700/40 rounded-lg p-3 mb-4">
-            <p className="text-yellow-300 text-sm">
-              Mode lecture seule — seul le MJ peut modifier l&apos;état.
-            </p>
+        {/* ============ Niveau A — essentiels toujours visibles ============ */}
+        <section className="cockpit-essentials">
+          <button
+            type="button"
+            onClick={ouvrirDes}
+            className="cockpit-ess-btn"
+            title="Lanceur de dés (accès rapide)"
+          >
+            🎲 <span>Dés</span>
+          </button>
+          <div className="cockpit-ess-chip" title="Chrono de session">
+            ⏱️ <SessionTimer sessionId={sessionId ?? `scn-${scenario.id}`} />
           </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Colonne gauche : contrôles MJ */}
-          {isMj && (
-            <div id="mjtab-narration" className="bg-gray-800 rounded-lg p-4 space-y-4 scroll-mt-24">
-              <h2 className="codex-section-title codex-section-title-left text-yellow-500" style={{ fontSize: 10 }}>
-                Contrôles MJ
-              </h2>
-
-              <div>
-                <label className="text-xs uppercase tracking-wider text-gray-400 block mb-1">
-                  Chapitre actuel
-                </label>
-                <input
-                  type="text"
-                  value={draftChapitre}
-                  onChange={(e) => setDraftChapitre(e.target.value)}
-                  onBlur={() => sauverChamp({ chapitre_actuel: draftChapitre.trim() || null })}
-                  placeholder="Acte II — Les Catacombes"
-                  className="w-full p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none focus:border-yellow-500 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs uppercase tracking-wider text-gray-400 block mb-1">
-                  Lieu actuel — nom
-                </label>
-                <input
-                  type="text"
-                  value={draftLieuNom}
-                  onChange={(e) => setDraftLieuNom(e.target.value)}
-                  onBlur={() => sauverChamp({ lieu_nom: draftLieuNom.trim() || null })}
-                  placeholder="Crypte oubliée"
-                  className="w-full p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none focus:border-yellow-500 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs uppercase tracking-wider text-gray-400 block mb-1">
-                  Lieu actuel — description (lue par les joueurs)
-                </label>
-                <textarea
-                  value={draftLieuDesc}
-                  onChange={(e) => setDraftLieuDesc(e.target.value)}
-                  onBlur={() => sauverChamp({ lieu_description: draftLieuDesc.trim() || null })}
-                  placeholder="L'air glacial vous saisit. Des torches vacillantes éclairent…"
-                  className="w-full p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none focus:border-yellow-500 text-sm min-h-[120px]"
-                />
-              </div>
-
-              {/* Roadmap Modes 1.7 — Image de fond du lieu */}
-              <div>
-                <label className="text-xs uppercase tracking-wider text-gray-400 block mb-1">
-                  Image de fond du lieu (URL)
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={etat?.lieu_image_fond ?? ''}
-                    onChange={(e) => sauverChamp({ lieu_image_fond: e.target.value.trim() || null })}
-                    placeholder="https://… (jpg/png/webp)"
-                    className="flex-1 min-w-0 p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none focus:border-yellow-500 text-xs font-mono"
-                  />
-                  {etat?.lieu_image_fond && (
-                    <button type="button" onClick={() => sauverChamp({ lieu_image_fond: null })}
-                      className="px-2 py-1 border border-red-700/50 text-red-300 rounded text-xs">
-                      ✕
-                    </button>
-                  )}
-                </div>
-                <label className="flex items-center gap-2 mt-1.5 text-[10px] text-gray-400 cursor-pointer">
-                  <input type="checkbox"
-                    checked={etat?.lieu_image_visible !== false}
-                    onChange={(e) => sauverChamp({ lieu_image_visible: e.target.checked })}
-                    className="accent-yellow-500"
-                  />
-                  Afficher aux joueurs (voile sombre 70 %)
-                </label>
-                {etat?.lieu_image_fond && (
-                  <div className="mt-2 relative h-24 rounded overflow-hidden border border-gray-700">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={etat.lieu_image_fond} alt="Aperçu" loading="lazy" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/70" />
+          {avecJoueurs && sessionId && (
+            <div className="cockpit-ess-chip">
+              🟢 <JoueursConnectes sessionId={sessionId} />
+            </div>
+          )}
+          <div className="cockpit-hp-strip">
+            {personnages.length === 0 ? (
+              <span className="text-[11px] text-gray-500 italic">
+                ❤️ Aucun PJ affiché — ajoute-en via ⚔️ Combat
+              </span>
+            ) : (
+              personnages.map((p) => {
+                const pct =
+                  p.hp_max > 0
+                    ? Math.max(0, Math.min(100, Math.round((p.hp_actuel / p.hp_max) * 100)))
+                    : 0
+                return (
+                  <div
+                    key={p.id}
+                    className={`cockpit-hp-item${p.hp_actuel <= 0 ? ' is-ko' : ''}${
+                      pct <= 25 ? ' is-low' : ''
+                    }`}
+                    title={`${p.nom} — ${p.hp_actuel}/${p.hp_max} PV`}
+                  >
+                    <span className="cockpit-hp-name">{p.nom}</span>
+                    <span className="cockpit-hp-bar">
+                      <span className="cockpit-hp-fill" style={{ width: `${pct}%` }} />
+                    </span>
+                    <span className="cockpit-hp-val">
+                      {p.hp_actuel}/{p.hp_max}
+                    </span>
                   </div>
-                )}
-              </div>
+                )
+              })
+            )}
+          </div>
+        </section>
 
-              {/* === Narration temps réel === */}
-              <div>
-                <label className="text-xs uppercase tracking-wider text-gray-400 block mb-1">
-                  Pousser à l&apos;écran (narration)
-                </label>
+        {/* ============ Niveau B — boutons d'ouverture des panneaux ============ */}
+        <nav className="cockpit-tabs" aria-label="Panneaux du cockpit">
+          {panneaux.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => togglePanel(p.key)}
+              className={`cockpit-tab${activePanel === p.key ? ' is-active' : ''}`}
+              aria-pressed={activePanel === p.key}
+            >
+              <span aria-hidden>{p.icon}</span>
+              <span>{p.label}</span>
+            </button>
+          ))}
+        </nav>
+
+        {/* ============ Panneau actif (un seul à la fois) ============ */}
+        {!activePanel && (
+          <p className="cockpit-hint">
+            Choisis un panneau ci-dessus pour pousser narration, image, son… Les
+            essentiels (dés, PV, chrono) restent toujours accessibles.
+          </p>
+        )}
+
+        {activePanel && (
+          <section key={activePanel} className="cockpit-panel space-y-4">
+            {/* --- 📜 Narration --- */}
+            {activePanel === 'narration' && (
+              <>
+                <h3 className="cockpit-panel-title">📜 Narration</h3>
                 <textarea
                   value={draftNarration}
                   onChange={(e) => setDraftNarration(e.target.value)}
                   placeholder="« Une lueur pâle filtre entre les colonnes brisées… »"
-                  className="w-full p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none focus:border-yellow-500 text-sm min-h-[80px]"
+                  className="w-full p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none focus:border-yellow-500 text-sm min-h-[100px]"
                 />
-                <div className="flex flex-wrap gap-1.5 mt-2">
+                <div className="flex flex-wrap gap-1.5">
                   {NARRATION_TEMPLATES.map((tpl) => (
                     <button
                       key={tpl}
@@ -1074,7 +1601,7 @@ function PresentationInner() {
                     </button>
                   ))}
                 </div>
-                <div className="flex gap-2 mt-2">
+                <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={pousserNarration}
@@ -1095,16 +1622,37 @@ function PresentationInner() {
                   )}
                 </div>
                 {etat?.narration && (
-                  <p className="text-[10px] text-gray-500 italic mt-1.5 truncate">
+                  <p className="text-[10px] text-gray-500 italic truncate">
                     À l&apos;écran : « {etat.narration} »
                   </p>
                 )}
-              </div>
+              </>
+            )}
 
-              {/* === Actions rapides === */}
-              <div id="mjtab-combat" className="scroll-mt-24">
-                <label className="text-xs uppercase tracking-wider text-gray-400 block mb-2">
-                  Actions rapides
+            {/* --- ⚔️ Combat (actions rapides + aperçu écran joueurs) --- */}
+            {activePanel === 'combat' && (
+              <>
+                <h3 className="cockpit-panel-title">⚔️ Combat</h3>
+
+                {/* Refonte combat diffusion — cockpit de combat MJ (Phase 1). */}
+                <CombatCockpitMJ
+                  combat={combat}
+                  personnages={personnages}
+                  ennemis={ennemis}
+                  onModifierHp={modifierHpCombat}
+                  onToggleCondition={toggleConditionCombat}
+                  onClearConditions={clearConditionsCombat}
+                  onTourSuivant={tourSuivantCombat}
+                  onTourPrecedent={tourPrecedentCombat}
+                  onTerminer={terminerCombat}
+                  onLancer={lancerCombat}
+                  onMoveJeton={deplacerJeton}
+                  onToggleCarteVisible={toggleCarteVisible}
+                  carteBackground={etat?.lieu_image_fond ?? null}
+                />
+
+                <label className="text-xs uppercase tracking-wider text-gray-400 block pt-2 border-t border-gray-700">
+                  Effets cinématiques (écran joueurs)
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -1128,24 +1676,10 @@ function PresentationInner() {
                   >
                     {etat?.en_pause ? '▶ Reprendre' : '⏸ Pause'}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      sauverChamp({ ennemis_visibles: !etat?.ennemis_visibles })
-                    }
-                    className={`presentation-action-btn${
-                      etat?.ennemis_visibles ? ' is-on' : ''
-                    }`}
-                  >
-                    {etat?.ennemis_visibles ? '👁 Ennemis révélés' : '🌫 Voile mystère'}
-                  </button>
-                </div>
-                {/* K.O. — choisir une cible puis déclencher l'animation */}
-                <div className="flex gap-2 mt-2">
                   <select
                     value={koCible}
                     onChange={(e) => setKoCible(e.target.value)}
-                    className="flex-1 min-w-0 p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none focus:border-yellow-500 text-xs"
+                    className="p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none focus:border-yellow-500 text-xs"
                   >
                     <option value="">— Cible du K.O. —</option>
                     {[...personnages, ...ennemis].map((c) => (
@@ -1154,52 +1688,172 @@ function PresentationInner() {
                       </option>
                     ))}
                   </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (koCible) declencherEffet('ko', koCible)
+                  }}
+                  disabled={!koCible}
+                  className="presentation-action-btn w-full disabled:opacity-40"
+                >
+                  💀 Déclencher le K.O.
+                </button>
+
+                {/* Aperçu de l'écran joueurs (inchangé pour l'instant — sera
+                    repensé dans une session dédiée, cf. point 4). */}
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.22em] text-gray-400 font-bold mb-1.5">
+                    Aperçu de l&apos;écran joueurs
+                  </p>
+                  <div className="rounded-lg overflow-hidden border border-yellow-700/30">
+                    <DisplayView
+                      root={{ current: null }}
+                      scenario={scenario}
+                      etat={etat}
+                      combat={combat}
+                      personnages={personnages}
+                      ennemis={ennemis}
+                      compact
+                      onAddPj={() => ouvrirPicker('pj')}
+                      onAddEnnemi={() => ouvrirPicker('ennemi')}
+                      onExit={handleExit}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* --- 🗺️ Carte & lieu + brouillard de guerre --- */}
+            {activePanel === 'carte' && (
+              <>
+                <h3 className="cockpit-panel-title">🗺️ Carte &amp; lieu</h3>
+                <div>
+                  <label className="text-xs uppercase tracking-wider text-gray-400 block mb-1">
+                    Chapitre actuel
+                  </label>
+                  <input
+                    type="text"
+                    value={draftChapitre}
+                    onChange={(e) => setDraftChapitre(e.target.value)}
+                    onBlur={() => sauverChamp({ chapitre_actuel: draftChapitre.trim() || null })}
+                    placeholder="Acte II — Les Catacombes"
+                    className="w-full p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none focus:border-yellow-500 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs uppercase tracking-wider text-gray-400 block mb-1">
+                    Lieu actuel — nom
+                  </label>
+                  <input
+                    type="text"
+                    value={draftLieuNom}
+                    onChange={(e) => setDraftLieuNom(e.target.value)}
+                    onBlur={() => sauverChamp({ lieu_nom: draftLieuNom.trim() || null })}
+                    placeholder="Crypte oubliée"
+                    className="w-full p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none focus:border-yellow-500 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs uppercase tracking-wider text-gray-400 block mb-1">
+                    Lieu actuel — description (lue par les joueurs)
+                  </label>
+                  <textarea
+                    value={draftLieuDesc}
+                    onChange={(e) => setDraftLieuDesc(e.target.value)}
+                    onBlur={() => sauverChamp({ lieu_description: draftLieuDesc.trim() || null })}
+                    placeholder="L'air glacial vous saisit. Des torches vacillantes éclairent…"
+                    className="w-full p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none focus:border-yellow-500 text-sm min-h-[120px]"
+                  />
+                </div>
+                {/* Image de fond du lieu (carte / décor). */}
+                <div>
+                  <label className="text-xs uppercase tracking-wider text-gray-400 block mb-1">
+                    Image de fond du lieu (URL)
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={etat?.lieu_image_fond ?? ''}
+                      onChange={(e) => sauverChamp({ lieu_image_fond: e.target.value.trim() || null })}
+                      placeholder="https://… (jpg/png/webp)"
+                      className="flex-1 min-w-0 p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none focus:border-yellow-500 text-xs font-mono"
+                    />
+                    {etat?.lieu_image_fond && (
+                      <button
+                        type="button"
+                        onClick={() => sauverChamp({ lieu_image_fond: null })}
+                        className="px-2 py-1 border border-red-700/50 text-red-300 rounded text-xs"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                  <label className="flex items-center gap-2 mt-1.5 text-[10px] text-gray-400 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={etat?.lieu_image_visible !== false}
+                      onChange={(e) => sauverChamp({ lieu_image_visible: e.target.checked })}
+                      className="accent-yellow-500"
+                    />
+                    Afficher aux joueurs (voile sombre 70 %)
+                  </label>
+                  {etat?.lieu_image_fond && (
+                    <div className="mt-2 relative h-24 rounded overflow-hidden border border-gray-700">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={etat.lieu_image_fond} alt="Aperçu" loading="lazy" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/70" />
+                    </div>
+                  )}
+                </div>
+                {/* Brouillard de guerre — voile sur les ennemis. */}
+                <div>
+                  <label className="text-xs uppercase tracking-wider text-gray-400 block mb-1.5">
+                    Brouillard de guerre
+                  </label>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (koCible) declencherEffet('ko', koCible)
-                    }}
-                    disabled={!koCible}
-                    className="presentation-action-btn flex-shrink-0 disabled:opacity-40"
+                    onClick={() => sauverChamp({ ennemis_visibles: !etat?.ennemis_visibles })}
+                    className={`presentation-action-btn w-full${
+                      etat?.ennemis_visibles ? ' is-on' : ''
+                    }`}
                   >
-                    💀 K.O.
+                    {etat?.ennemis_visibles ? '👁 Ennemis révélés' : '🌫 Voile mystère'}
                   </button>
+                  <p className="text-[10px] text-gray-500 italic mt-1.5">
+                    « Voile mystère » masque noms et HP des ennemis côté joueurs.
+                  </p>
                 </div>
-                <p className="text-[10px] text-gray-500 italic mt-1.5">
-                  « Voile mystère » masque noms et HP des ennemis côté joueurs.
-                </p>
-              </div>
+              </>
+            )}
 
-              {/* === Galerie d'images à pousser plein écran === */}
-              <div id="mjtab-carte" className="scroll-mt-24">
-                <label className="text-xs uppercase tracking-wider text-gray-400 block mb-2">
-                  Galerie — image plein écran
-                </label>
+            {/* --- 🖼️ Image plein écran --- */}
+            {activePanel === 'image' && (
+              <>
+                <h3 className="cockpit-panel-title">🖼️ Image plein écran</h3>
                 {etat?.image_plein_ecran && (
                   <button
                     type="button"
                     onClick={() => sauverChamp({ image_plein_ecran: null })}
-                    className="w-full mb-2 px-3 py-2 border border-red-700/50 text-red-300 rounded hover:bg-red-900/20 text-xs uppercase tracking-wider"
+                    className="w-full px-3 py-2 border border-red-700/50 text-red-300 rounded hover:bg-red-900/20 text-xs uppercase tracking-wider"
                   >
                     ✕ Retirer l&apos;image de l&apos;écran
                   </button>
                 )}
                 {galerie.length === 0 ? (
                   <p className="text-[10px] text-gray-500 italic">
-                    Aucune image — ajoute des portraits/visuels à tes PNJ,
-                    ennemis, items ou cartes.
+                    Aucune image — ajoute des portraits/visuels à tes PNJ, ennemis,
+                    items ou cartes.
                   </p>
                 ) : (
-                  <div className="grid grid-cols-4 gap-1.5 max-h-44 overflow-y-auto">
+                  <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5 max-h-72 overflow-y-auto">
                     {galerie.map((img) => {
                       const actif = etat?.image_plein_ecran === img.url
                       return (
                         <button
                           key={img.url}
                           type="button"
-                          onClick={() =>
-                            sauverChamp({ image_plein_ecran: img.url })
-                          }
+                          onClick={() => sauverChamp({ image_plein_ecran: img.url })}
                           title={`Afficher : ${img.label}`}
                           className={`relative aspect-square rounded overflow-hidden border transition ${
                             actif
@@ -1219,249 +1873,265 @@ function PresentationInner() {
                     })}
                   </div>
                 )}
-              </div>
+              </>
+            )}
 
-              {/* Roadmap Modes 1.6 — Mode auto ambiance sonore (bibliothèque sons_user) */}
-              <AmbianceSonoreAuto
-                contexte={
-                  etat?.en_pause ? 'pause'
-                  : combat?.actif ? 'combat'
-                  : 'exploration'
-                }
-              />
-
-              {/* === Ambiance sonore en boucle === */}
-              <div id="mjtab-sons" className="scroll-mt-24">
-                <label className="text-xs uppercase tracking-wider text-gray-400 block mb-1">
-                  Ambiance sonore (URL en boucle)
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={draftSon}
-                    onChange={(e) => setDraftSon(e.target.value)}
-                    placeholder="https://… .mp3"
-                    className="flex-1 min-w-0 p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none focus:border-yellow-500 text-xs font-mono"
-                  />
-                  <button
-                    type="button"
-                    onClick={() =>
-                      sauverChamp({ lieu_son: draftSon.trim() || null })
-                    }
-                    className="presentation-action-btn flex-shrink-0"
-                  >
-                    ▶ Lancer
-                  </button>
-                </div>
-                {etat?.lieu_son && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className="text-[10px] text-green-400 italic flex-shrink-0">
-                      ♪ En boucle
-                    </span>
+            {/* --- 🎵 Ambiance sonore + visuelle --- */}
+            {activePanel === 'sons' && (
+              <>
+                <h3 className="cockpit-panel-title">🎵 Ambiance</h3>
+                {/* Mode auto (bibliothèque sons_user). */}
+                <AmbianceSonoreAuto
+                  contexte={
+                    etat?.en_pause ? 'pause' : combat?.actif ? 'combat' : 'exploration'
+                  }
+                />
+                {/* Ambiance sonore en boucle (URL). */}
+                <div>
+                  <label className="text-xs uppercase tracking-wider text-gray-400 block mb-1">
+                    Ambiance sonore (URL en boucle)
+                  </label>
+                  <div className="flex gap-2">
                     <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={etat.lieu_son_volume}
-                      onChange={(e) =>
-                        sauverChamp({ lieu_son_volume: Number(e.target.value) })
-                      }
-                      className="flex-1 accent-yellow-500"
-                      aria-label="Volume de l'ambiance sonore"
+                      type="text"
+                      value={draftSon}
+                      onChange={(e) => setDraftSon(e.target.value)}
+                      placeholder="https://… .mp3"
+                      className="flex-1 min-w-0 p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none focus:border-yellow-500 text-xs font-mono"
                     />
                     <button
                       type="button"
-                      onClick={() => sauverChamp({ lieu_son: null })}
-                      className="text-[10px] text-red-300 hover:text-red-200 flex-shrink-0"
+                      onClick={() => sauverChamp({ lieu_son: draftSon.trim() || null })}
+                      className="presentation-action-btn flex-shrink-0"
                     >
-                      ✕ Couper
+                      ▶ Lancer
                     </button>
                   </div>
-                )}
-              </div>
-
-              {/* === Ambiance visuelle du fond === */}
-              <div>
-                <label className="text-xs uppercase tracking-wider text-gray-400 block mb-2">
-                  Ambiance visuelle du fond
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { key: 'auto', label: '✨ Auto' },
-                    { key: 'combat', label: '⚔ Combat' },
-                    { key: 'mystere', label: '🔮 Mystère' },
-                    { key: 'exploration', label: '🧭 Exploration' }
-                  ].map((a) => (
-                    <button
-                      key={a.key}
-                      type="button"
-                      onClick={() => sauverChamp({ ambiance: a.key })}
-                      className={`presentation-action-btn${
-                        (etat?.ambiance ?? 'auto') === a.key ? ' is-on' : ''
-                      }`}
-                    >
-                      {a.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Colonne droite : partage + lancement plein écran */}
-          <div id="mjtab-controle" className="bg-gray-800 rounded-lg p-4 space-y-4 scroll-mt-24">
-            <h2 className="codex-section-title codex-section-title-left text-yellow-500" style={{ fontSize: 10 }}>
-              Diffusion
-            </h2>
-
-            <button
-              type="button"
-              onClick={() => router.push('/dashboard/presentation?display=1')}
-              className="w-full px-4 py-3 bg-yellow-500 text-gray-900 font-bold rounded hover:bg-yellow-400 text-sm uppercase tracking-wider"
-            >
-              📺 Ouvrir la vue diffusion
-            </button>
-
-            <button
-              type="button"
-              onClick={toggleFullscreen}
-              className="w-full px-4 py-3 border border-yellow-600/40 text-yellow-300 rounded hover:bg-yellow-500/10 text-sm uppercase tracking-wider"
-            >
-              {isFullscreen ? '↙️ Quitter le plein écran' : '📺 Plein écran'}
-            </button>
-
-            <div className="border-t border-gray-700 pt-4">
-              <p className="text-xs uppercase tracking-wider text-gray-400 mb-2">
-                Partager aux joueurs
-              </p>
-              <div className="flex items-center gap-2 mb-3">
-                <input
-                  type="text"
-                  readOnly
-                  value={displayUrl}
-                  className="flex-1 p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none text-xs font-mono"
-                />
-                <button
-                  type="button"
-                  onClick={() => navigator.clipboard?.writeText(displayUrl)}
-                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded"
-                  title="Copier le lien"
-                >
-                  📋
-                </button>
-              </div>
-              <div className="flex justify-center">
-                {/* QR code via service public (pas de dépendance) */}
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(displayUrl)}`}
-                  alt="QR code à scanner pour ouvrir la vue présentation"
-                  className="rounded bg-white p-2"
-                  width={200}
-                  height={200}
-                />
-              </div>
-              <p className="text-[10px] text-gray-500 italic text-center mt-2">
-                Scanne ce QR depuis un téléphone connecté au compte joueur.
-              </p>
-            </div>
-
-            {/* Diffusion multi-écran : lien public sans login */}
-            {isMj && (
-              <div className="border-t border-gray-700 pt-4">
-                <p className="text-xs uppercase tracking-wider text-gray-400 mb-2">
-                  🎮 Diffusion multi-écran
-                </p>
-                {!sessionId ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={lancerDiffusion}
-                      className="w-full px-4 py-3 bg-yellow-500 text-gray-900 font-bold rounded hover:bg-yellow-400 text-sm uppercase tracking-wider"
-                    >
-                      🎮 Lancer la diffusion
-                    </button>
-                    <p className="text-[10px] text-gray-500 italic mt-2">
-                      Génère un lien public — les joueurs ouvrent l&apos;écran sur
-                      n&apos;importe quel appareil, sans compte.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-2 mb-3">
+                  {etat?.lieu_son && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-[10px] text-green-400 italic flex-shrink-0">
+                        ♪ En boucle
+                      </span>
                       <input
-                        type="text"
-                        readOnly
-                        value={sessionUrl}
-                        className="flex-1 p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none text-xs font-mono"
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={etat.lieu_son_volume}
+                        onChange={(e) => sauverChamp({ lieu_son_volume: Number(e.target.value) })}
+                        className="flex-1 accent-yellow-500"
+                        aria-label="Volume de l'ambiance sonore"
                       />
                       <button
                         type="button"
-                        onClick={() => navigator.clipboard?.writeText(sessionUrl)}
-                        className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded"
-                        title="Copier le lien public"
+                        onClick={() => sauverChamp({ lieu_son: null })}
+                        className="text-[10px] text-red-300 hover:text-red-200 flex-shrink-0"
                       >
-                        📋
+                        ✕ Couper
                       </button>
                     </div>
-                    <div className="flex justify-center mb-3">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(sessionUrl)}`}
-                        alt="QR code de l'écran joueurs public"
-                        className="rounded bg-white p-2"
-                        width={200}
-                        height={200}
-                      />
-                    </div>
-                    <p className="text-[10px] text-green-400 italic text-center mb-2">
-                      ● Diffusion active — synchro temps réel
-                    </p>
-                    <button
-                      type="button"
-                      onClick={arreterDiffusion}
-                      className="w-full px-3 py-2 border border-red-700/50 text-red-300 rounded hover:bg-red-900/20 text-xs uppercase tracking-wider"
-                    >
-                      ⏹ Arrêter la diffusion
-                    </button>
-                  </>
-                )}
-                {diffusionMsg && (
-                  <p className="text-[10px] text-yellow-300 italic mt-2">
-                    {diffusionMsg}
+                  )}
+                </div>
+                {/* Ambiance visuelle du fond. */}
+                <div>
+                  <label className="text-xs uppercase tracking-wider text-gray-400 block mb-2">
+                    Ambiance visuelle du fond
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { key: 'auto', label: '✨ Auto' },
+                      { key: 'combat', label: '⚔ Combat' },
+                      { key: 'mystere', label: '🔮 Mystère' },
+                      { key: 'exploration', label: '🧭 Exploration' }
+                    ].map((a) => (
+                      <button
+                        key={a.key}
+                        type="button"
+                        onClick={() => sauverChamp({ ambiance: a.key })}
+                        className={`presentation-action-btn${
+                          (etat?.ambiance ?? 'auto') === a.key ? ' is-on' : ''
+                        }`}
+                      >
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* --- 📊 Sondage rapide --- */}
+            {activePanel === 'sondage' && (
+              <>
+                <h3 className="cockpit-panel-title">📊 Sondage rapide</h3>
+                {sessionId ? (
+                  <SondageLauncher sessionId={sessionId} />
+                ) : (
+                  <p className="text-xs text-gray-400 italic">
+                    Lance d&apos;abord une diffusion (panneau 📡 Diffusion) pour
+                    envoyer un sondage aux joueurs.
                   </p>
                 )}
-              </div>
+              </>
             )}
-          </div>
-        </div>
 
-        {/* Roadmap Modes 1.4 — Historique de session (panneau dépliable) */}
-        {isMj && sessionId && (
-          <div id="mjtab-notes" className="mt-6 scroll-mt-24">
-            <HistoriqueSessionPanel sessionId={sessionId} />
-          </div>
+            {/* --- 📝 Notes MJ (privées, locales à l'appareil) --- */}
+            {activePanel === 'notes' && (
+              <>
+                <h3 className="cockpit-panel-title">📝 Notes MJ</h3>
+                <textarea
+                  value={notesMj}
+                  onChange={(e) => sauverNotes(e.target.value)}
+                  placeholder="Rappels, secrets, PNJ à introduire, jets cachés…"
+                  className="w-full p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none focus:border-yellow-500 text-sm min-h-[220px]"
+                />
+                <p className="text-[10px] text-gray-500 italic">
+                  Tes notes restent privées et sont enregistrées sur cet appareil.
+                </p>
+              </>
+            )}
+
+            {/* --- 📜 Historique de session --- */}
+            {activePanel === 'historique' && (
+              <>
+                <h3 className="cockpit-panel-title">📜 Historique de session</h3>
+                {sessionId ? (
+                  <HistoriqueSessionPanel sessionId={sessionId} />
+                ) : (
+                  <p className="text-xs text-gray-400 italic">
+                    L&apos;historique se remplit pendant une diffusion. Lance-en une
+                    via le panneau 📡 Diffusion.
+                  </p>
+                )}
+              </>
+            )}
+
+            {/* --- 📡 Diffusion & partage --- */}
+            {activePanel === 'diffusion' && (
+              <>
+                <h3 className="cockpit-panel-title">📡 Diffusion &amp; partage</h3>
+                <p className="text-[11px] text-gray-400 italic">
+                  {setupMode === 'pc-tv'
+                    ? 'Setup PC + TV : ouvre la vue diffusion puis passe-la en plein écran sur la TV.'
+                    : 'Setup avec téléphones : lance la diffusion et fais scanner le QR public aux joueurs.'}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => router.push('/dashboard/presentation?display=1')}
+                  className="w-full px-4 py-3 bg-yellow-500 text-gray-900 font-bold rounded hover:bg-yellow-400 text-sm uppercase tracking-wider"
+                >
+                  📺 Ouvrir la vue diffusion
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleFullscreen}
+                  className="w-full px-4 py-3 border border-yellow-600/40 text-yellow-300 rounded hover:bg-yellow-500/10 text-sm uppercase tracking-wider"
+                >
+                  {isFullscreen ? '↙️ Quitter le plein écran' : '📺 Plein écran'}
+                </button>
+
+                <div className="border-t border-gray-700 pt-4">
+                  <p className="text-xs uppercase tracking-wider text-gray-400 mb-2">
+                    Partager aux joueurs (compte connecté)
+                  </p>
+                  <div className="flex items-center gap-2 mb-3">
+                    <input
+                      type="text"
+                      readOnly
+                      value={displayUrl}
+                      className="flex-1 p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none text-xs font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => navigator.clipboard?.writeText(displayUrl)}
+                      className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded"
+                      title="Copier le lien"
+                    >
+                      📋
+                    </button>
+                  </div>
+                  <div className="flex justify-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(displayUrl)}`}
+                      alt="QR code à scanner pour ouvrir la vue présentation"
+                      className="rounded bg-white p-2"
+                      width={200}
+                      height={200}
+                    />
+                  </div>
+                  <p className="text-[10px] text-gray-500 italic text-center mt-2">
+                    Scanne ce QR depuis un téléphone connecté au compte joueur.
+                  </p>
+                </div>
+
+                {/* Diffusion multi-écran : lien public sans login. */}
+                <div className="border-t border-gray-700 pt-4">
+                  <p className="text-xs uppercase tracking-wider text-gray-400 mb-2">
+                    🎮 Diffusion multi-écran (sans compte)
+                  </p>
+                  {!sessionId ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={lancerDiffusion}
+                        className="w-full px-4 py-3 bg-yellow-500 text-gray-900 font-bold rounded hover:bg-yellow-400 text-sm uppercase tracking-wider"
+                      >
+                        🎮 Lancer la diffusion
+                      </button>
+                      <p className="text-[10px] text-gray-500 italic mt-2">
+                        Génère un lien public — les joueurs ouvrent l&apos;écran sur
+                        n&apos;importe quel appareil, sans compte.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 mb-3">
+                        <input
+                          type="text"
+                          readOnly
+                          value={sessionUrl}
+                          className="flex-1 p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none text-xs font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => navigator.clipboard?.writeText(sessionUrl)}
+                          className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded"
+                          title="Copier le lien public"
+                        >
+                          📋
+                        </button>
+                      </div>
+                      <div className="flex justify-center mb-3">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(sessionUrl)}`}
+                          alt="QR code de l'écran joueurs public"
+                          className="rounded bg-white p-2"
+                          width={200}
+                          height={200}
+                        />
+                      </div>
+                      <p className="text-[10px] text-green-400 italic text-center mb-2">
+                        ● Diffusion active — synchro temps réel
+                      </p>
+                      <button
+                        type="button"
+                        onClick={arreterDiffusion}
+                        className="w-full px-3 py-2 border border-red-700/50 text-red-300 rounded hover:bg-red-900/20 text-xs uppercase tracking-wider"
+                      >
+                        ⏹ Arrêter la diffusion
+                      </button>
+                    </>
+                  )}
+                  {diffusionMsg && (
+                    <p className="text-[10px] text-yellow-300 italic mt-2">{diffusionMsg}</p>
+                  )}
+                </div>
+              </>
+            )}
+          </section>
         )}
-
-        {/* Preview de ce que voient les joueurs */}
-        <div className="mt-6">
-          <h2 className="codex-section-title codex-section-title-left text-yellow-500" style={{ fontSize: 10 }}>
-            Aperçu
-          </h2>
-          <div className="rounded-lg overflow-hidden border border-yellow-700/30">
-            <DisplayView
-              root={{ current: null }}
-              scenario={scenario}
-              etat={etat}
-              combat={combat}
-              personnages={personnages}
-              ennemis={ennemis}
-              compact
-              onAddPj={isMj ? () => ouvrirPicker('pj') : undefined}
-              onAddEnnemi={isMj ? () => ouvrirPicker('ennemi') : undefined}
-              onExit={handleExit}
-            />
-          </div>
-        </div>
       </div>
 
       {/* Picker modal pour ajouter un PJ ou un ennemi à la roster */}
@@ -1478,6 +2148,22 @@ function PresentationInner() {
           onClose={() => setPicker(null)}
         />
       )}
+
+      {/* Roue d'action MJ (mode diffusion uniquement) — remplace le FAB dés. */}
+      <ActionWheelMJ onSelect={handleWheel} />
+
+      {/* Outils accessibles via la roue, même pendant un combat. */}
+      <WildMagicRoller
+        scenarioId={scenario.id}
+        flottant={false}
+        ouvert={wildMagicOpen}
+        onClose={() => setWildMagicOpen(false)}
+      />
+      <SituationsRandom
+        scenarioId={scenario.id}
+        ouvert={rencontreOpen}
+        onClose={() => setRencontreOpen(false)}
+      />
     </main>
   )
 }
@@ -1910,76 +2596,71 @@ export function DisplayView({
           </section>
         )}
 
-        {/* Tour de combat */}
-        {combat?.actif && tourCourant && (
+        {/* Magie Sauvage poussée à l'écran joueurs (Phase 5). */}
+        {etat?.wild_magic && (
           <section
-            className="rounded-lg p-4 md:p-5 mb-8 text-center"
-            style={{
-              background: 'rgba(120, 30, 30, 0.20)',
-              border: '1px solid rgba(220, 90, 90, 0.40)'
-            }}
+            key={etat.wild_magic.titre}
+            className="presentation-wildmagic"
           >
-            <p
-              className="uppercase tracking-[0.3em]"
-              style={{ color: '#fca5a5', fontSize: compact ? 9 : 11, fontWeight: 700, marginBottom: 4 }}
-            >
-              ⚔ Combat en cours — Round {combat.round}
-            </p>
-            <p
-              style={{
-                fontFamily: 'Georgia, serif',
-                color: '#fff',
-                fontSize: compact ? 20 : 28,
-                fontWeight: 400
-              }}
-            >
-              C&apos;est à <span style={{ color: '#fca5a5' }}>{tourCourant.nom}</span>
-            </p>
+            <p className="presentation-wildmagic-label">✨ Magie Sauvage</p>
+            <p className="presentation-wildmagic-titre">{etat.wild_magic.titre}</p>
+            <p className="presentation-wildmagic-desc">{etat.wild_magic.description}</p>
           </section>
         )}
 
-        {/* Rosters PJ + Ennemis — empilés, chacun en grille de cartes portraits */}
-        <div className="space-y-6">
-          <Roster
-            titre="Compagnons"
-            icone="🛡"
-            variant="pj"
-            currentTurnId={tourCourant?.id ?? null}
-            entries={personnages.map((p) => ({
-              id: p.id,
-              nom: p.nom,
-              sous: [p.classe, `Niv. ${p.niveau}`].filter(Boolean).join(' · '),
-              hp: p.hp_actuel,
-              hpMax: p.hp_max,
-              image: p.image_url,
-              conditions: Array.isArray(p.conditions) ? p.conditions : []
-            }))}
-            compact={compact}
-            obscure={false}
-            onAdd={onAddPj}
-            addLabel="+ Ajouter un compagnon"
+        {/* Combat actif → vue joueurs épurée (transition automatique, Phase 4.4).
+            Hors combat → rosters au repos avec boutons d'ajout côté MJ. */}
+        {combat?.actif ? (
+          <CombatVueJoueurs
+            combat={combat}
+            personnages={personnages}
+            ennemis={ennemis}
+            ennemisReveles={ennemisVisibles}
+            carteBackground={etat?.lieu_image_fond ?? null}
           />
-          <Roster
-            titre="Adversaires"
-            icone="👹"
-            variant="ennemi"
-            currentTurnId={tourCourant?.id ?? null}
-            entries={ennemis.map((e) => ({
-              id: e.id,
-              nom: ennemisVisibles ? e.nom : 'Créature obscure',
-              sous: null,
-              hp: ennemisVisibles ? e.hp_actuel : null,
-              hpMax: ennemisVisibles ? e.hp_max : null,
-              image: ennemisVisibles ? e.image_url : null,
-              conditions:
-                ennemisVisibles && Array.isArray(e.conditions) ? e.conditions : []
-            }))}
-            compact={compact}
-            obscure={!ennemisVisibles}
-            onAdd={onAddEnnemi}
-            addLabel="+ Ajouter un adversaire"
-          />
-        </div>
+        ) : (
+          <div className="space-y-6">
+            <Roster
+              titre="Compagnons"
+              icone="🛡"
+              variant="pj"
+              currentTurnId={resolveEntiteId(tourCourant)}
+              entries={personnages.map((p) => ({
+                id: p.id,
+                nom: p.nom,
+                sous: [p.classe, `Niv. ${p.niveau}`].filter(Boolean).join(' · '),
+                hp: p.hp_actuel,
+                hpMax: p.hp_max,
+                image: p.image_url,
+                conditions: Array.isArray(p.conditions) ? p.conditions : []
+              }))}
+              compact={compact}
+              obscure={false}
+              onAdd={onAddPj}
+              addLabel="+ Ajouter un compagnon"
+            />
+            <Roster
+              titre="Adversaires"
+              icone="👹"
+              variant="ennemi"
+              currentTurnId={resolveEntiteId(tourCourant)}
+              entries={ennemis.map((e) => ({
+                id: e.id,
+                nom: ennemisVisibles ? e.nom : 'Créature obscure',
+                sous: null,
+                hp: ennemisVisibles ? e.hp_actuel : null,
+                hpMax: ennemisVisibles ? e.hp_max : null,
+                image: ennemisVisibles ? e.image_url : null,
+                conditions:
+                  ennemisVisibles && Array.isArray(e.conditions) ? e.conditions : []
+              }))}
+              compact={compact}
+              obscure={!ennemisVisibles}
+              onAdd={onAddEnnemi}
+              addLabel="+ Ajouter un adversaire"
+            />
+          </div>
+        )}
 
         {/* Dernier jet */}
         {etat?.dernier_jet && (
