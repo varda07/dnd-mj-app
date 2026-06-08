@@ -314,6 +314,7 @@ export default function Sidebar() {
       title: t('section_aventure'),
       items: [
         { label: t('adv_combat'), icon: '⚔', href: '/dashboard/combat' },
+        { label: t('adv_combat_rapide'), icon: '⚡', href: '/dashboard/combat-rapide' },
         { label: t('adv_exploration'), icon: '🏞', href: '/dashboard/exploration' },
         { label: t('adv_presentation'), icon: '📺', href: '/dashboard/presentation' }
       ]

@@ -92,7 +92,7 @@ function CombatRapideInner() {
   }, [combat?.actif, combat])
 
   const diffuser = useCallback(() => {
-    if (scenarioId) router.push(`/dashboard/presentation?scenario=${scenarioId}`)
+    if (scenarioId) router.push(`/dashboard/presentation?scenario=${scenarioId}&diffuser=1`)
   }, [router, scenarioId])
 
   if (resolvingScenario || engine.loading) {

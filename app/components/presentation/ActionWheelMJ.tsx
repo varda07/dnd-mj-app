@@ -104,12 +104,15 @@ function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v))
 }
 
-// Position par défaut : bord droit à mi-hauteur sur desktop ; bas-droite avec
-// marge confortable sur mobile (accessible au pouce).
+// Position par défaut : BAS-GAUCHE (zone du FAB dés classique). ⚠️ La sidebar
+// de l'app est à DROITE — un défaut à droite passerait DERRIÈRE elle et serait
+// invisible. On reste donc à gauche ; l'arc se déploie vers le haut-droite.
+// Le bouton reste déplaçable (position mémorisée en localStorage).
 function defaultPos(w: number, h: number): Pos {
-  const x = w - BTN / 2 - 18
-  if (w >= 768) return { x, y: Math.round(h / 2) }
-  return { x, y: h - (56 + 24 + BTN / 2) }
+  const x = BTN / 2 + 22
+  if (w >= 768) return { x, y: h - BTN / 2 - 22 }
+  // Mobile : au-dessus de la bottom-bar (56px) avec marge.
+  return { x, y: h - (56 + 16 + BTN / 2) }
 }
 
 // Calcule les offsets (dx,dy) de chaque pétale par rapport au centre du bouton.
@@ -165,7 +168,15 @@ export default function ActionWheelMJ({
       const raw = window.localStorage.getItem(STORAGE_KEY)
       if (raw) {
         const p = JSON.parse(raw) as Pos
-        if (typeof p?.x === 'number' && typeof p?.y === 'number') next = p
+        // Position valide (nombres finis) ET hors de la zone droite occupée par
+        // la sidebar (sinon la roue serait masquée derrière → on réinitialise).
+        if (
+          Number.isFinite(p?.x) &&
+          Number.isFinite(p?.y) &&
+          p.x <= w - 96
+        ) {
+          next = p
+        }
       }
     } catch {
       /* noop */

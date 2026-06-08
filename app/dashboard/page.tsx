@@ -594,6 +594,7 @@ export default function Dashboard() {
                   <div className="grimoire-quick-grid">
                     {[
                       { titre: 'Scénarios', desc: 'Créer et gérer tes aventures', href: '/dashboard/scenarios' },
+                      { titre: '⚡ Combat rapide', desc: 'Lancer un combat sans diffusion', href: '/dashboard/combat-rapide' },
                       { titre: 'Personnages', desc: 'Fiches des joueurs et PJ', href: '/dashboard/personnages' },
                       { titre: 'Ennemis', desc: 'Bestiaire et adversaires', href: '/dashboard/ennemis' },
                       { titre: 'PNJ', desc: 'Personnages non-joueurs', href: '/dashboard/pnj' },
@@ -658,13 +659,13 @@ export default function Dashboard() {
                           {
                             icon: '⚔',
                             titre: 'Combat',
-                            desc: 'Initiatives, HP et conditions tour par tour',
+                            desc: 'Page complète avec grille tactique',
                             href: `/dashboard/combat?scenario=${scenarioAventureEffectif}`
                           },
                           {
                             icon: '⚡',
                             titre: 'Combat rapide',
-                            desc: 'MJ seul — moteur unifié, un écran',
+                            desc: 'Version légère MJ seul, sans diffusion',
                             href: `/dashboard/combat-rapide?scenario=${scenarioAventureEffectif}`
                           },
                           {
@@ -676,7 +677,7 @@ export default function Dashboard() {
                           {
                             icon: '📺',
                             titre: 'Présentation',
-                            desc: 'Écran joueurs / mode TV',
+                            desc: 'Combat diffusé avec vue joueurs',
                             href: `/dashboard/presentation?scenario=${scenarioAventureEffectif}`
                           },
                           {

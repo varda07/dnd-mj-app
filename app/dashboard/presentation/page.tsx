@@ -1253,6 +1253,29 @@ function PresentationInner() {
     }
   }, [cockpitActif])
 
+  // Bascule « Diffuser ce combat » (depuis le combat rapide / l'ancienne page) :
+  // ?diffuser=1 → on choisit un setup par défaut si besoin, on ouvre le panneau
+  // Combat et on lance la diffusion. L'état du combat (table combats partagée par
+  // scénario) est préservé : il continue où il en était, vue joueurs activée.
+  const wantDiffuser = params?.get('diffuser') === '1'
+  const diffuserDoneRef = useRef(false)
+  useEffect(() => {
+    if (!wantDiffuser || diffuserDoneRef.current) return
+    if (!isMj || !scenario || loading) return
+    diffuserDoneRef.current = true
+    if (!setupMode) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSetupMode('pc-tv')
+      try {
+        window.localStorage.setItem(SETUP_STORAGE_KEY, 'pc-tv')
+      } catch {
+        /* noop */
+      }
+    }
+    setActivePanel('combat')
+    if (!sessionId) void lancerDiffusion()
+  }, [wantDiffuser, isMj, scenario, loading, setupMode, sessionId, lancerDiffusion])
+
   // --------------------------------------------------------------------------
   // Rendus
   // --------------------------------------------------------------------------

@@ -1520,6 +1520,19 @@ function CombatInner() {
           >
             🧮 Calculateur de rencontre
           </button>
+          {/* Moteur unifié — bascule vers le mode diffusion (état préservé : la
+              ligne combats est partagée par scénario). */}
+          <button
+            type="button"
+            onClick={() =>
+              router.push(`/dashboard/presentation?scenario=${scenarioId}&diffuser=1`)
+            }
+            disabled={!scenarioId}
+            title={!scenarioId ? 'Sélectionne un scénario d\'abord' : 'Diffuser ce combat avec vue joueurs'}
+            className="px-3 py-1.5 text-xs uppercase tracking-[0.16em] font-bold rounded border border-[rgba(201,168,76,0.5)] text-[#ffe6a8] bg-[rgba(201,168,76,0.1)] hover:bg-[rgba(201,168,76,0.2)] transition disabled:opacity-40"
+          >
+            📡 Diffuser ce combat
+          </button>
         </div>
 
         <div className="grim-card p-4 mb-4">
