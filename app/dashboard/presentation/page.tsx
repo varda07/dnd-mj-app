@@ -15,6 +15,7 @@ import AmbianceSonoreAuto from '@/app/components/presentation/AmbianceSonoreAuto
 import type { AttaqueData } from '@/app/components/AttackRoller'
 import CombatCockpitMJ from '@/app/components/presentation/CombatCockpitMJ'
 import CombatVueJoueurs from '@/app/components/presentation/CombatVueJoueurs'
+import CombatsPreparesLaunch from '@/app/components/combat/CombatsPreparesLaunch'
 import ActionWheelMJ, { type ActionWheelKey } from '@/app/components/presentation/ActionWheelMJ'
 import WildMagicRoller from '@/app/components/WildMagicRoller'
 import SituationsRandom from '@/app/components/SituationsRandom'
@@ -1656,6 +1657,9 @@ function PresentationInner() {
             {activePanel === 'combat' && (
               <>
                 <h3 className="cockpit-panel-title">⚔️ Combat</h3>
+
+                {/* Préparateur — lancer un combat préparé directement (Phase 3.2). */}
+                <CombatsPreparesLaunch scenarioId={scenario.id} />
 
                 {/* Refonte combat diffusion — cockpit de combat MJ (Phase 1). */}
                 <CombatCockpitMJ

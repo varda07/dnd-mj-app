@@ -594,6 +594,7 @@ export default function Dashboard() {
                   <div className="grimoire-quick-grid">
                     {[
                       { titre: 'Scénarios', desc: 'Créer et gérer tes aventures', href: '/dashboard/scenarios' },
+                      { titre: '🛠 Préparer un combat', desc: 'Configurer des combats à l\'avance', href: '/dashboard/combat-prepare' },
                       { titre: '⚡ Combat rapide', desc: 'Lancer un combat sans diffusion', href: '/dashboard/combat-rapide' },
                       { titre: 'Personnages', desc: 'Fiches des joueurs et PJ', href: '/dashboard/personnages' },
                       { titre: 'Ennemis', desc: 'Bestiaire et adversaires', href: '/dashboard/ennemis' },
@@ -657,16 +658,22 @@ export default function Dashboard() {
                       <div className="grimoire-aventure-grid">
                         {[
                           {
-                            icon: '⚔',
-                            titre: 'Combat',
-                            desc: 'Page complète avec grille tactique',
-                            href: `/dashboard/combat?scenario=${scenarioAventureEffectif}`
+                            icon: '🛠',
+                            titre: 'Préparer un combat',
+                            desc: 'Configurer et sauvegarder des combats',
+                            href: `/dashboard/combat-prepare?scenario=${scenarioAventureEffectif}`
                           },
                           {
                             icon: '⚡',
                             titre: 'Combat rapide',
                             desc: 'Version légère MJ seul, sans diffusion',
                             href: `/dashboard/combat-rapide?scenario=${scenarioAventureEffectif}`
+                          },
+                          {
+                            icon: '⚔',
+                            titre: 'Combat (grille)',
+                            desc: 'Combat live complet avec grille tactique',
+                            href: `/dashboard/combat?scenario=${scenarioAventureEffectif}`
                           },
                           {
                             icon: '🧭',

@@ -875,6 +875,17 @@ export default function ScenarioEditPage() {
               📌 Memo MJ
             </button>
 
+            {/* Préparateur de combat — combats préparés de ce scénario (Phase 2.2) */}
+            <button
+              type="button"
+              onClick={() =>
+                router.push(`/dashboard/combat-prepare?scenario=${scenarioId}`)
+              }
+              className="w-full px-3 py-2 rounded border border-yellow-700/40 bg-[#171717] text-yellow-400 hover:bg-[#1c1c1c] hover:border-yellow-600 text-xs font-bold uppercase tracking-[0.16em] transition codex-btn-press"
+            >
+              ⚔️ Combats préparés
+            </button>
+
             {/* Roadmap Affinement 2.3 — Calendrier de campagne */}
             <button
               type="button"
