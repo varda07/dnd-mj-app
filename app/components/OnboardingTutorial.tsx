@@ -205,7 +205,9 @@ export default function OnboardingTutorial() {
               type="button"
               onClick={async () => {
                 await fermer(true)
-                router.push('/dashboard/bibliotheque')
+                // Roadmap correctif — atterrir sur le dashboard (accueil),
+                // pas la bibliothèque : l'utilisateur explore à son rythme.
+                router.push('/dashboard')
               }}
               className="px-4 py-2 bg-yellow-500 text-gray-900 font-bold rounded hover:bg-yellow-400 text-sm"
             >
@@ -466,8 +468,8 @@ function StepCreate({
           sub="Tu joueras dans des scénarios créés par un MJ."
         />
         <p className="text-gray-300 text-sm mb-3">
-          Demande à ton MJ un <strong>code d&apos;invitation</strong> (format
-          <code className="mx-1 px-1 py-0.5 bg-gray-800 rounded text-yellow-400">
+          Demande à ton MJ un <strong>code d&apos;invitation</strong> (format{' '}
+          <code className="inline-block align-middle whitespace-nowrap mx-0.5 px-1.5 py-0.5 rounded text-[11px] font-mono text-[var(--theme-accent,#C9A84C)] bg-[var(--theme-bg-secondary,#0f1115)] border border-[var(--theme-border,rgba(255,255,255,0.08))]">
             DND-XXXXXX
           </code>
           ) puis colle-le dans le menu hamburger → « Rejoindre un scénario ».

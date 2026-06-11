@@ -382,7 +382,7 @@ export default function Scenarios() {
               value={codeJoueur}
               onChange={(e) => setCodeJoueur(e.target.value)}
               placeholder={td('menu_join_code_ph')}
-              className="flex-1 p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none font-mono uppercase"
+              className="flex-1 min-w-0 p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none font-mono uppercase"
             />
             <select
               value={scenarioCibleId}
@@ -509,9 +509,9 @@ export default function Scenarios() {
               </div>
               {codesVisibles[scenario.id] && (
                 <div className="mt-2 p-2 rounded bg-gray-900 border border-green-600/50 flex items-center justify-between gap-2">
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-gray-400 text-xs">{t('invite_code_label')}</p>
-                    <code className="text-green-300 font-mono font-bold text-lg">{codesVisibles[scenario.id]}</code>
+                    <code className="text-green-300 font-mono font-bold text-lg break-all">{codesVisibles[scenario.id]}</code>
                   </div>
                   <div className="flex gap-2">
                     <button

@@ -46,6 +46,8 @@ export default function AdminFeedbackPage() {
   const [filtreCat, setFiltreCat] = useState<'all' | Categorie>('all')
   const [filtreStatut, setFiltreStatut] = useState<'all' | Statut>('all')
   const [loading, setLoading] = useState(true)
+  // Section « Traités » repliée par défaut.
+  const [traitesOuverts, setTraitesOuverts] = useState(false)
 
   const charger = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -97,7 +99,12 @@ export default function AdminFeedbackPage() {
   const filtres = rows.filter(
     (r) => (filtreCat === 'all' || r.categorie === filtreCat) && (filtreStatut === 'all' || r.statut === filtreStatut)
   )
-  const nbNouveaux = rows.filter((r) => r.statut === 'nouveau').length
+  // Non traités = nouveau OU en cours (restent en haut, pleine taille).
+  const nonTraites = filtres.filter((r) => r.statut !== 'resolu')
+  // Traités = résolu (descendent dans la section repliable du bas).
+  const traites = filtres.filter((r) => r.statut === 'resolu')
+  // Compteur global des retours encore à traiter (indépendant des filtres).
+  const nbNonTraites = rows.filter((r) => r.statut !== 'resolu').length
 
   return (
     <main className="min-h-screen bg-gray-900 text-white p-4 md:p-6">
@@ -107,11 +114,13 @@ export default function AdminFeedbackPage() {
             ← Dashboard
           </button>
           <h1 className="text-2xl grim-title">🛡 Retours (admin)</h1>
-          {nbNouveaux > 0 && (
-            <span className="text-xs font-bold px-2 py-1 rounded bg-red-500/20 text-red-300">
-              {nbNouveaux} nouveau{nbNouveaux > 1 ? 'x' : ''}
-            </span>
-          )}
+          <span
+            className={`text-xs font-bold px-2 py-1 rounded ${
+              nbNonTraites > 0 ? 'bg-red-500/20 text-red-300' : 'bg-emerald-500/15 text-emerald-300'
+            }`}
+          >
+            {nbNonTraites > 0 ? `${nbNonTraites} à traiter` : '✅ Tout est traité'}
+          </span>
         </div>
 
         {/* Filtres */}
@@ -127,7 +136,7 @@ export default function AdminFeedbackPage() {
             <option value="all">Tous statuts</option>
             {STATUTS.map((s) => <option key={s} value={s}>{STATUT_LABEL[s]}</option>)}
           </select>
-          <span className="text-xs text-gray-500 self-center">{filtres.length} retour(s)</span>
+          <span className="text-xs text-gray-500 self-center">{filtres.length} affiché(s)</span>
         </div>
 
         {loading ? (
@@ -135,11 +144,40 @@ export default function AdminFeedbackPage() {
         ) : filtres.length === 0 ? (
           <p className="text-gray-500 text-sm italic">Aucun retour pour ces filtres.</p>
         ) : (
-          <div className="space-y-3">
-            {filtres.map((f) => (
-              <AdminCard key={f.id} f={f} onStatut={changerStatut} onReponse={enregistrerReponse} />
-            ))}
-          </div>
+          <>
+            {/* À traiter — en haut, pleine taille */}
+            {nonTraites.length === 0 ? (
+              <p className="text-gray-500 text-sm italic mb-4">Aucun retour à traiter pour ces filtres. 🎉</p>
+            ) : (
+              <div className="space-y-3">
+                {nonTraites.map((f) => (
+                  <AdminCard key={f.id} f={f} onStatut={changerStatut} onReponse={enregistrerReponse} />
+                ))}
+              </div>
+            )}
+
+            {/* Traités — section repliable en bas */}
+            {traites.length > 0 && (
+              <div className="mt-6">
+                <button
+                  type="button"
+                  onClick={() => setTraitesOuverts((o) => !o)}
+                  aria-expanded={traitesOuverts}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded bg-gray-800/60 border border-gray-700 hover:border-emerald-600/40 text-left transition"
+                >
+                  <span className="text-sm font-bold text-emerald-300">✅ Traités ({traites.length})</span>
+                  <span className="ml-auto text-xs text-gray-500">{traitesOuverts ? '▾ Masquer' : '▸ Afficher'}</span>
+                </button>
+                {traitesOuverts && (
+                  <div className="space-y-3 mt-3 opacity-80">
+                    {traites.map((f) => (
+                      <AdminCard key={f.id} f={f} onStatut={changerStatut} onReponse={enregistrerReponse} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
     </main>
@@ -191,7 +229,7 @@ function AdminCard({
       {detailsOuverts && f.metadonnees && (
         <ul className="mt-1 text-[11px] text-gray-500 space-y-0.5">
           {Object.entries(f.metadonnees).map(([k, v]) => (
-            <li key={k}><span className="text-gray-400">{k} :</span> {String(v)}</li>
+            <li key={k} className="break-words"><span className="text-gray-400">{k} :</span> {String(v)}</li>
           ))}
         </ul>
       )}

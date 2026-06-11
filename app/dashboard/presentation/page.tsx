@@ -2069,7 +2069,7 @@ function PresentationInner() {
                       type="text"
                       readOnly
                       value={displayUrl}
-                      className="flex-1 p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none text-xs font-mono"
+                      className="flex-1 min-w-0 p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none text-xs font-mono"
                     />
                     <button
                       type="button"
@@ -2121,7 +2121,7 @@ function PresentationInner() {
                           type="text"
                           readOnly
                           value={sessionUrl}
-                          className="flex-1 p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none text-xs font-mono"
+                          className="flex-1 min-w-0 p-2 rounded bg-gray-900 text-white border border-gray-700 outline-none text-xs font-mono"
                         />
                         <button
                           type="button"

@@ -15,6 +15,7 @@ import {
   applyTheme,
   type ThemeKey
 } from '@/app/styles/themes'
+import { useAdminMode } from '@/app/lib/adminMode'
 
 type NavItem = {
   label: string
@@ -73,6 +74,8 @@ export default function Sidebar() {
   const tSearch = useTranslations('search')
   const tLang = useTranslations('language')
   const { locale, setLocale } = useLocale()
+  // Mode Admin / Mode Public (toggle UX réservé aux comptes is_admin).
+  const { isAdmin, modeActif: adminModeActif, setMode: setAdminMode } = useAdminMode()
 
   const [drawerOuvert, setDrawerOuvert] = useState(false)
   const [replie, setReplie] = useState(false)
@@ -853,6 +856,83 @@ export default function Sidebar() {
             </>
           )}
         </nav>
+
+        {/* Bloc admin (visible uniquement si is_admin) : bascule Mode Admin /
+            Mode Public + accès console. Purement UX — la RLS serveur reste la
+            vraie barrière de sécurité. */}
+        {isAdmin && (
+          <div className="border-t border-[rgba(201,168,76,0.12)] bg-[rgba(201,168,76,0.03)]">
+            {compact ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setAdminMode(!adminModeActif)}
+                  title={adminModeActif ? 'Mode Admin actif — cliquer pour passer en vue Public' : 'Mode Public actif — cliquer pour repasser en Admin'}
+                  aria-label="Basculer Mode Admin / Mode Public"
+                  className="w-full flex items-center justify-center py-2 text-[#C9A84C] hover:bg-[rgba(201,168,76,0.08)] transition-all"
+                >
+                  <span className="text-base leading-none">{adminModeActif ? '🛡' : '👁'}</span>
+                </button>
+                {adminModeActif && (
+                  <button
+                    type="button"
+                    onClick={() => aller('/dashboard/admin/feedback')}
+                    title="Console admin — retours"
+                    aria-label="Console admin"
+                    className="w-full flex items-center justify-center py-2 text-[#a8a8b0] hover:text-white hover:bg-[rgba(201,168,76,0.05)] transition-all"
+                  >
+                    <span className="text-base leading-none">🛡️</span>
+                  </button>
+                )}
+              </>
+            ) : (
+              <div className="px-2 py-2">
+                <button
+                  type="button"
+                  onClick={() => setAdminMode(!adminModeActif)}
+                  aria-pressed={adminModeActif}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded border border-[rgba(201,168,76,0.18)] hover:border-[rgba(201,168,76,0.45)] hover:bg-[rgba(201,168,76,0.06)] transition-all"
+                  title="Basculer entre la vue Admin et la vue d'un utilisateur normal"
+                >
+                  <span
+                    className={`text-[9px] font-bold uppercase tracking-[0.14em] px-1.5 py-0.5 rounded ${
+                      adminModeActif
+                        ? 'bg-[#C9A84C] text-[#0a0b0d]'
+                        : 'bg-[#2a2a30] text-[#8a8a92] border border-[rgba(255,255,255,0.08)]'
+                    }`}
+                  >
+                    {adminModeActif ? 'ADMIN' : 'PUBLIC'}
+                  </span>
+                  <span className="flex-1 text-left text-[10px] text-[#6a6a72] leading-tight truncate">
+                    {adminModeActif ? 'Tu vois les accès admin' : 'Vue utilisateur lambda'}
+                  </span>
+                  <span
+                    className={`relative inline-flex items-center h-4 w-7 rounded-full transition-colors flex-shrink-0 ${
+                      adminModeActif ? 'bg-[#C9A84C]' : 'bg-gray-600'
+                    }`}
+                    aria-hidden="true"
+                  >
+                    <span
+                      className={`inline-block w-3 h-3 transform rounded-full bg-white shadow transition-transform ${
+                        adminModeActif ? 'translate-x-3.5' : 'translate-x-0.5'
+                      }`}
+                    />
+                  </span>
+                </button>
+                {adminModeActif && (
+                  <button
+                    type="button"
+                    onClick={() => aller('/dashboard/admin/feedback')}
+                    className="mt-1 w-full flex items-center gap-2.5 px-3 py-2 text-left text-[13px] tracking-wide border-l-2 border-l-transparent text-[#a8a8b0] hover:text-white hover:bg-[rgba(201,168,76,0.05)] hover:border-l-[rgba(201,168,76,0.4)] transition-all duration-150 rounded"
+                  >
+                    <span className="text-base leading-none w-5 text-center flex-shrink-0" aria-hidden="true">🛡️</span>
+                    <span className="truncate">Console admin</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Pied de sidebar : déconnexion */}
         <div className="border-t border-[rgba(201,168,76,0.12)]">

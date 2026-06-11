@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic'
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { useAdminMode } from '@/app/lib/adminMode'
 
 type Categorie = 'probleme' | 'suggestion'
 type Statut = 'nouveau' | 'en_cours' | 'resolu'
@@ -41,21 +42,18 @@ export default function FeedbackPage() {
   const [confirme, setConfirme] = useState(false)
   const [erreur, setErreur] = useState('')
   const [mesRetours, setMesRetours] = useState<FeedbackRow[]>([])
-  const [estAdmin, setEstAdmin] = useState(false)
+  // `vueAdmin` = compte admin ET « Mode Admin » actif → affiche l'accès console.
+  const { vueAdmin } = useAdminMode()
 
   const chargerMesRetours = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/'); return }
-    const [{ data }, { data: profile }] = await Promise.all([
-      supabase
-        .from('feedback')
-        .select('id, categorie, titre, description, statut, reponse_admin, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false }),
-      supabase.from('profiles').select('is_admin').eq('id', user.id).maybeSingle(),
-    ])
+    const { data } = await supabase
+      .from('feedback')
+      .select('id, categorie, titre, description, statut, reponse_admin, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
     setMesRetours((data ?? []) as FeedbackRow[])
-    setEstAdmin(!!profile?.is_admin)
   }, [router])
 
   useEffect(() => { void chargerMesRetours() }, [chargerMesRetours])
@@ -100,7 +98,7 @@ export default function FeedbackPage() {
             ← Retour
           </button>
           <h1 className="text-2xl grim-title">💬 Retours & suggestions</h1>
-          {estAdmin && (
+          {vueAdmin && (
             <button
               type="button"
               onClick={() => router.push('/dashboard/admin/feedback')}

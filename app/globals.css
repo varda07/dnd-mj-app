@@ -2186,8 +2186,10 @@ html[data-theme] .divide-gray-800 > * + * {
 }
 .grimoire-modal-input-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  /* Évite tout débordement du placeholder/valeur dans un modal étroit. */
+  max-width: 100%;
 }
 .grimoire-modal-input:focus {
   outline: none;
