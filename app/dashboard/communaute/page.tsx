@@ -8,6 +8,25 @@ import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import LikeButton from '@/app/components/LikeButton'
 import NotationsScenario from '@/app/components/NotationsScenario'
+import CommentairesCommunaute, { type EntiteType } from '@/app/components/CommentairesCommunaute'
+
+// Roadmap Finalisation 2.8 — bloc commentaires repliable sous chaque carte
+// partagée (évite de charger les commentaires de toutes les cartes d'un coup).
+function CommentsToggle({ entiteType, entiteId }: { entiteType: EntiteType; entiteId: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="w-full mt-1">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="text-[11px] text-gray-400 hover:text-yellow-300"
+      >
+        💬 {open ? 'Masquer les commentaires' : 'Commentaires'}
+      </button>
+      {open && <CommentairesCommunaute entiteType={entiteType} entiteId={entiteId} />}
+    </div>
+  )
+}
 
 type Onglet = 'scenarios' | 'personnages' | 'ennemis' | 'items' | 'maps' | 'sorts' | 'pnj'
 
@@ -450,9 +469,23 @@ export default function Communaute() {
     copies: number
   ) => (
     <div className="flex items-center gap-3 text-[11px] text-gray-400 mt-1 flex-wrap">
-      <span>👤 {auteur ?? t('anonymous')}</span>
+      {auteur ? (
+        <button
+          type="button"
+          onClick={() => router.push(`/profil/${encodeURIComponent(auteur)}`)}
+          className="underline hover:text-yellow-300"
+          title="Voir le profil public de l'auteur"
+        >
+          👤 {auteur}
+        </button>
+      ) : (
+        <span>👤 {t('anonymous')}</span>
+      )}
       <span>📥 {copies} {t('copies')}</span>
       <LikeButton entiteType={entiteType} entiteId={entiteId} />
+      {entiteType !== 'personnage' && (
+        <CommentsToggle entiteType={entiteType as EntiteType} entiteId={entiteId} />
+      )}
     </div>
   )
 
@@ -482,6 +515,14 @@ export default function Communaute() {
             ← {tc('back')}
           </button>
           <h1 className="text-2xl grim-title">{t('title')}</h1>
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard/communaute/flux')}
+            className="md:ml-auto px-3 py-2 rounded font-bold bg-[#C9A84C]/15 text-[#e6c878] border border-[#C9A84C] hover:bg-[#C9A84C]/25 text-sm transition"
+            title="Les dernières créations des utilisateurs que tu suis"
+          >
+            📡 Mon flux
+          </button>
           <p className="text-gray-400 text-sm w-full md:w-auto md:ml-2">
             {t('subtitle')}
           </p>

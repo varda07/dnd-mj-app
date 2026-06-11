@@ -23,6 +23,7 @@ import ModaleMonteeNiveau, {
   type MonteeResult
 } from './ModaleMonteeNiveau'
 import NumberInput from '@/app/components/NumberInput'
+import GuidedTour from '@/app/components/GuidedTour'
 
 type StatKey = 'force' | 'dexterite' | 'constitution' | 'intelligence' | 'sagesse' | 'charisme'
 
@@ -1018,6 +1019,7 @@ export default function FichePersonnage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-900 via-stone-900 to-gray-900 text-white p-4 md:p-6">
+      <GuidedTour tourId="personnage" />
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center gap-4 mb-4 flex-wrap">
           <button

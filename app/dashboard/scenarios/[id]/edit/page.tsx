@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import MeteoGenerator from '@/app/components/MeteoGenerator'
+import GuidedTour from '@/app/components/GuidedTour'
 
 // ============================================================================
 // Types
@@ -658,9 +659,34 @@ export default function ScenarioEditPage() {
         </span>
       </header>
 
+      {/* Roadmap Finalisation 3.4 — accès aux sous-pages du scénario sur mobile.
+          Le panneau « Scénario global » de droite est `hidden lg:flex` (invisible
+          sous 1024px) : cette barre défilante le remplace sur petit écran. */}
+      <GuidedTour tourId="scenario" />
+      <nav data-tour="scenario-souspages" className="lg:hidden flex gap-2 overflow-x-auto px-3 py-2 bg-[#191919]/80 border-b border-yellow-900/30 [scrollbar-width:thin]">
+        {[
+          { label: '📋 Session zéro', sub: 'session-zero' },
+          { label: '💰 Économie', sub: 'economie' },
+          { label: "✨ Suivi d'XP", sub: 'xp' },
+          { label: '📌 Memo MJ', sub: 'memo' },
+          { label: '🗓 Calendrier', sub: 'calendrier' },
+          { label: '📔 Récap', sub: 'recap' }
+        ].map((it) => (
+          <button
+            key={it.sub}
+            type="button"
+            onClick={() => router.push(`/dashboard/scenarios/${scenarioId}/${it.sub}`)}
+            className="whitespace-nowrap px-3 py-1.5 rounded border border-yellow-700/40 bg-[#171717] text-yellow-400 hover:border-yellow-600 text-xs font-bold uppercase tracking-[0.14em] transition"
+          >
+            {it.label}
+          </button>
+        ))}
+      </nav>
+
       <div className="flex-1 flex min-h-0">
         {/* Sidebar — chapitres (drawer sur mobile) */}
         <aside
+          data-tour="scenario-chapitres"
           className={`fixed inset-y-0 left-0 z-40 w-72 bg-[#1c1c1c] transform transition-transform md:static md:translate-x-0 md:w-72 flex flex-col ${
             drawerOpen ? 'translate-x-0' : '-translate-x-full'
           }`}

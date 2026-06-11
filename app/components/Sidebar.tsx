@@ -37,12 +37,6 @@ type PjLite = {
   image_url: string | null
 }
 
-type NavSection = {
-  id: string
-  title: string
-  items: NavItem[]
-}
-
 const SIDEBAR_OPEN_EVENT = 'sidebar:open'
 const SIDEBAR_CLOSE_EVENT = 'sidebar:close'
 const COLLAPSED_KEY = 'sidebar_collapsed'
@@ -296,49 +290,52 @@ export default function Sidebar() {
     { label: t('forge_ennemis'), icon: '👹', href: '/dashboard/ennemis' },
     { label: t('forge_pnj'), icon: '🧑', href: '/dashboard/pnj' },
     { label: t('forge_items'), icon: '🎒', href: '/dashboard/items' },
-    {
-      label: t('forge_maps'),
-      icon: '🗺',
-      href: '/dashboard/maps',
-      match: (p) => p.startsWith('/dashboard/maps')
-    },
     { label: t('forge_sorts'), icon: '✦', href: '/dashboard/sorts' },
     { label: t('tools_library'), icon: '📚', href: '/dashboard/bibliotheque' },
     { label: t('tools_community'), icon: '🌍', href: '/dashboard/communaute' }
   ]
 
-  const sections: NavSection[] = [
+  // ⚔️ AVENTURE — Roadmap Finalisation 3.1/3.2 : deux hubs dépliables (Combat,
+  // Cartes & Exploration) + Présentation en accès direct.
+  const hubCombatItems: NavItem[] = [
+    { label: t('adv_combat_prepare'), icon: '🛠', href: '/dashboard/combat-prepare' },
+    { label: t('adv_combat_rapide'), icon: '⚡', href: '/dashboard/combat-rapide' },
+    { label: t('adv_combat'), icon: '⚔', href: '/dashboard/combat', match: (p) => p === '/dashboard/combat' },
+    { label: 'Calculateur de rencontre', icon: '🧮', href: '/dashboard/combat/encounter-builder' }
+  ]
+  const hubCartesItems: NavItem[] = [
+    { label: t('forge_maps'), icon: '🗺', href: '/dashboard/maps', match: (p) => p === '/dashboard/maps' },
+    { label: 'Éditeur de carte', icon: '🎨', href: '/dashboard/maps/editor' },
+    { label: 'Atelier de donjon', icon: '🏗', href: '/dashboard/maps/builder' },
+    { label: 'Générateur de donjon', icon: '🏰', href: '/dashboard/maps/generer-donjon' },
+    { label: 'Hexcrawl', icon: '🧭', href: '/dashboard/maps/hexcrawl' },
+    { label: 'Templates de donjons', icon: '📚', href: '/dashboard/maps/templates' },
+    { label: t('adv_exploration'), icon: '🏞', href: '/dashboard/exploration' }
+  ]
+  const presentationItem: NavItem = {
+    label: t('adv_presentation'), icon: '📺', href: '/dashboard/presentation'
+  }
+
+  // ⚙️ OUTILS — utilitaires transverses (+ Succès, Historique, Tables d'effets
+  // branchés en Roadmap Finalisation 2.1/2.5/2.6).
+  const outilsItems: NavItem[] = [
     {
-      // ⚔️ AVENTURE — ce qu'on joue activement.
-      id: 'aventure',
-      title: t('section_aventure'),
-      items: [
-        { label: t('adv_combat_prepare'), icon: '🛠', href: '/dashboard/combat-prepare' },
-        { label: t('adv_combat_rapide'), icon: '⚡', href: '/dashboard/combat-rapide' },
-        { label: t('adv_combat'), icon: '⚔', href: '/dashboard/combat' },
-        { label: t('adv_exploration'), icon: '🏞', href: '/dashboard/exploration' },
-        { label: t('adv_presentation'), icon: '📺', href: '/dashboard/presentation' }
-      ]
+      label: t('tools_soundbox'),
+      icon: '🎵',
+      action: () => {
+        setDrawerOuvert(false)
+        window.dispatchEvent(new CustomEvent('soundbox:open'))
+      }
     },
-    {
-      // ⚙️ OUTILS — utilitaires transverses.
-      id: 'outils',
-      title: t('section_outils'),
-      items: [
-        {
-          label: t('tools_soundbox'),
-          icon: '🎵',
-          action: () => {
-            setDrawerOuvert(false)
-            window.dispatchEvent(new CustomEvent('soundbox:open'))
-          }
-        },
-        { label: t('tools_customize'), icon: '🎨', href: '/dashboard/personnalisation' },
-        { label: t('tools_accessibility'), icon: '♿', href: '/dashboard/accessibilite' },
-        // Roadmap Affinement 4.4 — accès rapide au centre d'aide.
-        { label: 'Aide', icon: '❓', href: '/dashboard/aide' }
-      ]
-    }
+    { label: 'Succès', icon: '🏆', href: '/dashboard/achievements' },
+    { label: 'Historique', icon: '📜', href: '/dashboard/historique' },
+    { label: t('tools_customize'), icon: '🎨', href: '/dashboard/personnalisation' },
+    { label: t('tools_accessibility'), icon: '♿', href: '/dashboard/accessibilite' },
+    { label: "Tables d'effets", icon: '🎲', href: '/dashboard/tables-effets' },
+    // Roadmap Finalisation 5.1 — soumettre un problème ou une suggestion.
+    { label: 'Retours & suggestions', icon: '💬', href: '/dashboard/feedback' },
+    // Roadmap Affinement 4.4 — accès rapide au centre d'aide.
+    { label: 'Aide', icon: '❓', href: '/dashboard/aide' }
   ]
 
   const aller = (href: string) => {
@@ -473,6 +470,44 @@ export default function Sidebar() {
           >
             <div className="sidebar-section-body-inner">{body}</div>
           </div>
+        </div>
+      )
+    }
+
+    // Hub : sous-menu dépliable (niveau 2) regroupant des items liés. État
+    // persisté via sectionsReplie (clé hub_*). Par défaut ouvert si une route
+    // enfant est active, sinon replié — une fois togglé, on respecte le choix.
+    const renderHub = (id: string, icon: string, label: string, items: NavItem[]) => {
+      if (compact) {
+        // Rail compact : on rend directement les enfants (icônes seules).
+        return <div key={id}>{items.map(renderNavItem)}</div>
+      }
+      const childActive = items.some((it) =>
+        it.href
+          ? it.match
+            ? it.match(pathname)
+            : pathname === it.href || pathname.startsWith(it.href + '/')
+          : false
+      )
+      const stored = sectionsReplie[id]
+      const replieHub = stored === undefined ? !childActive : stored
+      return (
+        <div key={id}>
+          <button
+            type="button"
+            onClick={() => toggleSection(id)}
+            aria-expanded={!replieHub}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[13px] tracking-wide border-l-2 border-l-transparent text-[#a8a8b0] hover:text-white hover:bg-[rgba(201,168,76,0.05)] hover:border-l-[rgba(201,168,76,0.4)] transition-all duration-150"
+          >
+            <span className="text-base leading-none w-5 text-center flex-shrink-0" aria-hidden="true">{icon}</span>
+            <span className="flex-1 truncate">{label}</span>
+            <span className="text-[10px] text-[#6a6a72]">{replieHub ? '▸' : '▾'}</span>
+          </button>
+          {!replieHub && (
+            <div className="ml-3 pl-1 border-l border-[rgba(201,168,76,0.12)]">
+              {items.map(renderNavItem)}
+            </div>
+          )}
         </div>
       )
     }
@@ -663,13 +698,22 @@ export default function Sidebar() {
             </>
           )}
 
-          {/* ===== ⚔️ AVENTURE + ⚙️ OUTILS ===== */}
-          {sections.map((section) =>
-            renderCollapsible(
-              section.id,
-              section.title,
-              <div>{section.items.map(renderNavItem)}</div>
-            )
+          {/* ===== ⚔️ AVENTURE : hubs Combat & Cartes + Présentation ===== */}
+          {renderCollapsible(
+            'aventure',
+            t('section_aventure'),
+            <>
+              {renderHub('hub_combat', '⚔️', 'Combat', hubCombatItems)}
+              {renderHub('hub_cartes', '🗺️', 'Cartes & Exploration', hubCartesItems)}
+              {renderNavItem(presentationItem)}
+            </>
+          )}
+
+          {/* ===== ⚙️ OUTILS ===== */}
+          {renderCollapsible(
+            'outils',
+            t('section_outils'),
+            <div>{outilsItems.map(renderNavItem)}</div>
           )}
 
           {/* ===== 🔧 PARAMÈTRES ===== */}
@@ -774,6 +818,22 @@ export default function Sidebar() {
                 })}
               </div>
             )}
+
+            {/* Éditeur de thème custom (Roadmap Finalisation 2.7) */}
+            <button
+              type="button"
+              onClick={() => aller('/dashboard/themes/custom')}
+              title={compact ? 'Thèmes custom' : undefined}
+              aria-label={compact ? 'Thèmes custom' : undefined}
+              className={`w-full flex items-center ${
+                compact ? 'justify-center px-0' : 'gap-2.5 px-3'
+              } py-2 text-left text-[13px] tracking-wide border-l-2 border-l-transparent text-[#a8a8b0] hover:text-white hover:bg-[rgba(201,168,76,0.05)] hover:border-l-[rgba(201,168,76,0.4)] transition-all duration-150`}
+            >
+              <span className="text-base leading-none w-5 text-center flex-shrink-0" aria-hidden="true">
+                ✨
+              </span>
+              {!compact && <span className="truncate">Thèmes custom</span>}
+            </button>
 
             {/* Refaire le tutoriel */}
             <button

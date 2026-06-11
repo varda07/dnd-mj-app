@@ -20,6 +20,7 @@ import {
 import NumberInput from '@/app/components/NumberInput'
 import WildMagicRoller from '@/app/components/WildMagicRoller'
 import SituationsRandom from '@/app/components/SituationsRandom'
+import GuidedTour from '@/app/components/GuidedTour'
 
 type Scenario = { id: string; nom: string; bg_image_url: string | null; mj_id: string }
 
@@ -1492,6 +1493,7 @@ function CombatInner() {
 
   return (
     <main className="min-h-screen bg-gray-900 text-white p-6">
+      <GuidedTour tourId="combat" />
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center gap-4 mb-6 flex-wrap">
           <button

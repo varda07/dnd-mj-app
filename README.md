@@ -114,6 +114,30 @@ supabase migration new nom_de_la_feature
 
 ---
 
+# 🧭 Anti-régression — détecteur de routes orphelines
+
+Pour éviter qu'une page soit codée mais jamais reliée à l'interface (route
+« orpheline », inaccessible via l'UI) :
+
+```bash
+node scripts/check-orphan-routes.mjs
+```
+
+Le script liste toutes les pages `app/**/page.tsx`, dérive leur route, et vérifie
+qu'au moins un lien entrant (`href`, `<Link>`, `router.push`) existe dans le code
+source (`.ts`/`.tsx`). Il gère les segments dynamiques (`[id]`, `[username]`…) et
+ignore les points d'entrée (`/`, `/dashboard`).
+
+- **Code de sortie 0** : aucune orpheline.
+- **Code de sortie 1** : au moins une route sans lien entrant (la liste est
+  affichée) — utile en CI / pre-commit.
+
+Quand le script signale une route, ajoute-lui un accès (sidebar, dashboard, page
+parente, ou palette Cmd+K). Les pages réservées (ex. console admin) doivent avoir
+un lien conditionnel (affiché selon le rôle) pour rester « reliées ».
+
+---
+
 ## Learn More (Next.js)
 
 - [Next.js Documentation](https://nextjs.org/docs)

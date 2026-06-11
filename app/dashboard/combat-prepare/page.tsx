@@ -24,6 +24,7 @@ import {
   type PrepParticipant
 } from '@/app/lib/combats-prepares'
 import CombatCarte, { type Jeton } from '@/app/components/presentation/CombatCarte'
+import GuidedTour from '@/app/components/GuidedTour'
 
 type ScenarioLite = { id: string; nom: string }
 type EnnemiLite = { id: string; nom: string; image_url: string | null }
@@ -200,6 +201,7 @@ function CombatPrepareInner() {
 
   return (
     <main className="codex-fade-in min-h-screen bg-gray-900 text-white p-3 md:p-6 pb-[calc(56px+env(safe-area-inset-bottom))] md:pb-6">
+      <GuidedTour tourId="combat-prepare" />
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center gap-2 md:gap-3 mb-4 flex-wrap">
           <button
@@ -212,6 +214,7 @@ function CombatPrepareInner() {
           <h1 className="text-lg md:text-2xl font-bold text-yellow-500">🛠 Préparateur de combat</h1>
           <button
             type="button"
+            data-tour="prepare-creer"
             onClick={() => setDraft(BLANK(filtreScenario || null))}
             className="ml-auto text-xs px-3 py-1.5 rounded bg-yellow-500 text-gray-900 font-bold hover:bg-yellow-400"
           >

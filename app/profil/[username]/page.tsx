@@ -13,6 +13,7 @@ export const dynamic = 'force-dynamic'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import FollowButton from '@/app/components/FollowButton'
 
 type Profil = {
   id: string
@@ -147,6 +148,9 @@ export default function ProfilPublicPage() {
               {totalCreations} création{totalCreations > 1 ? 's' : ''} publique
               {totalCreations > 1 ? 's' : ''}
             </p>
+          </div>
+          <div className="ml-auto flex-shrink-0">
+            <FollowButton targetUserId={profil.id} />
           </div>
         </header>
 

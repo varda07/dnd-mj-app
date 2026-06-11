@@ -14,6 +14,7 @@ import SondageLauncher from '@/app/components/presentation/SondageLauncher'
 import AmbianceSonoreAuto from '@/app/components/presentation/AmbianceSonoreAuto'
 import type { AttaqueData } from '@/app/components/AttackRoller'
 import CombatCockpitMJ from '@/app/components/presentation/CombatCockpitMJ'
+import GuidedTour from '@/app/components/GuidedTour'
 import CombatVueJoueurs from '@/app/components/presentation/CombatVueJoueurs'
 import CombatsPreparesLaunch from '@/app/components/combat/CombatsPreparesLaunch'
 import ActionWheelMJ, { type ActionWheelKey } from '@/app/components/presentation/ActionWheelMJ'
@@ -199,6 +200,7 @@ export type EtatCombat = {
 }
 
 export type CombatLite = {
+  id?: string
   scenario_id: string
   round: number
   tour_actuel: number
@@ -437,7 +439,7 @@ function PresentationInner() {
       // 3. État de combat
       const { data: combatData } = await supabase
         .from('combats')
-        .select('scenario_id, round, tour_actuel, ordre_initiative, actif, en_pause, etats_combat, carte_id, carte_visible_joueurs, positions')
+        .select('id, scenario_id, round, tour_actuel, ordre_initiative, actif, en_pause, etats_combat, carte_id, carte_visible_joueurs, positions')
         .eq('scenario_id', activeScn.id)
         .maybeSingle()
       if (cancelled) return
@@ -1454,6 +1456,7 @@ function PresentationInner() {
         compact ? ' cockpit-compact' : ''
       }`}
     >
+      <GuidedTour tourId="diffusion" />
       <div className="max-w-5xl mx-auto">
         {/* En-tête : retour + titre + setup courant + « Changer de setup ». */}
         <div className="flex items-center gap-2 md:gap-3 mb-3 flex-wrap">
@@ -1576,7 +1579,7 @@ function PresentationInner() {
         </section>
 
         {/* ============ Niveau B — boutons d'ouverture des panneaux ============ */}
-        <nav className="cockpit-tabs" aria-label="Panneaux du cockpit">
+        <nav data-tour="diffusion-tabs" className="cockpit-tabs" aria-label="Panneaux du cockpit">
           {panneaux.map((p) => (
             <button
               key={p.key}

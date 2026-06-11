@@ -18,6 +18,8 @@ import { useMemo, useState } from 'react'
 import { CONDITIONS, CONDITIONS_MAP, isConditionKey } from '@/app/data/conditions'
 import AttackRoller, { type AttaqueData, type CibleData } from '@/app/components/AttackRoller'
 import CombatCarte, { type Jeton } from '@/app/components/presentation/CombatCarte'
+import JetGroupeModal from '@/app/components/combat/JetGroupeModal'
+import HistoriqueCombat from '@/app/components/combat/HistoriqueCombat'
 import type { CombatLite, Persona, Ennemi, InitiativeEntry } from '@/app/dashboard/presentation/page'
 
 function entiteId(e: InitiativeEntry | null | undefined): string | null {
@@ -224,6 +226,18 @@ export default function CombatCockpitMJ({
   // Ennemi dont on lance les attaques (ouvre AttackRoller).
   const [attaquant, setAttaquant] = useState<{ nom: string; attaques: AttaqueData[] } | null>(null)
 
+  // 2.9 — Jet groupé (multi-cibles). Les caractéristiques ne sont pas chargées
+  // dans la vue cockpit : on passe les participants sans modificateurs (le MJ
+  // ajuste de tête si besoin). Le DC et le d20 restent pleinement fonctionnels.
+  const [jetGroupeOuvert, setJetGroupeOuvert] = useState(false)
+  const combatantsJet = useMemo(
+    () => [
+      ...personnages.map((p) => ({ id: p.id, nom: p.nom, kind: 'perso' as const })),
+      ...ennemis.map((e) => ({ id: e.id, nom: e.nom, kind: 'ennemi' as const }))
+    ],
+    [personnages, ennemis]
+  )
+
   // Carte tactique : jetons PJ + ennemis. Section repliable.
   const [carteOuverte, setCarteOuverte] = useState(false)
   const jetons: Jeton[] = useMemo(
@@ -327,6 +341,15 @@ export default function CombatCockpitMJ({
         <button
           type="button"
           className="presentation-action-btn"
+          onClick={() => setJetGroupeOuvert(true)}
+          disabled={combatantsJet.length === 0}
+          title="Lancer un jet de sauvegarde / caractéristique pour plusieurs participants"
+        >
+          🎲 Jet groupé
+        </button>
+        <button
+          type="button"
+          className="presentation-action-btn"
           onClick={onTerminer}
           style={{ marginLeft: 'auto' }}
         >
@@ -423,6 +446,16 @@ export default function CombatCockpitMJ({
         attaquantNom={attaquant?.nom}
         onApplyDamage={(cibleId, degats) => onModifierHp('perso', cibleId, -degats)}
       />
+
+      {/* 2.9 — Jet groupé multi-cibles */}
+      <JetGroupeModal
+        open={jetGroupeOuvert}
+        onClose={() => setJetGroupeOuvert(false)}
+        combatants={combatantsJet}
+      />
+
+      {/* 2.9 — Historique du combat (panneau dépliable) */}
+      {combat?.id && <HistoriqueCombat combatId={combat.id} />}
     </div>
   )
 }

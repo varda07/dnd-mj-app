@@ -214,6 +214,22 @@ export default function Maps() {
           >
             🎨 Créer une map
           </button>
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard/maps/builder')}
+            className="px-4 py-2 rounded font-bold bg-[#C9A84C]/15 text-[#e6c878] border border-[#C9A84C] hover:bg-[#C9A84C]/25 text-sm transition"
+            title="Outils MJ avancés : triggers, annotations, liens, zones de rencontre"
+          >
+            🏗 Atelier de donjon
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard/maps/templates')}
+            className="px-4 py-2 rounded font-bold bg-[#C9A84C]/15 text-[#e6c878] border border-[#C9A84C] hover:bg-[#C9A84C]/25 text-sm transition"
+            title="Parcourir et appliquer des templates de donjons"
+          >
+            📚 Templates
+          </button>
         </div>
         <div className="grim-card p-6 mb-6">
           <h2 className="text-lg grim-h2 mb-4">{editingId ? t('edit_title') : t('create_title')}</h2>

@@ -8,6 +8,7 @@ import { useA11y, type DaltonienType } from '@/app/lib/accessibility'
 import { supabase } from '@/lib/supabase'
 import { CONDITIONS } from '@/app/data/conditions'
 import { setEmojisConditionsCache } from '@/app/lib/conditionEmojis'
+import { autoToursDisabled, setAutoToursDisabled } from '@/app/lib/tours'
 
 // ============================================================================
 // Page Accessibilité — 6 options activées globalement via les attributs
@@ -175,6 +176,9 @@ export default function AccessibilitePage() {
             </header>
           </section>
 
+          {/* ---- Tutoriels guidés (Roadmap Finalisation 4.2) ---- */}
+          <TutorielsSection />
+
           {/* ---- 7. Emojis de conditions personnalisés (Roadmap 11.3) ---- */}
           <EmojisConditionsSection />
 
@@ -199,6 +203,45 @@ export default function AccessibilitePage() {
         </div>
       </div>
     </main>
+  )
+}
+
+// ============================================================================
+// Roadmap Finalisation 4.2 — Tutoriels guidés automatiques
+// ----------------------------------------------------------------------------
+// Active/désactive l'ouverture automatique des tutoriels contextuels à la
+// première visite d'une page. Préférence stockée en localStorage (par appareil).
+// ============================================================================
+function TutorielsSection() {
+  const [auto, setAuto] = useState(true)
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAuto(!autoToursDisabled())
+  }, [])
+
+  return (
+    <section className="grim-card p-4 md:p-5">
+      <header className="flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <h2 className="text-base font-bold text-yellow-500">
+            🎓 Tutoriels guidés automatiques
+          </h2>
+          <p className="text-xs text-gray-400 mt-1">
+            Affiche un guide pas-à-pas à la première visite des pages importantes
+            (combat, diffusion, scénario…). Tu peux toujours le relancer via le
+            bouton 🎓 en bas à gauche de ces pages.
+          </p>
+        </div>
+        <Switch
+          checked={auto}
+          onChange={(v) => {
+            setAuto(v)
+            setAutoToursDisabled(!v)
+          }}
+        />
+      </header>
+    </section>
   )
 }
 

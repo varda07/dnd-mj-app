@@ -228,14 +228,14 @@ export default function AidePage() {
             <div className="text-2xl mb-1">🎓</div>
             <div className="font-semibold text-yellow-300">Refaire le tutoriel</div>
           </button>
-          <a href="https://github.com/anthropics/master-screen/issues/new?labels=bug" target="_blank" rel="noopener noreferrer" className="codex-card codex-card-hover p-4 text-left codex-btn-press block">
+          <button type="button" onClick={() => router.push('/dashboard/feedback')} className="codex-card codex-card-hover p-4 text-left codex-btn-press">
             <div className="text-2xl mb-1">🐛</div>
-            <div className="font-semibold text-yellow-300">Signaler un bug</div>
-          </a>
-          <a href="https://github.com/anthropics/master-screen/issues/new?labels=enhancement" target="_blank" rel="noopener noreferrer" className="codex-card codex-card-hover p-4 text-left codex-btn-press block">
+            <div className="font-semibold text-yellow-300">Signaler un problème</div>
+          </button>
+          <button type="button" onClick={() => router.push('/dashboard/feedback')} className="codex-card codex-card-hover p-4 text-left codex-btn-press">
             <div className="text-2xl mb-1">💡</div>
             <div className="font-semibold text-yellow-300">Suggérer une amélioration</div>
-          </a>
+          </button>
         </div>
 
         {categories.map(([cat, articles]) => (
