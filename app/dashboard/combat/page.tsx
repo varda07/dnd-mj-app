@@ -1492,7 +1492,7 @@ function CombatInner() {
   const nbEnnemisSel = ennemis.filter((e) => selectedIds.has(`ennemi-${e.id}`)).length
 
   return (
-    <main className="min-h-screen bg-gray-900 text-white p-6">
+    <main className="min-h-screen bg-gray-900 text-white p-4 md:p-6">
       <GuidedTour tourId="combat" />
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center gap-4 mb-6 flex-wrap">
@@ -2446,7 +2446,7 @@ function CombatInner() {
       {showRoundAnnouncement && (
         <div className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none px-4 animate-round-flash">
           <div className="bg-gradient-to-br from-yellow-500 via-yellow-400 to-orange-500 px-8 py-6 rounded-2xl border-4 border-yellow-200 shadow-2xl shadow-yellow-500/50">
-            <h2 className="text-5xl md:text-7xl font-black text-gray-900 drop-shadow-lg whitespace-nowrap">
+            <h2 className="text-4xl md:text-7xl font-black text-gray-900 drop-shadow-lg whitespace-nowrap">
               🆕 Round {round}
             </h2>
           </div>
@@ -2600,7 +2600,7 @@ function CombatInner() {
             </div>
 
             <div
-              className="px-6 py-4 border-t flex items-center justify-between gap-3"
+              className="px-6 py-4 border-t flex flex-wrap items-center justify-between gap-3"
               style={{ borderColor: 'rgba(201,168,76,0.2)' }}
             >
               <button

@@ -1473,7 +1473,7 @@ function ChapterHeader({
         value={rest}
         onChange={(e) => onTitreChange(emoji ? `${emoji} ${e.target.value}` : e.target.value)}
         placeholder="Sans titre"
-        className="w-full bg-transparent text-4xl md:text-5xl font-bold text-gray-50 border-none outline-none placeholder-gray-700 focus:ring-0 leading-tight tracking-tight"
+        className="w-full bg-transparent text-3xl md:text-5xl font-bold text-gray-50 border-none outline-none placeholder-gray-700 focus:ring-0 leading-tight tracking-tight"
         style={{
           fontFamily:
             'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'

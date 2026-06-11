@@ -88,7 +88,7 @@ export default function AnnotationsMJPanel({
                   ({a.position.x_pct.toFixed(0)}%, {a.position.y_pct.toFixed(0)}%)
                 </span>
                 <span className="flex gap-1">
-                  <button type="button" onClick={() => editer(a)} className="text-[10px] text-gray-400 hover:text-yellow-300">✏</button>
+                  <button type="button" onClick={() => editer(a)} className="text-xs text-gray-400 hover:text-yellow-300 px-1.5 py-1">✏</button>
                   <button type="button" onClick={() => supprimer(a)} className="text-[10px] text-red-400">🗑</button>
                 </span>
               </div>

@@ -126,7 +126,7 @@ export default function SonsPage() {
     : sons.filter((s) => s.categorie === categorieActive)
 
   return (
-    <main className="min-h-screen bg-gray-900 text-white p-6">
+    <main className="min-h-screen bg-gray-900 text-white p-4 md:p-6">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center gap-4 mb-6 flex-wrap">
           <button type="button" onClick={() => router.back()} className="text-gray-400 hover:text-white">← Retour</button>
@@ -192,7 +192,7 @@ export default function SonsPage() {
                     {CATEGORIES.find((c) => c.key === s.categorie)?.label} {s.tags.length > 0 ? '· ' + s.tags.join(', ') : ''}
                   </div>
                 </div>
-                <button type="button" onClick={() => supprimer(s)} className="text-red-400 text-sm hover:bg-red-500/10 rounded p-1">🗑</button>
+                <button type="button" onClick={() => supprimer(s)} className="text-red-400 text-sm hover:bg-red-500/10 rounded p-2">🗑</button>
                 {playingId === s.id && (
                   <audio src={s.url} autoPlay loop onError={() => toast.error('Lecture impossible — vérifie l\'URL')} />
                 )}

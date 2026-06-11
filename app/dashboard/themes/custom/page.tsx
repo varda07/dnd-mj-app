@@ -218,7 +218,7 @@ export default function CustomThemesPage() {
                     className="w-10 h-9 rounded bg-transparent border border-gray-600 cursor-pointer flex-shrink-0"
                     aria-label={v.label}
                   />
-                  <span className="text-sm text-gray-300 w-40 flex-shrink-0">
+                  <span className="text-sm text-gray-300 w-28 sm:w-40 flex-shrink-0">
                     {v.label}
                   </span>
                   <input

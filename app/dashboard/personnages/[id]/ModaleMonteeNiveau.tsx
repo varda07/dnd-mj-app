@@ -401,7 +401,7 @@ export default function ModaleMonteeNiveau({
 
         {/* Stepper */}
         <div
-          className="px-6 py-3 flex items-center gap-2 border-b text-[10px] uppercase tracking-widest"
+          className="px-6 py-3 flex flex-wrap items-center gap-2 border-b text-[10px] uppercase tracking-widest"
           style={{ borderColor: 'rgba(201,168,76,0.15)' }}
         >
           {(['class-choice', 'hp', 'sous-classe', 'asi', 'sorts', 'recap'] as Etape[]).map((s, i) => {

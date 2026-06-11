@@ -109,7 +109,7 @@ export default function TriggerEditor({ mapId }: { mapId: string }) {
                 <span className="flex-1 text-gray-200">{t.nom}</span>
                 {t.declenche && <span className="text-[10px] text-gray-500">déclenché</span>}
                 {!t.valide_mj && <span className="text-[10px] text-red-400">auto</span>}
-                <button type="button" onClick={() => ouvrirEdition(t)} className="text-[10px] text-gray-400 hover:text-yellow-300">✏</button>
+                <button type="button" onClick={() => ouvrirEdition(t)} className="text-xs text-gray-400 hover:text-yellow-300 px-1.5 py-1">✏</button>
                 <button type="button" onClick={() => supprimer(t)} className="text-[10px] text-red-400">🗑</button>
               </li>
             )

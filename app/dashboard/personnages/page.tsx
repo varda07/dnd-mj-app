@@ -732,7 +732,7 @@ export default function Personnages() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-900 text-white p-6">
+    <main className="min-h-screen bg-gray-900 text-white p-4 md:p-6">
       {/* Ghost flottant affiché pendant le drag d'un jet */}
       {dragInfo && rolled4d6[dragInfo.rollIdx] && (
         <div

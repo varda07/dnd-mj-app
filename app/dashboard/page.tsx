@@ -376,8 +376,8 @@ export default function Dashboard() {
         <p className="grimoire-slogan">— Fortis Fortuna Adiuvat —</p>
         <div className="grimoire-divider-line" />
       </header>
-      {/* Sous le titre : bascule MJ/Joueur. */}
-      <div className="h-12 md:h-auto pl-12 pr-3 md:p-3 flex items-center justify-end md:justify-center gap-2 border-b border-[rgba(201,168,76,0.10)] theme-header-border theme-no-deco">
+      {/* Sous le titre : bascule MJ/Joueur. Centrée sur mobile ET desktop. */}
+      <div className="h-12 md:h-auto px-3 md:p-3 flex items-center justify-center gap-2 border-b border-[rgba(201,168,76,0.10)] theme-header-border theme-no-deco">
         <div className="grimoire-pill-group">
           <button
             type="button"
@@ -806,7 +806,7 @@ export default function Dashboard() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="grimoire-modal w-full max-w-md"
+            className="grimoire-modal w-full max-w-md max-h-[calc(100vh-1.5rem)] overflow-y-auto"
           >
             <div className="grimoire-modal-header">
               <h3 className="grimoire-modal-title">{t('add_player_title')}</h3>

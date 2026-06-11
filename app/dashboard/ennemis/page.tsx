@@ -461,7 +461,7 @@ export default function Ennemis() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-900 text-white p-6">
+    <main className="min-h-screen bg-gray-900 text-white p-4 md:p-6">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center gap-4 mb-6">
           <button type="button" onClick={() => router.back()} className="text-gray-400 hover:text-white">
@@ -469,7 +469,7 @@ export default function Ennemis() {
           </button>
           <h1 className="text-2xl grim-title">{t('title')}</h1>
         </div>
-        <div className="grim-card p-6 mb-6">
+        <div className="grim-card p-4 md:p-6 mb-6">
           <h2 className="text-lg grim-h2 mb-4">{editingId ? t('edit_title') : t('create_title')}</h2>
           <div className="space-y-3">
             <input type="text" placeholder={t('name_ph')} value={nom} onChange={(e) => setNom(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
@@ -491,7 +491,7 @@ export default function Ennemis() {
               </div>
             </div>
             <p className="text-gray-400 text-sm font-bold">{t('stats')}</p>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div>
                 <label className="text-gray-400 text-sm">Force</label>
                 <input type="number" value={force} onChange={(e) => setForce(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
@@ -749,7 +749,7 @@ export default function Ennemis() {
                     className="w-24 h-24 object-cover rounded bg-gray-900 flex-shrink-0"
                   />
                 )}
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <StarFavori type="ennemis" id={ennemi.id} />

@@ -30,7 +30,7 @@ export default function TuilesPalette({
           {([0, 90, 180, 270] as const).map((r) => (
             <button key={r} type="button"
               onClick={() => setRotation(r)}
-              className={`text-[10px] px-1.5 py-0.5 rounded border ${rotation === r ? 'bg-yellow-500/15 border-yellow-500/50 text-yellow-200' : 'bg-gray-800 border-gray-700 text-gray-400'}`}
+              className={`text-[11px] px-2 py-1 rounded border ${rotation === r ? 'bg-yellow-500/15 border-yellow-500/50 text-yellow-200' : 'bg-gray-800 border-gray-700 text-gray-400'}`}
             >{r}°</button>
           ))}
         </div>

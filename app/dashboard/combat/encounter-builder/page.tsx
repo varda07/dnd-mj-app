@@ -183,7 +183,7 @@ export default function EncounterBuilderPage() {
           </div>
 
           {/* Budget */}
-          <div className="grid grid-cols-4 gap-2 mt-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
             {(
               [
                 ['facile', 'Facile'],
@@ -316,7 +316,7 @@ export default function EncounterBuilderPage() {
                     <button
                       type="button"
                       onClick={() => setQ(e.id, -1)}
-                      className="w-7 h-7 rounded bg-gray-800 text-gray-300 hover:bg-gray-700 font-bold"
+                      className="w-9 h-9 md:w-7 md:h-7 rounded bg-gray-800 text-gray-300 hover:bg-gray-700 font-bold"
                       aria-label={`Retirer ${e.nom}`}
                     >
                       −
@@ -327,7 +327,7 @@ export default function EncounterBuilderPage() {
                     <button
                       type="button"
                       onClick={() => setQ(e.id, 1)}
-                      className="w-7 h-7 rounded bg-gray-800 text-gray-300 hover:bg-gray-700 font-bold"
+                      className="w-9 h-9 md:w-7 md:h-7 rounded bg-gray-800 text-gray-300 hover:bg-gray-700 font-bold"
                       aria-label={`Ajouter ${e.nom}`}
                     >
                       +

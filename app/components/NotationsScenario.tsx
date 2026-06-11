@@ -36,7 +36,7 @@ function Etoiles({
           type="button"
           disabled={!onPick}
           onClick={() => onPick?.(n)}
-          className={onPick ? 'cursor-pointer' : 'cursor-default'}
+          className={onPick ? 'cursor-pointer px-1 text-lg leading-none' : 'cursor-default'}
           aria-label={`${n} étoile${n > 1 ? 's' : ''}`}
         >
           <span className={n <= note ? 'text-yellow-400' : 'text-gray-600'}>

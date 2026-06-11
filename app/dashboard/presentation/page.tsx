@@ -2513,7 +2513,7 @@ export function DisplayView({
           <span className="presentation-exit-label">Retour au dashboard</span>
         </button>
       )}
-      <div className={`${compact ? 'p-6 pt-12' : 'p-8 md:p-12 pt-16 md:pt-20'} max-w-7xl mx-auto`}>
+      <div className={`${compact ? 'p-4 md:p-6 pt-12' : 'p-4 md:p-12 pt-16 md:pt-20'} max-w-7xl mx-auto`}>
         {/* Bandeau de titre */}
         <header className="text-center mb-8">
           <p
@@ -2552,7 +2552,7 @@ export function DisplayView({
         {/* Lieu actuel */}
         {(etat?.lieu_nom || etat?.lieu_description) && (
           <section
-            className="rounded-lg p-6 md:p-8 mb-8 text-center"
+            className="rounded-lg p-4 md:p-8 mb-8 text-center"
             style={{
               background:
                 'radial-gradient(ellipse at 50% 130%, rgba(150,30,30,0.20) 0%, transparent 70%), linear-gradient(180deg, rgba(20,14,8,0.6) 0%, rgba(8,5,3,0.5) 100%)',

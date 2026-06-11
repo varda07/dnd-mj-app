@@ -272,7 +272,7 @@ export default function PnjPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-900 text-white p-6">
+    <main className="min-h-screen bg-gray-900 text-white p-4 md:p-6">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center gap-4 mb-6">
           <button type="button" onClick={() => router.back()} className="text-gray-400 hover:text-white">
@@ -281,7 +281,7 @@ export default function PnjPage() {
           <h1 className="text-2xl grim-title">{t('title')}</h1>
         </div>
 
-        <div className="grim-card p-6 mb-6">
+        <div className="grim-card p-4 md:p-6 mb-6">
           <h2 className="text-lg grim-h2 mb-4">
             {editingId ? t('edit_title') : t('create_title')}
           </h2>

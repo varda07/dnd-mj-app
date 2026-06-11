@@ -210,7 +210,7 @@ export default function TablesEffetsPage() {
               </div>
               {effets.map((e, i) => (
                 <div key={i} className="rounded border border-gray-700 bg-gray-800/50 p-2 space-y-1">
-                  <div className="flex gap-2 items-center">
+                  <div className="flex flex-wrap gap-2 items-center">
                     <input
                       type="number"
                       value={e.min}
@@ -252,7 +252,7 @@ export default function TablesEffetsPage() {
               ))}
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => setEditId(null)}

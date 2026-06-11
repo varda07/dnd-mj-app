@@ -223,15 +223,15 @@ export default function CalendrierPage() {
   }, [evenements, calendrier])
 
   if (notFound) return (
-    <main className="min-h-screen bg-gray-900 text-white p-6">
+    <main className="min-h-screen bg-gray-900 text-white p-4 md:p-6">
       <EmptyState icon="🗓" title="Scénario introuvable" message="Ce scénario n'existe pas ou tu n'y as pas accès." />
     </main>
   )
 
   return (
-    <main className="min-h-screen bg-gray-900 text-white p-6">
+    <main className="min-h-screen bg-gray-900 text-white p-4 md:p-6">
       <div className="max-w-5xl mx-auto">
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex items-center gap-4 mb-6 flex-wrap">
           <button type="button" onClick={() => router.back()} className="text-gray-400 hover:text-white">← Retour</button>
           <h1 className="text-2xl grim-title">🗓 Calendrier — {scenarioNom}</h1>
         </div>

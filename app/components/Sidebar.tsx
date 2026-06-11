@@ -968,7 +968,7 @@ export default function Sidebar() {
         type="button"
         onClick={() => setDrawerOuvert(true)}
         aria-label={t('open_menu')}
-        className="md:hidden fixed top-1.5 right-1.5 z-[80] w-9 h-9 flex items-center justify-center rounded bg-[#12141a]/90 border border-[rgba(201,168,76,0.3)] text-[#C9A84C] hover:bg-[#1a1d24] active:scale-95 transition-all duration-150"
+        className="md:hidden fixed top-1.5 right-1.5 z-[80] w-11 h-11 flex items-center justify-center rounded bg-[#12141a]/90 border border-[rgba(201,168,76,0.3)] text-[#C9A84C] hover:bg-[#1a1d24] active:scale-95 transition-all duration-150"
       >
         <span aria-hidden="true" className="text-lg leading-none">
           ☰
@@ -1017,7 +1017,7 @@ export default function Sidebar() {
             type="button"
             onClick={() => setDrawerOuvert(false)}
             aria-label={t('close_menu')}
-            className="absolute top-2 left-2 w-8 h-8 flex items-center justify-center rounded text-[#6a6a72] hover:text-white hover:bg-[rgba(255,255,255,0.05)] text-lg transition-all"
+            className="absolute top-2 left-2 w-10 h-10 flex items-center justify-center rounded text-[#6a6a72] hover:text-white hover:bg-[rgba(255,255,255,0.05)] text-lg transition-all"
           >
             ✕
           </button>

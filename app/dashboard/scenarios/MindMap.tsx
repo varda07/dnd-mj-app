@@ -2263,7 +2263,7 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
             onClick={() => setLinkEditor(null)}
           >
             <div
-              className="bg-gray-800 border-2 border-yellow-600 rounded-lg shadow-2xl w-full max-w-md p-4 space-y-4"
+              className="bg-gray-800 border-2 border-yellow-600 rounded-lg shadow-2xl w-full max-w-md p-4 space-y-4 max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <h3 className="text-yellow-500 font-bold">
@@ -2291,7 +2291,7 @@ export default function MindMap({ scenarios }: { scenarios: ScenarioLite[] }) {
                 <label className="text-[11px] uppercase tracking-[0.18em] text-gray-400 block mb-2">
                   Couleur
                 </label>
-                <div className="grid grid-cols-7 gap-2">
+                <div className="flex flex-wrap gap-2">
                   {(['auto', 'or', 'rouge', 'vert', 'bleu', 'violet', 'gris'] as ColorKey[]).map((key) => {
                     const actif = linkEditor.couleur === key
                     const commun = {
@@ -2547,7 +2547,7 @@ function CustomTypeCreator({
       onClick={onCancel}
     >
       <div
-        className="bg-gray-800 border-2 border-yellow-600 rounded-lg shadow-2xl w-full max-w-md p-4 space-y-4"
+        className="bg-gray-800 border-2 border-yellow-600 rounded-lg shadow-2xl w-full max-w-md p-4 space-y-4 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-yellow-500 font-bold flex items-center gap-2">
@@ -2573,7 +2573,7 @@ function CustomTypeCreator({
           <label className="text-[11px] uppercase tracking-[0.18em] text-gray-400 block mb-2">
             Couleur
           </label>
-          <div className="grid grid-cols-7 gap-2">
+          <div className="flex flex-wrap gap-2">
             {(Object.keys(CUSTOM_COLOR_HEX) as CustomColorKey[]).map((key) => {
               const actif = couleur === key
               return (

@@ -116,7 +116,7 @@ export default function SondageLauncher({ sessionId }: { sessionId: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="px-2 py-0.5 rounded text-xs font-bold border bg-gray-900/50 border-gray-700 text-gray-100 hover:border-yellow-500/40 inline-flex items-center gap-1"
+        className="px-3 py-1.5 rounded text-xs font-bold border bg-gray-900/50 border-gray-700 text-gray-100 hover:border-yellow-500/40 inline-flex items-center gap-1"
         title="Lancer un sondage rapide"
       >
         📊 Sondage{actifCourant ? ` (${total})` : ''}
