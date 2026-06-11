@@ -2,12 +2,12 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import { useFavoris, type FavoriType } from '@/app/lib/favoris'
-import type { DashboardPrefs } from '@/app/lib/widgets'
+import type { DashboardPrefs, WidgetInstance } from '@/app/lib/widgets'
 import CustomDashboard from '@/app/components/CustomDashboard'
 
 type ScenarioLite = { id: string; nom: string; actif?: boolean }
@@ -94,6 +94,29 @@ export default function Dashboard() {
       cancel = true
     }
   }, [])
+
+  // Réordonne les widgets de la config active sur MOBILE (pile 1 colonne) et
+  // persiste le nouvel ordre (champ `order`) sans toucher x/y (desktop intact).
+  const reordonnerWidgetsMobile = useCallback(
+    async (nouveaux: WidgetInstance[]) => {
+      const activeId = customPrefs?.active
+      if (!activeId || !customPrefs) return
+      const next: DashboardPrefs = {
+        ...customPrefs,
+        configs: customPrefs.configs.map((c) =>
+          c.id === activeId ? { ...c, widgets: nouveaux } : c
+        )
+      }
+      setCustomPrefs(next)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      await supabase
+        .from('profiles')
+        .update({ dashboard_config: next })
+        .eq('id', user.id)
+    },
+    [customPrefs]
+  )
 
   // Écoute l'évènement global pour ouvrir la modale d'ajout de PJ depuis la
   // sidebar (ou n'importe quel point d'entrée externe).
@@ -482,7 +505,7 @@ export default function Dashboard() {
                         Modifier
                       </button>
                     </div>
-                    <CustomDashboard widgets={cfg.widgets} />
+                    <CustomDashboard widgets={cfg.widgets} onReorder={reordonnerWidgetsMobile} />
                   </section>
                 )
               }

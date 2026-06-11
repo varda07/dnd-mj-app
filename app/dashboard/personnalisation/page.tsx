@@ -386,7 +386,7 @@ export default function PersonnalisationPage() {
                       <button
                         type="button"
                         onClick={() => supprimerWidget(i)}
-                        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-red-300 hover:bg-red-700 hover:text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute top-1 right-1 w-9 h-9 md:w-6 md:h-6 flex items-center justify-center rounded-full bg-black/60 text-red-300 hover:bg-red-700 hover:text-white text-base md:text-xs opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                         title="Supprimer ce widget"
                       >
                         ×

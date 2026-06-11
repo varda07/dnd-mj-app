@@ -64,10 +64,13 @@ export const WIDGETS_BY_TYPE: Record<WidgetType, WidgetDef> = WIDGETS.reduce(
 // ----------------------------------------------------------------------------
 export type WidgetInstance = {
   type: WidgetType
-  x: number // colonne 0..3
-  y: number // ligne 0..5
+  x: number // colonne 0..3 (source de vérité DESKTOP)
+  y: number // ligne 0..5 (source de vérité DESKTOP)
   w: number
   h: number
+  // Ordre vertical sur MOBILE (1 colonne), indépendant de x/y pour ne jamais
+  // altérer la grille desktop. Absent → ordre dérivé du tri (y puis x).
+  order?: number
 }
 
 export type DashboardConfig = {
