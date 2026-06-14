@@ -14,6 +14,7 @@ export const dynamic = 'force-dynamic'
 // ============================================================================
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import GuidedTour from '@/app/components/GuidedTour'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useCombatEngine, computeCombatStats, type CombatStats } from '@/app/lib/combat-engine'
@@ -124,6 +125,7 @@ function CombatRapideInner() {
 
   return (
     <main className="codex-fade-in min-h-screen bg-gray-900 text-white p-3 md:p-6 pb-[calc(56px+env(safe-area-inset-bottom))] md:pb-6">
+      <GuidedTour tourId="combat-rapide" />
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center gap-2 md:gap-3 mb-3 flex-wrap">
           <button

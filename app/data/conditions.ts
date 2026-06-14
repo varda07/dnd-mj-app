@@ -7,11 +7,13 @@ export type ConditionKey =
   | 'aveugle'
   | 'a_terre'
   | 'assourdi'
+  | 'beni'
   | 'charme'
   | 'effraye'
   | 'empoisonne'
   | 'entrave'
   | 'etourdi'
+  | 'hate'
   | 'inconscient'
   | 'invisible'
   | 'metamorphose'
@@ -19,6 +21,15 @@ export type ConditionKey =
   | 'petrifie'
   | 'ralenti'
   | 'saisi'
+  // Épuisement : 6 niveaux cumulatifs (chaque niveau ajoute ses effets aux
+  // précédents). Stockés comme des clés distinctes ; l'UI n'autorise qu'un seul
+  // niveau actif à la fois.
+  | 'epuisement_1'
+  | 'epuisement_2'
+  | 'epuisement_3'
+  | 'epuisement_4'
+  | 'epuisement_5'
+  | 'epuisement_6'
 
 export type Condition = {
   key: ConditionKey
@@ -62,6 +73,17 @@ export const CONDITIONS: Condition[] = [
     description:
       'La créature ne peut pas entendre et rate automatiquement les jets de caractéristique nécessitant l’ouïe.',
     effets: ['Ne peut pas entendre', 'Rate les jets nécessitant l’ouïe']
+  },
+  {
+    key: 'beni',
+    nom: 'Béni',
+    icone: '✨',
+    description:
+      'La créature est bénie : elle ajoute 1d4 à ses jets d’attaque et à ses jets de sauvegarde.',
+    effets: [
+      'Ajoute 1d4 aux jets d’attaque',
+      'Ajoute 1d4 aux jets de sauvegarde'
+    ]
   },
   {
     key: 'charme',
@@ -119,6 +141,20 @@ export const CONDITIONS: Condition[] = [
       'Ne parle que difficilement',
       'Rate les jets de sauvegarde de Force et de Dextérité',
       'Avantage aux attaques contre elle'
+    ]
+  },
+  {
+    key: 'hate',
+    nom: 'Hâte',
+    icone: '⏩',
+    description:
+      'La créature est hâtée : vitesse doublée, +2 à la CA, avantage aux jets de sauvegarde de Dextérité, et une action supplémentaire à chaque tour.',
+    effets: [
+      'Vitesse doublée',
+      '+2 à la CA',
+      'Avantage aux jets de sauvegarde de Dextérité',
+      'Action supplémentaire (Attaquer, Foncer, Se désengager, Se cacher ou Utiliser un objet)',
+      'À la fin de l’effet : ne peut ni bouger ni agir au tour suivant'
     ]
   },
   {
@@ -208,8 +244,89 @@ export const CONDITIONS: Condition[] = [
       'Vitesse = 0 ; ne bénéficie d’aucun bonus de vitesse',
       'Prend fin si la saisie est brisée ou si l’agresseur ne peut plus maintenir la prise'
     ]
+  },
+  {
+    key: 'epuisement_1',
+    nom: 'Épuisement (niv. 1)',
+    icone: '🥵',
+    description: 'Niveau 1 d’épuisement.',
+    effets: ['Désavantage aux jets de caractéristique']
+  },
+  {
+    key: 'epuisement_2',
+    nom: 'Épuisement (niv. 2)',
+    icone: '🥵',
+    description: 'Niveau 2 d’épuisement (effets cumulatifs).',
+    effets: ['Désavantage aux jets de caractéristique', 'Vitesse réduite de moitié']
+  },
+  {
+    key: 'epuisement_3',
+    nom: 'Épuisement (niv. 3)',
+    icone: '🥵',
+    description: 'Niveau 3 d’épuisement (effets cumulatifs).',
+    effets: [
+      'Désavantage aux jets de caractéristique',
+      'Vitesse réduite de moitié',
+      'Désavantage aux jets d’attaque et de sauvegarde'
+    ]
+  },
+  {
+    key: 'epuisement_4',
+    nom: 'Épuisement (niv. 4)',
+    icone: '🥵',
+    description: 'Niveau 4 d’épuisement (effets cumulatifs).',
+    effets: [
+      'Désavantage aux jets de caractéristique',
+      'Vitesse réduite de moitié',
+      'Désavantage aux jets d’attaque et de sauvegarde',
+      'Maximum de points de vie réduit de moitié'
+    ]
+  },
+  {
+    key: 'epuisement_5',
+    nom: 'Épuisement (niv. 5)',
+    icone: '🥵',
+    description: 'Niveau 5 d’épuisement (effets cumulatifs).',
+    effets: [
+      'Désavantage aux jets de caractéristique',
+      'Vitesse réduite à 0',
+      'Désavantage aux jets d’attaque et de sauvegarde',
+      'Maximum de points de vie réduit de moitié'
+    ]
+  },
+  {
+    key: 'epuisement_6',
+    nom: 'Épuisement (niv. 6)',
+    icone: '💀',
+    description: 'Niveau 6 d’épuisement : la créature meurt.',
+    effets: [
+      'La créature meurt',
+      'Vitesse à 0',
+      'Désavantage à tous les jets',
+      'Maximum de points de vie réduit de moitié'
+    ]
   }
 ]
+
+// Clés des 6 niveaux d'épuisement, dans l'ordre. Utilisé par l'UI pour
+// proposer un sélecteur de niveau unique plutôt que 6 conditions distinctes.
+export const EPUISEMENT_KEYS: ConditionKey[] = [
+  'epuisement_1',
+  'epuisement_2',
+  'epuisement_3',
+  'epuisement_4',
+  'epuisement_5',
+  'epuisement_6'
+]
+
+export const isEpuisementKey = (v: unknown): v is ConditionKey =>
+  typeof v === 'string' && (EPUISEMENT_KEYS as string[]).includes(v)
+
+// Niveau (1-6) d'une clé d'épuisement, ou 0 si ce n'en est pas une.
+export const epuisementNiveau = (key: string): number => {
+  const m = /^epuisement_(\d)$/.exec(key)
+  return m ? Number(m[1]) : 0
+}
 
 export const CONDITIONS_MAP: Record<ConditionKey, Condition> = CONDITIONS.reduce(
   (acc, c) => {

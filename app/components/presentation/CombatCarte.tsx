@@ -19,6 +19,17 @@ export type Jeton = {
   image_url: string | null
 }
 
+// V1 1.2 — Brouillard de guerre : grille de cellules masquées. `hidden`
+// contient les index (y * cols + x) des cellules cachées. Vide = tout visible.
+export type FogState = { cols: number; rows: number; hidden: number[] }
+
+export const FOG_COLS = 24
+export const FOG_ROWS = 14
+
+export function fogVide(): FogState {
+  return { cols: FOG_COLS, rows: FOG_ROWS, hidden: [] }
+}
+
 // Position par défaut si le jeton n'a pas encore été déplacé : PJ en bas,
 // ennemis en haut, répartis horizontalement par index.
 function positionParDefaut(jetons: Jeton[]): Record<string, { x: number; y: number }> {
@@ -41,7 +52,12 @@ export default function CombatCarte({
   backgroundUrl,
   editable = false,
   onMove,
-  compact = false
+  compact = false,
+  fog,
+  fogEditable = false,
+  brushSize = 1,
+  fogMode = 'hide',
+  onFogChange
 }: {
   jetons: Jeton[]
   positions: Record<string, { x: number; y: number }>
@@ -49,10 +65,42 @@ export default function CombatCarte({
   editable?: boolean
   onMove?: (pieceId: string, x: number, y: number) => void
   compact?: boolean
+  // V1 1.2 — brouillard de guerre
+  fog?: FogState | null
+  fogEditable?: boolean
+  brushSize?: number
+  fogMode?: 'hide' | 'reveal'
+  onFogChange?: (fog: FogState) => void
 }) {
   const boardRef = useRef<HTMLDivElement | null>(null)
   const dragRef = useRef<string | null>(null)
+  const fogPaintRef = useRef(false)
   const defauts = positionParDefaut(jetons)
+
+  const cols = fog?.cols ?? FOG_COLS
+  const rows = fog?.rows ?? FOG_ROWS
+  const hidden = new Set(fog?.hidden ?? [])
+
+  // Applique le pinceau autour de la cellule visée (rayon = brushSize).
+  const peindre = (clientX: number, clientY: number) => {
+    const board = boardRef.current
+    if (!board || !onFogChange) return
+    const rect = board.getBoundingClientRect()
+    const cx = Math.floor(((clientX - rect.left) / rect.width) * cols)
+    const cy = Math.floor(((clientY - rect.top) / rect.height) * rows)
+    const next = new Set(hidden)
+    for (let dy = -brushSize; dy <= brushSize; dy++) {
+      for (let dx = -brushSize; dx <= brushSize; dx++) {
+        const x = cx + dx
+        const y = cy + dy
+        if (x < 0 || x >= cols || y < 0 || y >= rows) continue
+        const idx = y * cols + x
+        if (fogMode === 'hide') next.add(idx)
+        else next.delete(idx)
+      }
+    }
+    onFogChange({ cols, rows, hidden: [...next] })
+  }
 
   const posDe = (j: Jeton) => positions[j.pieceId] ?? defauts[j.pieceId] ?? { x: 0.5, y: 0.5 }
 
@@ -90,6 +138,38 @@ export default function CombatCarte({
       onPointerLeave={stopDrag}
     >
       {!backgroundUrl && <div className="combatcarte-grid" aria-hidden />}
+
+      {/* V1 1.2 — Brouillard : cellules masquées (overlay non interactif). */}
+      {hidden.size > 0 && (
+        <div
+          className="combatcarte-fog"
+          aria-hidden
+          style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)` }}
+        >
+          {Array.from({ length: cols * rows }, (_, idx) => (
+            <span
+              key={idx}
+              className={hidden.has(idx) ? 'combatcarte-fog-cell is-hidden' : 'combatcarte-fog-cell'}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Couche de peinture du brouillard (MJ, mode brouillard actif). */}
+      {fogEditable && onFogChange && (
+        <div
+          className="combatcarte-fogpaint"
+          onPointerDown={(e) => {
+            fogPaintRef.current = true
+            try { (e.target as HTMLElement).setPointerCapture?.(e.pointerId) } catch { /* noop */ }
+            peindre(e.clientX, e.clientY)
+          }}
+          onPointerMove={(e) => { if (fogPaintRef.current) peindre(e.clientX, e.clientY) }}
+          onPointerUp={() => { fogPaintRef.current = false }}
+          onPointerLeave={() => { fogPaintRef.current = false }}
+        />
+      )}
+
       {jetons.map((j) => {
         const p = posDe(j)
         const ko = false
@@ -115,7 +195,7 @@ export default function CombatCarte({
           >
             {j.image_url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={j.image_url} alt="" className="combatcarte-jeton-img" />
+              <img src={j.image_url} alt="" className="combatcarte-jeton-img" loading="lazy" decoding="async" />
             ) : (
               <span>{j.kind === 'ennemi' ? '👹' : '🛡'}</span>
             )}

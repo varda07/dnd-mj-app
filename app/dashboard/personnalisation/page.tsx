@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import GuidedTour from '@/app/components/GuidedTour'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import {
@@ -227,6 +228,7 @@ export default function PersonnalisationPage() {
 
   return (
     <main className="codex-fade-in min-h-screen bg-gray-900 text-white p-4 md:p-6 pb-[calc(56px+env(safe-area-inset-bottom))] md:pb-6">
+      <GuidedTour tourId="dashboard-perso" />
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-3 mb-4 flex-wrap">

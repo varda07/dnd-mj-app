@@ -517,17 +517,25 @@
     "aveugle": "Aveuglé",
     "a_terre": "À terre",
     "assourdi": "Assourdi",
+    "beni": "Béni",
     "charme": "Charmé",
     "effraye": "Effrayé",
     "empoisonne": "Empoisonné",
     "entrave": "Entravé",
     "etourdi": "Étourdi",
+    "hate": "Hâte",
     "inconscient": "Inconscient",
     "invisible": "Invisible",
     "metamorphose": "Métamorphosé",
     "paralyse": "Paralysé",
     "petrifie": "Pétrifié",
     "ralenti": "Ralenti",
-    "saisi": "Saisi"
+    "saisi": "Saisi",
+    "epuisement_1": "Épuisement (niv. 1)",
+    "epuisement_2": "Épuisement (niv. 2)",
+    "epuisement_3": "Épuisement (niv. 3)",
+    "epuisement_4": "Épuisement (niv. 4)",
+    "epuisement_5": "Épuisement (niv. 5)",
+    "epuisement_6": "Épuisement (niv. 6)"
   }
 }

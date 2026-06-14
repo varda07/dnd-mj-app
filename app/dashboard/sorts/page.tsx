@@ -2,7 +2,8 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useMemo, useState, useEffect } from 'react'
+import { memo, useMemo, useState, useEffect } from 'react'
+import GuidedTour from '@/app/components/GuidedTour'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
@@ -104,7 +105,9 @@ type SpellCardProps = {
   cantrip?: boolean
 }
 
-export function SpellCard({
+// V1 6.3 — mémoïsation : SpellCard ne reçoit que des props primitives, donc
+// React.memo évite les re-rendus inutiles dans les longues listes de sorts.
+function SpellCardBase({
   nom,
   niveau,
   ecole,
@@ -291,6 +294,8 @@ export function SpellCard({
     </div>
   )
 }
+
+export const SpellCard = memo(SpellCardBase)
 
 function SpellChip({
   label,
@@ -602,6 +607,7 @@ export default function Sorts() {
 
   return (
     <main className="min-h-screen bg-gray-900 text-white p-4 md:p-6">
+      <GuidedTour tourId="sorts" />
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center gap-4 mb-6">
           <button type="button" onClick={() => router.back()} className="text-gray-400 hover:text-white text-sm">

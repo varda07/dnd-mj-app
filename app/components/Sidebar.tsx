@@ -331,9 +331,11 @@ export default function Sidebar() {
       }
     },
     { label: 'Succès', icon: '🏆', href: '/dashboard/achievements' },
+    // (Accessibilité retirée d'Outils → cf. accessibiliteItem dans Paramètres)
     { label: 'Historique', icon: '📜', href: '/dashboard/historique' },
     { label: t('tools_customize'), icon: '🎨', href: '/dashboard/personnalisation' },
-    { label: t('tools_accessibility'), icon: '♿', href: '/dashboard/accessibilite' },
+    // V1 4.1 — l'Accessibilité (un réglage) est déplacée dans la section
+    // Paramètres ci-dessous (renderNavItem accessibiliteItem).
     { label: "Tables d'effets", icon: '🎲', href: '/dashboard/tables-effets' },
     // Roadmap Finalisation 5.1 — soumettre un problème ou une suggestion.
     { label: 'Retours & suggestions', icon: '💬', href: '/dashboard/feedback' },
@@ -838,6 +840,13 @@ export default function Sidebar() {
               {!compact && <span className="truncate">Thèmes custom</span>}
             </button>
 
+            {/* Accessibilité (V1 4.1 — déplacée d'Outils vers Paramètres) */}
+            {renderNavItem({
+              label: t('tools_accessibility'),
+              icon: '♿',
+              href: '/dashboard/accessibilite'
+            })}
+
             {/* Refaire le tutoriel */}
             <button
               type="button"
@@ -876,9 +885,9 @@ export default function Sidebar() {
                 {adminModeActif && (
                   <button
                     type="button"
-                    onClick={() => aller('/dashboard/admin/feedback')}
-                    title="Console admin — retours"
-                    aria-label="Console admin"
+                    onClick={() => aller('/dashboard/admin')}
+                    title="Administration"
+                    aria-label="Administration"
                     className="w-full flex items-center justify-center py-2 text-[#a8a8b0] hover:text-white hover:bg-[rgba(201,168,76,0.05)] transition-all"
                   >
                     <span className="text-base leading-none">🛡️</span>
@@ -922,11 +931,11 @@ export default function Sidebar() {
                 {adminModeActif && (
                   <button
                     type="button"
-                    onClick={() => aller('/dashboard/admin/feedback')}
+                    onClick={() => aller('/dashboard/admin')}
                     className="mt-1 w-full flex items-center gap-2.5 px-3 py-2 text-left text-[13px] tracking-wide border-l-2 border-l-transparent text-[#a8a8b0] hover:text-white hover:bg-[rgba(201,168,76,0.05)] hover:border-l-[rgba(201,168,76,0.4)] transition-all duration-150 rounded"
                   >
                     <span className="text-base leading-none w-5 text-center flex-shrink-0" aria-hidden="true">🛡️</span>
-                    <span className="truncate">Console admin</span>
+                    <span className="truncate">Administration</span>
                   </button>
                 )}
               </div>

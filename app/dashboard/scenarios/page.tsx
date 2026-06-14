@@ -6,7 +6,15 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
-import MindMap from './MindMap'
+import nextDynamic from 'next/dynamic'
+// V1 6.2 — code splitting : la carte mentale (lourde) n'est chargée qu'à
+// l'ouverture de la vue carte. `dynamic` est déjà pris par `export const
+// dynamic`, d'où l'alias nextDynamic.
+const MindMap = nextDynamic(() => import('./MindMap'), {
+  ssr: false,
+  loading: () => <p className="text-gray-400 italic p-6">Chargement de la carte…</p>
+})
+import GuidedTour from '@/app/components/GuidedTour'
 import StarFavori from '@/app/components/StarFavori'
 import TemplatesScenariosGallery from '@/app/components/TemplatesScenariosGallery'
 import { useFavoris } from '@/app/lib/favoris'
@@ -308,6 +316,9 @@ export default function Scenarios() {
 
   return (
     <main className="min-h-screen bg-gray-900 text-white p-4 md:p-6">
+      {/* V1 5.2 — lanceur du tutoriel Mindmap, monté seulement en vue carte
+          (évite le doublon avec d'autres 🎓 et n'apparaît pas en vue liste). */}
+      {vue === 'carte' && <GuidedTour tourId="mindmap" />}
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center gap-4 mb-6">
           <button type="button" onClick={() => router.back()} className="text-gray-400 hover:text-white">

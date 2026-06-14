@@ -16,6 +16,7 @@ import type { AttaqueData } from '@/app/components/AttackRoller'
 import CombatCockpitMJ from '@/app/components/presentation/CombatCockpitMJ'
 import GuidedTour from '@/app/components/GuidedTour'
 import CombatVueJoueurs from '@/app/components/presentation/CombatVueJoueurs'
+import type { FogState } from '@/app/components/presentation/CombatCarte'
 import CombatsPreparesLaunch from '@/app/components/combat/CombatsPreparesLaunch'
 import ActionWheelMJ, { type ActionWheelKey } from '@/app/components/presentation/ActionWheelMJ'
 import WildMagicRoller from '@/app/components/WildMagicRoller'
@@ -212,6 +213,8 @@ export type CombatLite = {
   carte_id?: string | null
   carte_visible_joueurs?: boolean
   positions?: Record<string, { x: number; y: number }>
+  // V1 1.2 — brouillard de guerre carte tactique
+  fog?: FogState | null
 }
 
 export type Persona = {
@@ -225,6 +228,15 @@ export type Persona = {
   conditions: string[]
   // Refonte combat diffusion — CA pour la vue MJ.
   ca?: number | null
+  // V1 1.1 — caractéristiques pour le jet groupé (modificateurs auto).
+  force?: number | null
+  dexterite?: number | null
+  constitution?: number | null
+  intelligence?: number | null
+  sagesse?: number | null
+  charisme?: number | null
+  // Maîtrises de sauvegarde (clé = nom long de la carac) pour le bonus de maîtrise.
+  saves_maitrises?: Record<string, boolean> | null
 }
 
 export type Ennemi = {
@@ -244,6 +256,13 @@ export type Ennemi = {
   immunites?: string[]
   vulnerabilites?: string[]
   comportement_tactique?: string | null
+  // V1 1.1 — caractéristiques pour le jet groupé (modificateurs auto).
+  force?: number | null
+  dexterite?: number | null
+  constitution?: number | null
+  intelligence?: number | null
+  sagesse?: number | null
+  charisme?: number | null
 }
 
 // ----------------------------------------------------------------------------
@@ -306,6 +325,9 @@ function PresentationInner() {
   // Refonte combat diffusion — throttle des écritures de positions de jetons.
   const positionsTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestPositions = useRef<Record<string, { x: number; y: number }>>({})
+  // V1 1.2 — throttle des écritures du brouillard de guerre.
+  const fogTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const latestFog = useRef<FogState | null>(null)
 
   // --------------------------------------------------------------------------
   // Chargement initial : scénario actif + état presentation + données combat
@@ -439,7 +461,7 @@ function PresentationInner() {
       // 3. État de combat
       const { data: combatData } = await supabase
         .from('combats')
-        .select('id, scenario_id, round, tour_actuel, ordre_initiative, actif, en_pause, etats_combat, carte_id, carte_visible_joueurs, positions')
+        .select('id, scenario_id, round, tour_actuel, ordre_initiative, actif, en_pause, etats_combat, carte_id, carte_visible_joueurs, positions, fog')
         .eq('scenario_id', activeScn.id)
         .maybeSingle()
       if (cancelled) return
@@ -493,22 +515,22 @@ function PresentationInner() {
       const [linkedP, addedP, linkedE, addedE] = await Promise.all([
         supabase
           .from('personnages')
-          .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions, ca')
+          .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions, ca, force, dexterite, constitution, intelligence, sagesse, charisme, saves_maitrises')
           .eq('scenario_id', scenario.id),
         idsP.length > 0
           ? supabase
               .from('personnages')
-              .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions, ca')
+              .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions, ca, force, dexterite, constitution, intelligence, sagesse, charisme, saves_maitrises')
               .in('id', idsP)
           : Promise.resolve({ data: [] }),
         supabase
           .from('ennemis')
-          .select('id, nom, hp_actuel, hp_max, image_url, conditions, armure, attaques, resistances, immunites, vulnerabilites, comportement_tactique')
+          .select('id, nom, hp_actuel, hp_max, image_url, conditions, armure, attaques, resistances, immunites, vulnerabilites, comportement_tactique, force, dexterite, constitution, intelligence, sagesse, charisme')
           .eq('scenario_id', scenario.id),
         idsE.length > 0
           ? supabase
               .from('ennemis')
-              .select('id, nom, hp_actuel, hp_max, image_url, conditions, armure, attaques, resistances, immunites, vulnerabilites, comportement_tactique')
+              .select('id, nom, hp_actuel, hp_max, image_url, conditions, armure, attaques, resistances, immunites, vulnerabilites, comportement_tactique, force, dexterite, constitution, intelligence, sagesse, charisme')
               .in('id', idsE)
           : Promise.resolve({ data: [] })
       ])
@@ -826,6 +848,29 @@ function PresentationInner() {
     [scenario, isMj]
   )
 
+  // V1 1.2 — Met à jour le brouillard de guerre (maj optimiste + écriture
+  // throttlée, comme les positions). La synchro joueurs passe par le snapshot.
+  const mettreAJourFog = useCallback(
+    (fog: FogState) => {
+      if (!scenario || !isMj) return
+      setCombat((c) => {
+        latestFog.current = fog
+        return c ? { ...c, fog } : c
+      })
+      if (fogTimer.current) clearTimeout(fogTimer.current)
+      fogTimer.current = setTimeout(() => {
+        supabase
+          .from('combats')
+          .update({ fog: latestFog.current })
+          .eq('scenario_id', scenario.id)
+          .then(({ error }) => {
+            if (error) console.error('[combat] fog :', error.message)
+          })
+      }, 250)
+    },
+    [scenario, isMj]
+  )
+
   // Autorise / retire l'affichage de la carte tactique côté joueurs.
   const toggleCarteVisible = useCallback(
     () => sauverCombat({ carte_visible_joueurs: !combat?.carte_visible_joueurs }),
@@ -948,12 +993,12 @@ function PresentationInner() {
         myScenarioIds.length > 0
           ? supabase
               .from('personnages')
-              .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions, ca')
+              .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions, ca, force, dexterite, constitution, intelligence, sagesse, charisme, saves_maitrises')
               .in('scenario_id', myScenarioIds)
           : Promise.resolve({ data: [] }),
         supabase
           .from('personnages')
-          .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions, ca')
+          .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions, ca, force, dexterite, constitution, intelligence, sagesse, charisme, saves_maitrises')
           .eq('joueur_id', user.id)
       ])
       const map = new Map<string, Persona>()
@@ -966,7 +1011,7 @@ function PresentationInner() {
     } else {
       const { data } = await supabase
         .from('ennemis')
-        .select('id, nom, hp_actuel, hp_max, image_url, conditions, armure, attaques, resistances, immunites, vulnerabilites, comportement_tactique')
+        .select('id, nom, hp_actuel, hp_max, image_url, conditions, armure, attaques, resistances, immunites, vulnerabilites, comportement_tactique, force, dexterite, constitution, intelligence, sagesse, charisme')
         .eq('mj_id', user.id)
         .order('nom')
       setLibEnnemis((data ?? []) as Ennemi[])
@@ -1678,6 +1723,7 @@ function PresentationInner() {
                   onLancer={lancerCombat}
                   onMoveJeton={deplacerJeton}
                   onToggleCarteVisible={toggleCarteVisible}
+                  onFogChange={mettreAJourFog}
                   carteBackground={etat?.lieu_image_fond ?? null}
                 />
 

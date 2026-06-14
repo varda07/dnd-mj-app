@@ -10,6 +10,8 @@ import {
   CONDITIONS,
   CONDITIONS_MAP,
   isConditionKey,
+  isEpuisementKey,
+  epuisementNiveau,
   type ConditionKey
 } from '@/app/data/conditions'
 import {
@@ -3617,7 +3619,7 @@ function ParticipantCard(props: ParticipantCardProps) {
               {conditionMenuOuvert && (
                 <div className="mt-2 p-2 rounded bg-black/40 border border-[rgba(201,168,76,0.2)] max-h-56 overflow-y-auto">
                   <div className="grid grid-cols-1 gap-0.5">
-                    {CONDITIONS.map((c) => {
+                    {CONDITIONS.filter((c) => !isEpuisementKey(c.key)).map((c) => {
                       const active = p.conditions.includes(c.key)
                       return (
                         <button
@@ -3637,6 +3639,45 @@ function ParticipantCard(props: ParticipantCardProps) {
                         </button>
                       )
                     })}
+                    {/* Épuisement : sélecteur de niveau unique (1-6) */}
+                    {(() => {
+                      const niveau = p.conditions.reduce(
+                        (max, c) => Math.max(max, epuisementNiveau(c)),
+                        0
+                      )
+                      const choisirNiveau = (n: number) => {
+                        const cible = `epuisement_${n}` as ConditionKey
+                        p.conditions
+                          .filter(isEpuisementKey)
+                          .forEach((c) => {
+                            if (c !== cible) basculerCondition(p, c)
+                          })
+                        basculerCondition(p, cible)
+                      }
+                      return (
+                        <div className="flex items-center gap-2 px-2 py-1 text-[11px] text-gray-300">
+                          <span className="text-base leading-none">🥵</span>
+                          <span className="flex-1">{tCond('epuisement_1').replace(/\s*\(.*$/, '')}</span>
+                          <span className="flex gap-1">
+                            {[1, 2, 3, 4, 5, 6].map((n) => (
+                              <button
+                                key={n}
+                                type="button"
+                                onClick={() => choisirNiveau(n)}
+                                title={CONDITIONS_MAP[`epuisement_${n}` as ConditionKey]?.effets.join(' · ')}
+                                className={`w-5 h-5 rounded text-[10px] border transition ${
+                                  niveau === n
+                                    ? 'bg-purple-700/60 text-white border-purple-400'
+                                    : 'border-white/15 text-gray-400 hover:bg-white/[0.06]'
+                                }`}
+                              >
+                                {n}
+                              </button>
+                            ))}
+                          </span>
+                        </div>
+                      )
+                    })()}
                   </div>
                 </div>
               )}

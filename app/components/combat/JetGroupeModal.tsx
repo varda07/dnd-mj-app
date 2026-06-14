@@ -10,15 +10,29 @@
 import { useState } from 'react'
 import Modal from '@/app/components/ui/Modal'
 
+type Carac = 'FOR' | 'DEX' | 'CON' | 'INT' | 'SAG' | 'CHA'
+
 type Combatant = {
   id: string
   nom: string
   kind: 'perso' | 'ennemi'
   // Modificateurs par caractéristique (déjà calculés depuis (caract - 10) / 2)
-  mods?: Partial<Record<'FOR' | 'DEX' | 'CON' | 'INT' | 'SAG' | 'CHA', number>>
+  mods?: Partial<Record<Carac, number>>
+  // V1 1.1 — bonus de maîtrise et caractéristiques de sauvegarde maîtrisées,
+  // pour appliquer la maîtrise sur un jet de sauvegarde.
+  pb?: number
+  saves?: Partial<Record<Carac, boolean>>
 }
 
-type Resultat = { combatantId: string; nom: string; jet: number; mod: number; total: number; reussi: boolean }
+type Resultat = {
+  combatantId: string
+  nom: string
+  jet: number
+  mod: number
+  pb: number
+  total: number
+  reussi: boolean
+}
 
 const CARAC_LABELS: Array<{ k: 'FOR' | 'DEX' | 'CON' | 'INT' | 'SAG' | 'CHA'; label: string }> = [
   { k: 'FOR', label: 'Force' }, { k: 'DEX', label: 'Dextérité' },
@@ -35,8 +49,9 @@ export default function JetGroupeModal({
   onClose: () => void
   combatants: Combatant[]
 }) {
-  const [carac, setCarac] = useState<'FOR' | 'DEX' | 'CON' | 'INT' | 'SAG' | 'CHA'>('DEX')
+  const [carac, setCarac] = useState<Carac>('DEX')
   const [dc, setDc] = useState(15)
+  const [avecMaitrise, setAvecMaitrise] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [resultats, setResultats] = useState<Resultat[] | null>(null)
 
@@ -59,8 +74,11 @@ export default function JetGroupeModal({
       if (!selectedIds.has(c.id)) continue
       const jet = Math.floor(Math.random() * 20) + 1
       const mod = c.mods?.[carac] ?? 0
-      const total = jet + mod
-      out.push({ combatantId: c.id, nom: c.nom, jet, mod, total, reussi: total >= dc })
+      // Bonus de maîtrise appliqué uniquement si l'option est active ET que le
+      // combattant maîtrise cette sauvegarde.
+      const pb = avecMaitrise && c.saves?.[carac] ? c.pb ?? 0 : 0
+      const total = jet + mod + pb
+      out.push({ combatantId: c.id, nom: c.nom, jet, mod, pb, total, reussi: total >= dc })
     }
     setResultats(out)
   }
@@ -92,6 +110,11 @@ export default function JetGroupeModal({
               className="mt-1 w-full p-2 rounded bg-gray-800 border border-gray-700 text-white" />
           </label>
         </div>
+
+        <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+          <input type="checkbox" checked={avecMaitrise} onChange={(e) => setAvecMaitrise(e.target.checked)} />
+          <span>Jet de sauvegarde — ajouter le bonus de maîtrise aux personnages qui maîtrisent cette sauvegarde</span>
+        </label>
 
         <div>
           <div className="flex justify-between mb-1">
@@ -129,7 +152,8 @@ export default function JetGroupeModal({
                     {r.reussi ? '✅' : '❌'} {r.nom}
                   </span>
                   <span className="text-xs text-gray-400 font-mono">
-                    🎲 {r.jet} {r.mod >= 0 ? '+' : ''}{r.mod} = <strong>{r.total}</strong>
+                    🎲 {r.jet} {r.mod >= 0 ? '+' : ''}{r.mod}
+                    {r.pb > 0 ? ` +${r.pb}🎓` : ''} = <strong>{r.total}</strong>
                   </span>
                 </li>
               ))}

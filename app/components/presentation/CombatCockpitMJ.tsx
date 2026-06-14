@@ -15,9 +15,16 @@
 // ============================================================================
 
 import { useMemo, useState } from 'react'
-import { CONDITIONS, CONDITIONS_MAP, isConditionKey } from '@/app/data/conditions'
+import {
+  CONDITIONS,
+  CONDITIONS_MAP,
+  isConditionKey,
+  isEpuisementKey,
+  epuisementNiveau,
+  EPUISEMENT_KEYS
+} from '@/app/data/conditions'
 import AttackRoller, { type AttaqueData, type CibleData } from '@/app/components/AttackRoller'
-import CombatCarte, { type Jeton } from '@/app/components/presentation/CombatCarte'
+import CombatCarte, { type Jeton, type FogState, fogVide, FOG_COLS, FOG_ROWS } from '@/app/components/presentation/CombatCarte'
 import JetGroupeModal from '@/app/components/combat/JetGroupeModal'
 import HistoriqueCombat from '@/app/components/combat/HistoriqueCombat'
 import type { CombatLite, Persona, Ennemi, InitiativeEntry } from '@/app/dashboard/presentation/page'
@@ -112,6 +119,20 @@ function ConditionsEditor({
   onClear: () => void
 }) {
   const [open, setOpen] = useState(false)
+  // Niveau d'épuisement actuellement actif (0 = aucun).
+  const niveauEpuisement = conditions.reduce(
+    (max, c) => Math.max(max, epuisementNiveau(c)),
+    0
+  )
+  // Sélection d'un niveau d'épuisement : retire l'éventuel niveau précédent et
+  // applique le nouveau (ou retire si on reclique le niveau actif).
+  const setEpuisement = (niveau: number) => {
+    const cible = `epuisement_${niveau}`
+    conditions.filter(isEpuisementKey).forEach((c) => {
+      if (c !== cible) onToggle(c)
+    })
+    onToggle(cible)
+  }
   return (
     <div className="combatmj-cond">
       <div className="combatmj-cond-pills">
@@ -151,7 +172,7 @@ function ConditionsEditor({
       </div>
       {open && (
         <div className="combatmj-cond-menu">
-          {CONDITIONS.map((cond) => {
+          {CONDITIONS.filter((c) => !isEpuisementKey(c.key)).map((cond) => {
             const actif = conditions.includes(cond.key)
             return (
               <button
@@ -166,6 +187,27 @@ function ConditionsEditor({
               </button>
             )
           })}
+          {/* Épuisement : sélecteur de niveau unique (1-6). */}
+          <div
+            className="combatmj-cond-epuisement"
+            title={CONDITIONS_MAP[EPUISEMENT_KEYS[Math.max(0, niveauEpuisement - 1)]]?.description}
+          >
+            <span aria-hidden>🥵</span>
+            <span>Épuisement</span>
+            <span className="combatmj-cond-epuisement-niv">
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className={`combatmj-cond-niv${niveauEpuisement === n ? ' is-on' : ''}`}
+                  onClick={() => setEpuisement(n)}
+                  title={`Niveau ${n} : ${CONDITIONS_MAP[`epuisement_${n}` as keyof typeof CONDITIONS_MAP]?.effets.join(' · ')}`}
+                >
+                  {n}
+                </button>
+              ))}
+            </span>
+          </div>
         </div>
       )}
     </div>
@@ -185,6 +227,7 @@ export default function CombatCockpitMJ({
   onLancer,
   onMoveJeton,
   onToggleCarteVisible,
+  onFogChange,
   carteBackground,
   onTogglePause,
   enPause
@@ -201,6 +244,8 @@ export default function CombatCockpitMJ({
   onLancer: () => void
   onMoveJeton: (pieceId: string, x: number, y: number) => void
   onToggleCarteVisible: () => void
+  // V1 1.2 — mise à jour du brouillard de guerre
+  onFogChange?: (fog: FogState) => void
   carteBackground?: string | null
   // Optionnel : pause/reprise du combat (Phase 4.3).
   onTogglePause?: () => void
@@ -226,20 +271,66 @@ export default function CombatCockpitMJ({
   // Ennemi dont on lance les attaques (ouvre AttackRoller).
   const [attaquant, setAttaquant] = useState<{ nom: string; attaques: AttaqueData[] } | null>(null)
 
-  // 2.9 — Jet groupé (multi-cibles). Les caractéristiques ne sont pas chargées
-  // dans la vue cockpit : on passe les participants sans modificateurs (le MJ
-  // ajuste de tête si besoin). Le DC et le d20 restent pleinement fonctionnels.
+  // V1 1.1 — Jet groupé (multi-cibles). Les caractéristiques (FOR/DEX/CON/INT/
+  // SAG/CHA) sont désormais chargées avec les participants : on calcule le
+  // modificateur D&D (carac - 10) / 2 (arrondi vers le bas) pour chaque
+  // combattant, appliqué automatiquement au jet selon la caractéristique choisie.
   const [jetGroupeOuvert, setJetGroupeOuvert] = useState(false)
-  const combatantsJet = useMemo(
-    () => [
-      ...personnages.map((p) => ({ id: p.id, nom: p.nom, kind: 'perso' as const })),
-      ...ennemis.map((e) => ({ id: e.id, nom: e.nom, kind: 'ennemi' as const }))
-    ],
-    [personnages, ennemis]
-  )
+  const combatantsJet = useMemo(() => {
+    const mod = (v: number | null | undefined) =>
+      typeof v === 'number' ? Math.floor((v - 10) / 2) : 0
+    const mods = (c: {
+      force?: number | null
+      dexterite?: number | null
+      constitution?: number | null
+      intelligence?: number | null
+      sagesse?: number | null
+      charisme?: number | null
+    }) => ({
+      FOR: mod(c.force),
+      DEX: mod(c.dexterite),
+      CON: mod(c.constitution),
+      INT: mod(c.intelligence),
+      SAG: mod(c.sagesse),
+      CHA: mod(c.charisme)
+    })
+    // Bonus de maîtrise D&D dérivé du niveau : 2 + (niveau - 1) / 4.
+    const pbNiveau = (niv: number) => 2 + Math.floor((Math.max(1, niv) - 1) / 4)
+    // Caractéristiques de sauvegarde maîtrisées (clé longue → clé courte).
+    const savesCourts = (m?: Record<string, boolean> | null) => ({
+      FOR: !!m?.force,
+      DEX: !!m?.dexterite,
+      CON: !!m?.constitution,
+      INT: !!m?.intelligence,
+      SAG: !!m?.sagesse,
+      CHA: !!m?.charisme
+    })
+    return [
+      ...personnages.map((p) => ({
+        id: p.id,
+        nom: p.nom,
+        kind: 'perso' as const,
+        mods: mods(p),
+        pb: pbNiveau(p.niveau ?? 1),
+        saves: savesCourts(p.saves_maitrises)
+      })),
+      ...ennemis.map((e) => ({
+        id: e.id,
+        nom: e.nom,
+        kind: 'ennemi' as const,
+        mods: mods(e)
+      }))
+    ]
+  }, [personnages, ennemis])
 
   // Carte tactique : jetons PJ + ennemis. Section repliable.
   const [carteOuverte, setCarteOuverte] = useState(false)
+  // V1 1.2 — Brouillard de guerre : mode pinceau, taille, et sens (masquer/révéler).
+  const [fogActif, setFogActif] = useState(false)
+  const [fogBrush, setFogBrush] = useState(1)
+  const [fogMode, setFogMode] = useState<'hide' | 'reveal'>('hide')
+  // fog peut valoir {} (défaut DB) → on retombe sur une grille vide.
+  const fogCourant: FogState = combat?.fog?.cols ? (combat.fog as FogState) : fogVide()
   const jetons: Jeton[] = useMemo(
     () => [
       ...personnages.map((p) => ({
@@ -307,7 +398,7 @@ export default function CombatCockpitMJ({
                 >
                   {e.image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={e.image_url} alt="" className="combatmj-init-img" />
+                    <img src={e.image_url} alt="" className="combatmj-init-img" loading="lazy" decoding="async" />
                   ) : (
                     <span className="combatmj-init-emoji">{e.kind === 'ennemi' ? '👹' : '🛡'}</span>
                   )}
@@ -421,15 +512,69 @@ export default function CombatCockpitMJ({
         </div>
         {carteOuverte && (
           <>
+            {/* V1 1.2 — Contrôles du brouillard de guerre */}
+            {onFogChange && (
+              <div className="combatmj-fog-controls">
+                <button
+                  type="button"
+                  className={`combatmj-fog-btn${fogActif ? ' is-on' : ''}`}
+                  onClick={() => setFogActif((v) => !v)}
+                  title="Activer le pinceau de brouillard (désactive le déplacement des jetons)"
+                >
+                  🌫️ Brouillard
+                </button>
+                {fogActif && (
+                  <>
+                    <div className="combatmj-fog-seg">
+                      <button type="button" className={`combatmj-fog-seg-btn${fogMode === 'hide' ? ' is-on' : ''}`} onClick={() => setFogMode('hide')}>Masquer</button>
+                      <button type="button" className={`combatmj-fog-seg-btn${fogMode === 'reveal' ? ' is-on' : ''}`} onClick={() => setFogMode('reveal')}>Révéler</button>
+                    </div>
+                    <div className="combatmj-fog-seg" title="Taille du pinceau">
+                      <button type="button" className={`combatmj-fog-seg-btn${fogBrush === 0 ? ' is-on' : ''}`} onClick={() => setFogBrush(0)}>S</button>
+                      <button type="button" className={`combatmj-fog-seg-btn${fogBrush === 1 ? ' is-on' : ''}`} onClick={() => setFogBrush(1)}>M</button>
+                      <button type="button" className={`combatmj-fog-seg-btn${fogBrush === 2 ? ' is-on' : ''}`} onClick={() => setFogBrush(2)}>L</button>
+                    </div>
+                    <button
+                      type="button"
+                      className="combatmj-fog-btn"
+                      onClick={() => onFogChange({ cols: FOG_COLS, rows: FOG_ROWS, hidden: [] })}
+                    >
+                      Tout révéler
+                    </button>
+                    <button
+                      type="button"
+                      className="combatmj-fog-btn"
+                      onClick={() =>
+                        onFogChange({
+                          cols: FOG_COLS,
+                          rows: FOG_ROWS,
+                          hidden: Array.from({ length: FOG_COLS * FOG_ROWS }, (_, i) => i)
+                        })
+                      }
+                    >
+                      Tout masquer
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
             <CombatCarte
               jetons={jetons}
               positions={combat?.positions ?? {}}
               backgroundUrl={carteBackground ?? null}
-              editable
+              editable={!fogActif}
               onMove={onMoveJeton}
+              fog={fogCourant}
+              fogEditable={fogActif}
+              brushSize={fogBrush}
+              fogMode={fogMode}
+              onFogChange={onFogChange}
             />
             <p className="combatmj-carte-hint">
-              Glisse les jetons pour les positionner. {combat?.carte_visible_joueurs
+              {fogActif
+                ? 'Mode brouillard : peins sur la carte pour masquer/révéler. Désactive « Brouillard » pour redéplacer les jetons.'
+                : 'Glisse les jetons pour les positionner.'}{' '}
+              {combat?.carte_visible_joueurs
                 ? 'La carte est visible par les joueurs.'
                 : 'La carte reste privée (MJ) tant que « Afficher aux joueurs » est décoché.'}
             </p>
@@ -505,7 +650,7 @@ function CarteCombattant({
       <div className="combatmj-card-head">
         {c.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={c.image_url} alt="" className="combatmj-card-img" />
+          <img src={c.image_url} alt="" className="combatmj-card-img" loading="lazy" decoding="async" />
         ) : (
           <span className="combatmj-card-emoji">{ennemi ? '👹' : '🛡'}</span>
         )}

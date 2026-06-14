@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import LikeButton from '@/app/components/LikeButton'
+import SignalerButton from '@/app/components/SignalerButton'
+import GuidedTour from '@/app/components/GuidedTour'
 import NotationsScenario from '@/app/components/NotationsScenario'
 import CommentairesCommunaute, { type EntiteType } from '@/app/components/CommentairesCommunaute'
 
@@ -486,6 +488,7 @@ export default function Communaute() {
       {entiteType !== 'personnage' && (
         <CommentsToggle entiteType={entiteType as EntiteType} entiteId={entiteId} />
       )}
+      <SignalerButton contenuType={entiteType} contenuId={entiteId} compact />
     </div>
   )
 
@@ -505,6 +508,7 @@ export default function Communaute() {
 
   return (
     <main className="min-h-screen bg-gray-900 text-white p-4 md:p-6">
+      <GuidedTour tourId="communaute" />
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center gap-4 mb-6 flex-wrap">
           <button

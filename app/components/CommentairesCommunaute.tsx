@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { toast } from '@/app/components/ui/Toast'
 import { confirmDialog } from '@/app/components/ui/ConfirmDialog'
+import SignalerButton from '@/app/components/SignalerButton'
 
 export type EntiteType = 'scenario' | 'ennemi' | 'pnj' | 'item' | 'sort' | 'map'
 
@@ -173,9 +174,10 @@ function CommentaireItem({
         <span className="text-[10px] text-gray-500">{new Date(c.created_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</span>
       </div>
       <div className="text-gray-200 whitespace-pre-wrap">{c.contenu}</div>
-      <div className="flex gap-2 mt-1">
+      <div className="flex gap-2 mt-1 items-center">
         {userId && <button type="button" onClick={onReply} className="text-[11px] text-gray-400 hover:text-yellow-300">Répondre</button>}
         {(moi || isProprio) && <button type="button" onClick={onDelete} className="text-[11px] text-red-400 hover:text-red-300">Supprimer</button>}
+        {userId && !moi && <SignalerButton contenuType="commentaire" contenuId={c.id} compact />}
       </div>
     </div>
   )

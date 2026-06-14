@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useA11y, type DaltonienType } from '@/app/lib/accessibility'
 import { supabase } from '@/lib/supabase'
-import { CONDITIONS } from '@/app/data/conditions'
+import { CONDITIONS, isEpuisementKey } from '@/app/data/conditions'
 import { setEmojisConditionsCache } from '@/app/lib/conditionEmojis'
 import { autoToursDisabled, setAutoToursDisabled } from '@/app/lib/tours'
 
@@ -312,7 +312,7 @@ function EmojisConditionsSection() {
         )}
       </header>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        {CONDITIONS.map((c) => (
+        {CONDITIONS.filter((c) => !isEpuisementKey(c.key)).map((c) => (
           <div
             key={c.key}
             className="flex items-center gap-2 bg-gray-900/40 border border-gray-700 rounded-md p-2"

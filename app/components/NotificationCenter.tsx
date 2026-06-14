@@ -27,7 +27,30 @@ const TYPE_EMOJI: Record<string, string> = {
   joueur: '🧑‍🤝‍🧑',
   commentaire: '💬',
   like: '❤️',
-  combat: '⚔️'
+  combat: '⚔️',
+  // Annonces globales (V1 3.2)
+  maintenance: '🔧',
+  nouveaute: '🎉',
+  annonce: '📣'
+}
+
+// V1 3.2 — les annonces globales sont communes à tous : l'état « lu » est local
+// (localStorage), puisqu'il n'y a pas de ligne par utilisateur.
+const ANNONCES_LU_KEY = 'annonces_lues'
+function getAnnoncesLues(): Set<string> {
+  try {
+    const raw = localStorage.getItem(ANNONCES_LU_KEY)
+    return new Set(raw ? (JSON.parse(raw) as string[]) : [])
+  } catch {
+    return new Set()
+  }
+}
+function setAnnoncesLues(ids: Set<string>): void {
+  try {
+    localStorage.setItem(ANNONCES_LU_KEY, JSON.stringify([...ids]))
+  } catch {
+    /* localStorage indisponible */
+  }
 }
 
 export default function NotificationCenter() {
@@ -65,7 +88,38 @@ export default function NotificationCenter() {
       return
     }
     setActif(true)
-    setNotifs((data ?? []) as Notif[])
+    const perso = (data ?? []) as Notif[]
+
+    // V1 3.2 — fusionne les annonces globales actives (lecture par tous). En cas
+    // d'absence de table (migration non appliquée), on ignore silencieusement.
+    let annonces: Notif[] = []
+    const { data: annData, error: annErr } = await supabase
+      .from('annonces_globales')
+      .select('id, type, titre, message, lien, created_at')
+      .eq('active', true)
+      .order('created_at', { ascending: false })
+      .limit(20)
+    if (!annErr && annData) {
+      const lues = getAnnoncesLues()
+      annonces = annData.map((a) => {
+        const r = a as Record<string, unknown>
+        const titre = String(r.titre ?? '')
+        const msg = String(r.message ?? '')
+        return {
+          id: `annonce-${String(r.id)}`,
+          type: String(r.type ?? 'annonce'),
+          message: titre && msg ? `${titre} — ${msg}` : titre || msg,
+          lien: String(r.lien ?? ''),
+          lu: lues.has(String(r.id)),
+          created_at: String(r.created_at)
+        }
+      })
+    }
+
+    const fusion = [...annonces, ...perso].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+    setNotifs(fusion)
   }, [])
 
   // Récupère l'utilisateur courant + écoute les changements d'auth.
@@ -140,7 +194,13 @@ export default function NotificationCenter() {
       setNotifs((ns) =>
         ns.map((x) => (x.id === n.id ? { ...x, lu: true } : x))
       )
-      await supabase.from('notifications').update({ lu: true }).eq('id', n.id)
+      if (n.id.startsWith('annonce-')) {
+        const lues = getAnnoncesLues()
+        lues.add(n.id.replace(/^annonce-/, ''))
+        setAnnoncesLues(lues)
+      } else {
+        await supabase.from('notifications').update({ lu: true }).eq('id', n.id)
+      }
     }
     if (n.lien) {
       setOuvert(false)
@@ -149,14 +209,26 @@ export default function NotificationCenter() {
   }
 
   const toutMarquerLu = async () => {
-    const ids = notifs.filter((n) => !n.lu).map((n) => n.id)
-    if (ids.length === 0) return
+    const aMarquer = notifs.filter((n) => !n.lu)
+    if (aMarquer.length === 0) return
     setNotifs((ns) => ns.map((x) => ({ ...x, lu: true })))
-    await supabase.from('notifications').update({ lu: true }).in('id', ids)
+    const lues = getAnnoncesLues()
+    aMarquer
+      .filter((n) => n.id.startsWith('annonce-'))
+      .forEach((n) => lues.add(n.id.replace(/^annonce-/, '')))
+    setAnnoncesLues(lues)
+    const ids = aMarquer.filter((n) => !n.id.startsWith('annonce-')).map((n) => n.id)
+    if (ids.length > 0) await supabase.from('notifications').update({ lu: true }).in('id', ids)
   }
 
   const supprimer = async (id: string) => {
     setNotifs((ns) => ns.filter((x) => x.id !== id))
+    if (id.startsWith('annonce-')) {
+      const lues = getAnnoncesLues()
+      lues.add(id.replace(/^annonce-/, ''))
+      setAnnoncesLues(lues)
+      return
+    }
     await supabase.from('notifications').delete().eq('id', id)
   }
 

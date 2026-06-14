@@ -517,17 +517,25 @@
     "aveugle": "Blinded",
     "a_terre": "Prone",
     "assourdi": "Deafened",
+    "beni": "Blessed",
     "charme": "Charmed",
     "effraye": "Frightened",
     "empoisonne": "Poisoned",
     "entrave": "Restrained",
     "etourdi": "Stunned",
+    "hate": "Hasted",
     "inconscient": "Unconscious",
     "invisible": "Invisible",
     "metamorphose": "Shapechanged",
     "paralyse": "Paralyzed",
     "petrifie": "Petrified",
     "ralenti": "Slowed",
-    "saisi": "Grappled"
+    "saisi": "Grappled",
+    "epuisement_1": "Exhaustion (lv. 1)",
+    "epuisement_2": "Exhaustion (lv. 2)",
+    "epuisement_3": "Exhaustion (lv. 3)",
+    "epuisement_4": "Exhaustion (lv. 4)",
+    "epuisement_5": "Exhaustion (lv. 5)",
+    "epuisement_6": "Exhaustion (lv. 6)"
   }
 }

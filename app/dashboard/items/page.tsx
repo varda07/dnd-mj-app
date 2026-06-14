@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useMemo, useState, useEffect } from 'react'
+import GuidedTour from '@/app/components/GuidedTour'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
@@ -315,6 +316,7 @@ export default function Items() {
 
   return (
     <main className="min-h-screen bg-gray-900 text-white p-4 md:p-6">
+      <GuidedTour tourId="items" />
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center gap-4 mb-6">
           <button type="button" onClick={() => router.back()} className="text-gray-400 hover:text-white">

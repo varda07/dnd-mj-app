@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useMemo } from 'react'
+import GuidedTour from '@/app/components/GuidedTour'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
@@ -412,6 +413,7 @@ export default function Bibliotheque() {
 
   return (
     <main className="min-h-screen bg-gray-900 text-white p-4 md:p-6">
+      <GuidedTour tourId="bibliotheque" />
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center gap-4 mb-6">
           <button

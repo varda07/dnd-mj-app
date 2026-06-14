@@ -145,6 +145,7 @@ export default function CombatVueJoueurs({
             jetons={jetons}
             positions={combat.positions ?? {}}
             backgroundUrl={carteBackground ?? null}
+            fog={combat.fog ?? null}
             compact
           />
         </div>

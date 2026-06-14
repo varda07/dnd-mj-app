@@ -3657,6 +3657,30 @@ html[data-a11y-aria="true"] :focus-visible {
 }
 .combatmj-cond-opt:hover { border-color: rgba(201, 168, 76, 0.5); color: #ffe6a8; }
 .combatmj-cond-opt.is-on { border-color: #c9a84c; color: #1a120a; background: linear-gradient(135deg, #f6d264 0%, #c9a84c 100%); }
+.combatmj-cond-epuisement {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  padding: 4px 6px;
+  border-radius: 5px;
+  color: #cbd5e1;
+  background: rgba(20, 15, 8, 0.5);
+  grid-column: 1 / -1;
+}
+.combatmj-cond-epuisement-niv { display: inline-flex; gap: 3px; margin-left: auto; }
+.combatmj-cond-niv {
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #cbd5e1;
+  background: rgba(40, 30, 15, 0.6);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+}
+.combatmj-cond-niv:hover { border-color: rgba(201, 168, 76, 0.6); color: #ffe6a8; }
+.combatmj-cond-niv.is-on { border-color: #c9a84c; color: #1a120a; background: linear-gradient(135deg, #f6d264 0%, #c9a84c 100%); }
 
 /* ============================================================================
    Combat diffusion — Carte tactique (CombatCarte)
@@ -3683,6 +3707,29 @@ html[data-a11y-aria="true"] :focus-visible {
   cursor: pointer;
 }
 .combatmj-carte-hint { font-size: 10px; color: #6b7280; font-style: italic; margin-top: 6px; }
+/* V1 1.2 — contrôles du brouillard de guerre */
+.combatmj-fog-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 4px; }
+.combatmj-fog-btn {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: #cbd5e1;
+  background: rgba(20, 15, 8, 0.6);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  cursor: pointer;
+}
+.combatmj-fog-btn:hover { border-color: rgba(201, 168, 76, 0.6); color: #ffe6a8; }
+.combatmj-fog-btn.is-on { border-color: #c9a84c; color: #1a120a; background: linear-gradient(135deg, #f6d264 0%, #c9a84c 100%); }
+.combatmj-fog-seg { display: inline-flex; border: 1px solid rgba(201, 168, 76, 0.25); border-radius: 6px; overflow: hidden; }
+.combatmj-fog-seg-btn {
+  font-size: 11px;
+  padding: 4px 8px;
+  color: #cbd5e1;
+  background: rgba(20, 15, 8, 0.6);
+  border: none;
+  cursor: pointer;
+}
+.combatmj-fog-seg-btn.is-on { color: #1a120a; background: linear-gradient(135deg, #f6d264 0%, #c9a84c 100%); }
 .combatj-carte { max-width: 1100px; margin: 0 auto 20px; }
 
 .combatcarte {
@@ -3706,6 +3753,26 @@ html[data-a11y-aria="true"] :focus-visible {
     linear-gradient(90deg, rgba(201, 168, 76, 0.12) 1px, transparent 1px);
   background-size: 7.5% 12.5%;
   pointer-events: none;
+}
+/* V1 1.2 — Brouillard de guerre sur la carte tactique */
+.combatcarte-fog {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  pointer-events: none;
+  z-index: 2;
+}
+.combatcarte-fog-cell { background: transparent; }
+.combatcarte-fog-cell.is-hidden {
+  background: rgba(8, 9, 12, 0.94);
+  box-shadow: 0 0 1px rgba(8, 9, 12, 0.94);
+}
+.combatcarte-fogpaint {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  cursor: crosshair;
+  touch-action: none;
 }
 .combatcarte-jeton {
   position: absolute;
