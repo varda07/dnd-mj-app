@@ -7,6 +7,7 @@ import GuidedTour from '@/app/components/GuidedTour'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useFocusHighlight } from '@/app/lib/useFocusHighlight'
+import ActionMenu from '@/app/components/ui/ActionMenu'
 import { supabase } from '@/lib/supabase'
 import ImageCropper from '@/app/components/ImageCropper'
 import StarFavori from '@/app/components/StarFavori'
@@ -616,29 +617,36 @@ export default function Items() {
                       <StarFavori type="items" id={item.id} />
                       <h3 className="text-lg font-bold text-white">{item.nom}</h3>
                     </div>
-                    <div className="flex gap-3 flex-wrap">
+                    {/* Refonte listes — Modifier visible, reste en ⋮. */}
+                    <div className="flex items-center gap-1 flex-shrink-0">
                       <button
                         type="button"
-                        onClick={() => togglerPublic(item)}
-                        className={`text-sm ${item.public ? 'text-green-400' : 'text-gray-400'}`}
-                        title={item.public ? `Partagé — ${item.nb_copies} copie(s)` : 'Partager à la communauté'}
+                        onClick={() => commencerEdition(item)}
+                        className="text-blue-400 text-sm font-bold px-2 py-1.5 rounded hover:bg-[rgba(201,168,76,0.1)] transition"
                       >
-                        {item.public ? `🌍 Public (${item.nb_copies})` : '🔒 Privé'}
+                        ✏️ {tc('modify')}
                       </button>
-                      <button type="button" onClick={() => commencerEdition(item)} className="text-blue-400 text-sm">
-                        {tc('modify')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => exporterItem(item)}
-                        className="text-gray-400 hover:text-white text-sm"
-                        title={tc('export_item_title')}
-                      >
-                        📥
-                      </button>
-                      <button type="button" onClick={() => supprimerItem(item.id)} className="text-red-400 text-sm">
-                        {tc('delete')}
-                      </button>
+                      <ActionMenu
+                        actions={[
+                          {
+                            label: item.public ? `Public (${item.nb_copies})` : 'Privé',
+                            icon: item.public ? '🌍' : '🔒',
+                            onClick: () => togglerPublic(item)
+                          },
+                          {
+                            label: tc('export_item_title'),
+                            icon: '📥',
+                            onClick: () => exporterItem(item)
+                          },
+                          {
+                            label: tc('delete'),
+                            icon: '🗑️',
+                            variant: 'danger',
+                            separatorBefore: true,
+                            onClick: () => supprimerItem(item.id)
+                          }
+                        ]}
+                      />
                     </div>
                   </div>
                   <div className="flex gap-3 text-sm text-gray-400 mb-2 flex-wrap items-center">

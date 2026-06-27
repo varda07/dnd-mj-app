@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import ImageCropper from '@/app/components/ImageCropper'
 import StarFavori from '@/app/components/StarFavori'
+import ActionMenu from '@/app/components/ui/ActionMenu'
 import { useFavoris } from '@/app/lib/favoris'
 import {
   construireEnveloppe,
@@ -1418,34 +1419,48 @@ export default function Personnages() {
                 <span>✨ Cha: {perso.charisme}</span>
               </div>
 
-              <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-gray-700 text-xs">
-                <button type="button" onClick={() => window.location.href = `/dashboard/personnages/${perso.id}`} className="text-yellow-400">
-                  {t('sheet')}
-                </button>
-                <button type="button" onClick={() => partagerPersonnage(perso.id)} className="text-green-400">
-                  {t('share_player')}
-                </button>
+              {/* Refonte listes — action principale (Fiche) visible, reste en ⋮. */}
+              <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-700 text-xs">
                 <button
                   type="button"
-                  onClick={() => togglerPublic(perso)}
-                  className={perso.public ? 'text-green-400' : 'text-gray-400'}
+                  onClick={() => (window.location.href = `/dashboard/personnages/${perso.id}`)}
+                  className="text-yellow-400 font-bold px-2 py-1.5 rounded hover:bg-[rgba(201,168,76,0.1)] transition"
                 >
-                  {perso.public ? `🌍 ${tc('public')} (${perso.nb_copies})` : `🔒 ${tc('private')}`}
+                  📜 {t('sheet')}
                 </button>
-                <button type="button" onClick={() => commencerEdition(perso)} className="text-blue-400">
-                  {tc('modify')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => exporterPersonnage(perso)}
-                  className="text-gray-400 hover:text-white"
-                  title={tc('export_item_title')}
-                >
-                  📥
-                </button>
-                <button type="button" onClick={() => supprimerPersonnage(perso.id)} className="text-red-400">
-                  {tc('delete')}
-                </button>
+                <ActionMenu
+                  actions={[
+                    {
+                      label: t('share_player'),
+                      icon: '🔑',
+                      onClick: () => partagerPersonnage(perso.id)
+                    },
+                    {
+                      label: perso.public
+                        ? `${tc('public')} (${perso.nb_copies})`
+                        : tc('private'),
+                      icon: perso.public ? '🌍' : '🔒',
+                      onClick: () => togglerPublic(perso)
+                    },
+                    {
+                      label: tc('modify'),
+                      icon: '✏️',
+                      onClick: () => commencerEdition(perso)
+                    },
+                    {
+                      label: tc('export_item_title'),
+                      icon: '📥',
+                      onClick: () => exporterPersonnage(perso)
+                    },
+                    {
+                      label: tc('delete'),
+                      icon: '🗑️',
+                      variant: 'danger',
+                      separatorBefore: true,
+                      onClick: () => supprimerPersonnage(perso.id)
+                    }
+                  ]}
+                />
               </div>
             </div>
           ))}

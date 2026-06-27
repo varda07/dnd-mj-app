@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import { useFocusHighlight } from '@/app/lib/useFocusHighlight'
+import ActionMenu from '@/app/components/ui/ActionMenu'
 import ImageCropper from '@/app/components/ImageCropper'
 import NumberInput from '@/app/components/NumberInput'
 import StarFavori from '@/app/components/StarFavori'
@@ -774,38 +775,43 @@ export default function Ennemis() {
                       <StarFavori type="ennemis" id={ennemi.id} />
                       <h3 className="text-lg font-bold text-white">{ennemi.nom}</h3>
                     </div>
-                    <div className="flex gap-3 flex-wrap">
+                    {/* Refonte listes — Modifier visible, reste en ⋮. */}
+                    <div className="flex items-center gap-1 flex-shrink-0">
                       <button
                         type="button"
-                        onClick={() => togglerPublic(ennemi)}
-                        className={`text-sm ${ennemi.public ? 'text-green-400' : 'text-gray-400'}`}
-                        title={ennemi.public ? `Partagé — ${ennemi.nb_copies} copie(s)` : 'Partager à la communauté'}
+                        onClick={() => commencerEdition(ennemi)}
+                        className="text-blue-400 text-sm font-bold px-2 py-1.5 rounded hover:bg-[rgba(201,168,76,0.1)] transition"
                       >
-                        {ennemi.public ? `🌍 Public (${ennemi.nb_copies})` : '🔒 Privé'}
+                        ✏️ {tc('modify')}
                       </button>
-                      {/* Roadmap 2.5 — créer une variante de ce monstre */}
-                      <button
-                        type="button"
-                        onClick={() => setVariantSource(ennemi)}
-                        className="text-purple-300 hover:text-purple-200 text-sm"
-                        title="Créer une variante (Chef, Élite, Mage, Ancien)"
-                      >
-                        ⎘ Variante
-                      </button>
-                      <button type="button" onClick={() => commencerEdition(ennemi)} className="text-blue-400 text-sm">
-                        {tc('modify')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => exporterEnnemi(ennemi)}
-                        className="text-gray-400 hover:text-white text-sm"
-                        title={tc('export_item_title')}
-                      >
-                        📥
-                      </button>
-                      <button type="button" onClick={() => supprimerEnnemi(ennemi.id)} className="text-red-400 text-sm">
-                        {tc('delete')}
-                      </button>
+                      <ActionMenu
+                        actions={[
+                          {
+                            label: ennemi.public
+                              ? `Public (${ennemi.nb_copies})`
+                              : 'Privé',
+                            icon: ennemi.public ? '🌍' : '🔒',
+                            onClick: () => togglerPublic(ennemi)
+                          },
+                          {
+                            label: 'Créer une variante',
+                            icon: '⎘',
+                            onClick: () => setVariantSource(ennemi)
+                          },
+                          {
+                            label: tc('export_item_title'),
+                            icon: '📥',
+                            onClick: () => exporterEnnemi(ennemi)
+                          },
+                          {
+                            label: tc('delete'),
+                            icon: '🗑️',
+                            variant: 'danger',
+                            separatorBefore: true,
+                            onClick: () => supprimerEnnemi(ennemi.id)
+                          }
+                        ]}
+                      />
                     </div>
                   </div>
                   {/* Roadmap 2.5 — badge si cet ennemi est une variante */}

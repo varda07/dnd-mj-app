@@ -16,6 +16,7 @@ const MindMap = nextDynamic(() => import('./MindMap'), {
 })
 import GuidedTour from '@/app/components/GuidedTour'
 import StarFavori from '@/app/components/StarFavori'
+import ActionMenu from '@/app/components/ui/ActionMenu'
 import TemplatesScenariosGallery from '@/app/components/TemplatesScenariosGallery'
 import { useFavoris } from '@/app/lib/favoris'
 import { unlockAchievement } from '@/app/lib/achievements'
@@ -450,7 +451,12 @@ export default function Scenarios() {
           {scenarios
             .filter((s) => !favorisOnly || estFavori('scenarios', s.id))
             .map((scenario) => (
-            <div key={scenario.id} className="grim-card grim-card-hover p-4">
+            <div
+              key={scenario.id}
+              className={`grim-card grim-card-hover p-4 ${
+                scenario.actif ? 'ring-1 ring-[rgba(201,168,76,0.55)]' : ''
+              }`}
+            >
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-3 flex-wrap min-w-0">
                   <StarFavori type="scenarios" id={scenario.id} />
@@ -478,54 +484,65 @@ export default function Scenarios() {
                     </span>
                   )}
                 </div>
-                <div className="flex gap-3 flex-wrap">
+                {/* Refonte listes — action principale (★ activer) visible,
+                    le reste dans le menu ⋮. */}
+                <div className="flex items-center gap-1 flex-shrink-0">
                   <button
                     type="button"
                     onClick={() => definirActif(scenario)}
-                    className={`text-sm font-bold ${scenario.actif ? 'text-yellow-300' : 'text-gray-400 hover:text-yellow-400'}`}
+                    className={`text-sm font-bold px-2 py-1.5 rounded transition ${scenario.actif ? 'text-yellow-300' : 'text-gray-400 hover:text-yellow-400'}`}
                     title={scenario.actif ? t('unset_active_tooltip') : t('set_active_tooltip')}
                   >
                     {scenario.actif ? `★ ${t('active_badge')}` : `☆ ${t('set_active')}`}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/dashboard/scenarios/${scenario.id}/edit`)}
-                    className="text-yellow-400 text-sm font-bold"
-                    title="Éditer (chapitres, éléments liés)"
-                  >
-                    📖 Éditer
-                  </button>
-                  <button type="button" onClick={() => inviterJoueur(scenario.id)} className="text-green-400 text-sm">
-                    {t('invite_player')}
-                  </button>
-                  <button type="button" onClick={() => router.push(`/dashboard/scenarios/${scenario.id}/quetes`)} className="text-yellow-400 text-sm" title="Quêtes du scénario">
-                    🎯 Quêtes
-                  </button>
-                  <button type="button" onClick={() => router.push(`/dashboard/scenarios/${scenario.id}/notes`)} className="text-yellow-400 text-sm">
-                    {t('notes')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => togglerPublic(scenario)}
-                    className={`text-sm ${scenario.public ? 'text-green-400' : 'text-gray-400'}`}
-                    title={scenario.public ? t('shared_tooltip', { n: scenario.nb_copies }) : t('share_tooltip')}
-                  >
-                    {scenario.public ? t('public_on', { n: scenario.nb_copies }) : t('public_off')}
-                  </button>
-                  <button type="button" onClick={() => commencerEdition(scenario)} className="text-blue-400 text-sm">
-                    {tc('modify')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => exporterScenario(scenario)}
-                    className="text-gray-400 hover:text-white text-sm"
-                    title={tc('export_item_title')}
-                  >
-                    📥
-                  </button>
-                  <button type="button" onClick={() => supprimerScenario(scenario.id)} className="text-red-400 text-sm">
-                    {tc('delete')}
-                  </button>
+                  <ActionMenu
+                    actions={[
+                      {
+                        label: 'Éditer',
+                        icon: '📖',
+                        onClick: () => router.push(`/dashboard/scenarios/${scenario.id}/edit`)
+                      },
+                      {
+                        label: t('invite_player'),
+                        icon: '✉️',
+                        onClick: () => inviterJoueur(scenario.id)
+                      },
+                      {
+                        label: 'Quêtes',
+                        icon: '🎯',
+                        onClick: () => router.push(`/dashboard/scenarios/${scenario.id}/quetes`)
+                      },
+                      {
+                        label: t('notes'),
+                        icon: '📝',
+                        onClick: () => router.push(`/dashboard/scenarios/${scenario.id}/notes`)
+                      },
+                      {
+                        label: scenario.public
+                          ? t('public_on', { n: scenario.nb_copies })
+                          : t('public_off'),
+                        icon: scenario.public ? '🌍' : '🔒',
+                        onClick: () => togglerPublic(scenario)
+                      },
+                      {
+                        label: tc('modify'),
+                        icon: '✏️',
+                        onClick: () => commencerEdition(scenario)
+                      },
+                      {
+                        label: tc('export_item_title'),
+                        icon: '📥',
+                        onClick: () => exporterScenario(scenario)
+                      },
+                      {
+                        label: tc('delete'),
+                        icon: '🗑️',
+                        variant: 'danger',
+                        separatorBefore: true,
+                        onClick: () => supprimerScenario(scenario.id)
+                      }
+                    ]}
+                  />
                 </div>
               </div>
               {codesVisibles[scenario.id] && (

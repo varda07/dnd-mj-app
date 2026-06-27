@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { memo, useMemo, useState, useEffect } from 'react'
 import GuidedTour from '@/app/components/GuidedTour'
+import ActionMenu from '@/app/components/ui/ActionMenu'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
@@ -964,40 +965,36 @@ export default function Sorts() {
                   concentration={sort.concentration}
                   rituel={sort.rituel}
                 />
-                <div className="flex flex-wrap gap-2 px-1">
-                  <button
-                    type="button"
-                    onClick={() => togglerPublic(sort)}
-                    className={`px-2 py-1.5 rounded text-[11px] tracking-wider uppercase border ${
-                      sort.public
-                        ? 'border-green-900 bg-green-950/40 text-green-300 hover:bg-green-900/40'
-                        : 'border-gray-700 bg-gray-800 text-gray-400 hover:bg-gray-700'
-                    }`}
-                  >
-                    {sort.public ? `🌍 (${sort.nb_copies})` : '🔒'}
-                  </button>
+                {/* Refonte listes — Modifier visible, reste en ⋮. */}
+                <div className="flex items-center justify-between gap-2 px-1">
                   <button
                     type="button"
                     onClick={() => commencerEdition(sort)}
                     className="px-2 py-1.5 rounded text-[11px] tracking-wider uppercase border border-blue-900 bg-blue-950/40 text-blue-300 hover:bg-blue-900/40"
                   >
-                    {tc('modify')}
+                    ✏️ {tc('modify')}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => exporterSort(sort)}
-                    className="px-2 py-1.5 rounded text-[11px] tracking-wider uppercase border border-gray-700 bg-gray-800 text-gray-300 hover:bg-gray-700"
-                    title={tc('export_item_title')}
-                  >
-                    📥
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => supprimerSort(sort.id)}
-                    className="px-2 py-1.5 rounded text-[11px] tracking-wider uppercase border border-red-900 bg-red-950/40 text-red-300 hover:bg-red-900/40"
-                  >
-                    {tc('delete')}
-                  </button>
+                  <ActionMenu
+                    actions={[
+                      {
+                        label: sort.public ? `Public (${sort.nb_copies})` : 'Privé',
+                        icon: sort.public ? '🌍' : '🔒',
+                        onClick: () => togglerPublic(sort)
+                      },
+                      {
+                        label: tc('export_item_title'),
+                        icon: '📥',
+                        onClick: () => exporterSort(sort)
+                      },
+                      {
+                        label: tc('delete'),
+                        icon: '🗑️',
+                        variant: 'danger',
+                        separatorBefore: true,
+                        onClick: () => supprimerSort(sort.id)
+                      }
+                    ]}
+                  />
                 </div>
               </div>
             ))}

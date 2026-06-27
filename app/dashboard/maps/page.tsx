@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import { useFocusHighlight } from '@/app/lib/useFocusHighlight'
+import ActionMenu from '@/app/components/ui/ActionMenu'
 import ImageCropper from '@/app/components/ImageCropper'
 import StarFavori from '@/app/components/StarFavori'
 import { useFavoris } from '@/app/lib/favoris'
@@ -291,29 +292,36 @@ export default function Maps() {
                   <StarFavori type="maps" id={map.id} />
                   <h3 className="text-lg font-bold text-white">{map.nom}</h3>
                 </div>
-                <div className="flex gap-3 flex-wrap">
+                {/* Refonte listes — Modifier visible, reste en ⋮. */}
+                <div className="flex items-center gap-1 flex-shrink-0">
                   <button
                     type="button"
-                    onClick={() => togglerPublic(map)}
-                    className={`text-sm ${map.public ? 'text-green-400' : 'text-gray-400'}`}
-                    title={map.public ? `Partagé — ${map.nb_copies} copie(s)` : 'Partager à la communauté'}
+                    onClick={() => commencerEdition(map)}
+                    className="text-blue-400 text-sm font-bold px-2 py-1.5 rounded hover:bg-[rgba(201,168,76,0.1)] transition"
                   >
-                    {map.public ? `🌍 Public (${map.nb_copies})` : '🔒 Privé'}
+                    ✏️ {tc('modify')}
                   </button>
-                  <button type="button" onClick={() => commencerEdition(map)} className="text-blue-400 text-sm">
-                    {tc('modify')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => exporterMap(map)}
-                    className="text-gray-400 hover:text-white text-sm"
-                    title={tc('export_item_title')}
-                  >
-                    📥
-                  </button>
-                  <button type="button" onClick={() => supprimerMap(map.id)} className="text-red-400 text-sm">
-                    {tc('delete')}
-                  </button>
+                  <ActionMenu
+                    actions={[
+                      {
+                        label: map.public ? `Public (${map.nb_copies})` : 'Privé',
+                        icon: map.public ? '🌍' : '🔒',
+                        onClick: () => togglerPublic(map)
+                      },
+                      {
+                        label: tc('export_item_title'),
+                        icon: '📥',
+                        onClick: () => exporterMap(map)
+                      },
+                      {
+                        label: tc('delete'),
+                        icon: '🗑️',
+                        variant: 'danger',
+                        separatorBefore: true,
+                        onClick: () => supprimerMap(map.id)
+                      }
+                    ]}
+                  />
                 </div>
               </div>
               {map.image_url && (

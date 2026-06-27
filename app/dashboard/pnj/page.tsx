@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import ImageCropper from '@/app/components/ImageCropper'
+import ActionMenu from '@/app/components/ui/ActionMenu'
 import {
   construireEnveloppe,
   lireFichierJSON,
@@ -579,36 +580,42 @@ export default function PnjPage() {
                         {[p.race, p.role].filter(Boolean).join(' · ') || '—'}
                       </p>
                     </div>
-                    <div className="flex gap-3 flex-wrap">
-                      <button
-                        type="button"
-                        onClick={() => togglerPublic(p)}
-                        className={`text-sm ${p.public ? 'text-green-400' : 'text-gray-400'}`}
-                      >
-                        {p.public ? `🌍 ${tc('public')} (${p.nb_copies})` : `🔒 ${tc('private')}`}
-                      </button>
+                    {/* Refonte listes — Fiche visible, reste en ⋮. */}
+                    <div className="flex items-center gap-1 flex-shrink-0">
                       <button
                         type="button"
                         onClick={() => router.push(`/dashboard/pnj/${p.id}`)}
-                        className="text-yellow-400 text-sm"
+                        className="text-yellow-400 text-sm font-bold px-2 py-1.5 rounded hover:bg-[rgba(201,168,76,0.1)] transition"
                         title="Ouvrir la fiche (relations, détails)"
                       >
                         🤝 Fiche
                       </button>
-                      <button type="button" onClick={() => commencerEdition(p)} className="text-blue-400 text-sm">
-                        {tc('modify')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => exporterPnj(p)}
-                        className="text-gray-400 hover:text-white text-sm"
-                        title={tc('export_item_title')}
-                      >
-                        📥
-                      </button>
-                      <button type="button" onClick={() => supprimer(p.id)} className="text-red-400 text-sm">
-                        {tc('delete')}
-                      </button>
+                      <ActionMenu
+                        actions={[
+                          {
+                            label: p.public ? `${tc('public')} (${p.nb_copies})` : tc('private'),
+                            icon: p.public ? '🌍' : '🔒',
+                            onClick: () => togglerPublic(p)
+                          },
+                          {
+                            label: tc('modify'),
+                            icon: '✏️',
+                            onClick: () => commencerEdition(p)
+                          },
+                          {
+                            label: tc('export_item_title'),
+                            icon: '📥',
+                            onClick: () => exporterPnj(p)
+                          },
+                          {
+                            label: tc('delete'),
+                            icon: '🗑️',
+                            variant: 'danger',
+                            separatorBefore: true,
+                            onClick: () => supprimer(p.id)
+                          }
+                        ]}
+                      />
                     </div>
                   </div>
                   {p.description && (
