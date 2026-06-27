@@ -132,6 +132,7 @@
     "params_language": "Language",
     "params_tutorial": "Replay tutorial",
     "params_join": "Join a scenario",
+    "params_account": "My account",
     "params_logout": "Sign out",
     "forge_scenarios": "Scenarios",
     "forge_personnages": "Characters",
@@ -150,6 +151,22 @@
     "tools_soundbox": "Sound Box",
     "tools_customize": "Customize home",
     "tools_accessibility": "Accessibility"
+  },
+  "compte": {
+    "title": "My account",
+    "back": "Back",
+    "change_password": "Change my password",
+    "connected_as": "Signed in as",
+    "current_password": "Current password",
+    "new_password": "New password",
+    "confirm_password": "Confirm new password",
+    "min_chars": "6 characters minimum",
+    "save": "Save new password",
+    "success": "✓ Password changed successfully.",
+    "err_too_short": "The new password must be at least 6 characters.",
+    "err_mismatch": "The two passwords do not match.",
+    "err_same": "The new password must differ from the current one.",
+    "err_current_wrong": "Current password is incorrect."
   },
   "palette": {
     "placeholder": "Search or run an action…",
@@ -179,7 +196,8 @@
   "language": {
     "select": "Select language",
     "fr": "🇫🇷 Français",
-    "en": "🇬🇧 English"
+    "en": "🇬🇧 English",
+    "es": "🇪🇸 Español"
   },
   "scenarios": {
     "title": "Scenarios",
@@ -417,6 +435,7 @@
     "next_turn": "⏭ Next turn",
     "end_combat": "🏆 End combat",
     "no_initiative_yet": "Roll initiative to determine turn order (d20 + Dexterity modifier).",
+    "remove_all_conditions": "Clear all",
     "grid_title": "Combat grid",
     "grid_legend": "1 square = 1.5 m",
     "choose_bg": "🖼️ Choose a background image",

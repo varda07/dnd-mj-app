@@ -49,6 +49,21 @@ type BaseParticipant = {
   xp?: number | null         // perso uniquement
   cd?: number | null         // ennemi uniquement (challenge rating)
   pieces_or?: number | null  // perso uniquement (fortune)
+  // V1 2.5 — données de combat des ennemis, consultables sans quitter le combat.
+  attaques?: Attaque[]
+  resistances?: string[] | null
+  immunites?: string[] | null
+  vulnerabilites?: string[] | null
+  comportement_tactique?: string | null
+}
+
+type Attaque = {
+  nom: string
+  bonus?: string | number | null
+  degats?: string | null
+  type?: string | null
+  portee?: string | null
+  description?: string | null
 }
 
 type Participant = BaseParticipant & { kind: 'perso' | 'ennemi' }
@@ -139,6 +154,9 @@ function CombatInner() {
   const [combatDemarre, setCombatDemarre] = useState(false)
   // Roadmap Phase 4 — modale de situation random.
   const [situationsOuvert, setSituationsOuvert] = useState(false)
+  // V1 2.7 — Magie Sauvage déclenchée depuis la barre d'outils du combat
+  // (plutôt qu'un FAB flottant qui chevauchait le bouton tutoriel).
+  const [wildMagicOuvert, setWildMagicOuvert] = useState(false)
   const [initiatives, setInitiatives] = useState<Record<string, number>>({})
   const [turnIndex, setTurnIndex] = useState(0)
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({})
@@ -153,6 +171,19 @@ function CombatInner() {
   >([])
   const [attributionTarget, setAttributionTarget] = useState<Record<string, string>>({})
   const [menuConditionsPour, setMenuConditionsPour] = useState<string | null>(null)
+  // V1 2.3 — ferme le menu de conditions au clic en dehors (le menu et son
+  // bouton déclencheur portent data-cond-menu=<pieceId>).
+  useEffect(() => {
+    if (!menuConditionsPour) return
+    const handler = (e: MouseEvent) => {
+      const el = e.target as HTMLElement | null
+      if (!el?.closest(`[data-cond-menu="${menuConditionsPour}"]`)) {
+        setMenuConditionsPour(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [menuConditionsPour])
   const [userId, setUserId] = useState<string>('')
   const [round, setRound] = useState(1)
   const [combatId, setCombatId] = useState<string | null>(null)
@@ -393,7 +424,9 @@ function CombatInner() {
         .eq('scenario_id', scenarioId),
       supabase
         .from('ennemis')
-        .select('id, nom, hp_max, hp_actuel, dexterite, image_url, conditions, force, constitution, cd')
+        // V1 2.5 — on charge attaques / armure / résistances pour pouvoir
+        // consulter l'équipement & capacités des ennemis sans quitter le combat.
+        .select('id, nom, hp_max, hp_actuel, dexterite, image_url, conditions, force, constitution, cd, armure, attaques, resistances, immunites, vulnerabilites, comportement_tactique')
         .eq('scenario_id', scenarioId),
       supabase.from('items').select('*').eq('scenario_id', scenarioId),
       supabase.from('combats').select('*').eq('scenario_id', scenarioId).maybeSingle()
@@ -1500,19 +1533,33 @@ function CombatInner() {
         <div className="flex items-center gap-4 mb-6 flex-wrap">
           <button
             type="button"
-            onClick={() => router.back()}
+            /* V1 2.1 — retour déterministe vers le dashboard. router.back()
+               bouclait car la page réécrit l'URL (scenario_id) et est souvent
+               atteinte via des redirections : l'historique ne ramenait pas au
+               dashboard. */
+            onClick={() => router.push('/dashboard')}
             className="text-gray-400 hover:text-white"
           >
             {tc('back')}
           </button>
           <h1 className="text-2xl grim-title">{tCombat('title')}</h1>
+          {/* V1 2.7 — Magie Sauvage dans la barre d'outils (MJ, combat démarré). */}
+          {isMJ && combatDemarre && (
+            <button
+              type="button"
+              onClick={() => setWildMagicOuvert(true)}
+              className="ml-auto px-3 py-1.5 text-xs uppercase tracking-[0.16em] font-bold rounded border border-purple-500/50 text-purple-200 hover:bg-purple-500/10 transition"
+            >
+              ✨ Magie Sauvage
+            </button>
+          )}
           {/* Roadmap Phase 4 — situation random */}
           <button
             type="button"
             onClick={() => setSituationsOuvert(true)}
             disabled={!scenarioId}
             title={!scenarioId ? 'Sélectionne un scénario d\'abord' : ''}
-            className="ml-auto px-3 py-1.5 text-xs uppercase tracking-[0.16em] font-bold rounded border border-fuchsia-600/50 text-fuchsia-200 hover:bg-fuchsia-500/10 transition disabled:opacity-40"
+            className={`${isMJ && combatDemarre ? '' : 'ml-auto '}px-3 py-1.5 text-xs uppercase tracking-[0.16em] font-bold rounded border border-fuchsia-600/50 text-fuchsia-200 hover:bg-fuchsia-500/10 transition disabled:opacity-40`}
           >
             🎲 Situation random
           </button>
@@ -3147,9 +3194,15 @@ function CombatInner() {
         </div>
       )}
 
-      {/* Roadmap Phase 5 — accès rapide à la table Wild Magic depuis le combat. */}
+      {/* Roadmap Phase 5 / V1 2.7 — Wild Magic piloté depuis la barre d'outils
+          (plus de FAB flottant qui chevauchait le bouton tutoriel). */}
       {isMJ && combatDemarre && (
-        <WildMagicRoller scenarioId={scenarioId} />
+        <WildMagicRoller
+          scenarioId={scenarioId}
+          flottant={false}
+          ouvert={wildMagicOuvert}
+          onClose={() => setWildMagicOuvert(false)}
+        />
       )}
 
       {/* Roadmap Phase 4 — situations random. */}
@@ -3354,6 +3407,7 @@ function ParticipantCard(props: ParticipantCardProps) {
     menuConditionsPour,
     setMenuConditionsPour,
     tCond,
+    tCombat,
     layoutMode,
     sorts,
     onToggleSortDispo
@@ -3590,6 +3644,61 @@ function ParticipantCard(props: ParticipantCardProps) {
               </CardSection>
             )}
 
+            {/* Attaques & capacités — ENNEMI uniquement (V1 2.5) */}
+            {!isPerso && (
+              <CardSection title="⚔ ATTAQUES & CAPACITÉS">
+                {p.attaques && p.attaques.length > 0 ? (
+                  <ul className="space-y-1">
+                    {p.attaques.map((a, i) => (
+                      <li key={i} className="text-xs">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-gray-200 truncate">{a.nom}</span>
+                          <span className="text-[#c9a84c] font-mono text-[11px] flex-shrink-0">
+                            {a.degats || '—'}
+                            {a.bonus != null && a.bonus !== '' ? ` · ${a.bonus}` : ''}
+                          </span>
+                        </div>
+                        {(a.portee || a.type || a.description) && (
+                          <p className="text-[10px] text-gray-500 leading-snug">
+                            {[a.type, a.portee].filter(Boolean).join(' · ')}
+                            {a.description ? ` — ${a.description}` : ''}
+                          </p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-[11px] text-gray-600 italic">
+                    Aucune attaque renseignée.
+                  </p>
+                )}
+                {(() => {
+                  const lignes: Array<[string, string[] | null | undefined]> = [
+                    ['Résistances', p.resistances],
+                    ['Immunités', p.immunites],
+                    ['Vulnérabilités', p.vulnerabilites]
+                  ]
+                  const actives = lignes.filter(([, v]) => v && v.length > 0)
+                  if (actives.length === 0 && !p.comportement_tactique) return null
+                  return (
+                    <div className="mt-2 space-y-0.5">
+                      {actives.map(([label, v]) => (
+                        <p key={label} className="text-[10px] text-gray-400">
+                          <span className="text-[#c9a84c]/80">{label} :</span>{' '}
+                          {(v ?? []).join(', ')}
+                        </p>
+                      ))}
+                      {p.comportement_tactique && (
+                        <p className="text-[10px] text-gray-400 italic">
+                          🧠 {p.comportement_tactique}
+                        </p>
+                      )}
+                    </div>
+                  )
+                })()}
+              </CardSection>
+            )}
+
             {/* Conditions — libellé utilisateur "États" */}
             <CardSection title="⚠ ÉTATS">
               {p.conditions.length === 0 ? (
@@ -3617,7 +3726,21 @@ function ParticipantCard(props: ParticipantCardProps) {
               )}
 
               {conditionMenuOuvert && (
-                <div className="mt-2 p-2 rounded bg-black/40 border border-[rgba(201,168,76,0.2)] max-h-56 overflow-y-auto">
+                <div
+                  data-cond-menu={pieceId}
+                  className="mt-2 p-2 rounded bg-black/40 border border-[rgba(201,168,76,0.2)] max-h-56 overflow-y-auto"
+                >
+                  {p.conditions.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        p.conditions.forEach((c) => basculerCondition(p, c))
+                      }}
+                      className="w-full mb-1 px-2 py-1 rounded text-[10px] uppercase tracking-[0.15em] font-bold border border-red-700/50 text-red-300 hover:bg-red-700/30 transition"
+                    >
+                      🗑️ {tCombat('remove_all_conditions')}
+                    </button>
+                  )}
                   <div className="grid grid-cols-1 gap-0.5">
                     {CONDITIONS.filter((c) => !isEpuisementKey(c.key)).map((c) => {
                       const active = p.conditions.includes(c.key)
@@ -3695,9 +3818,16 @@ function ParticipantCard(props: ParticipantCardProps) {
                 tone="heal"
                 onClick={() => modifierHp(p, 1)}
               />
+              {/* V1 2.6 — remettre les PV au max (soin de zone, reset rapide). */}
+              <CardActionButton
+                label="PV MAX"
+                tone="heal"
+                onClick={() => modifierHp(p, p.hp_max - p.hp_actuel)}
+              />
               <CardActionButton
                 label="+ ÉTAT"
                 tone="neutral"
+                dataAttr={pieceId}
                 onClick={() =>
                   setMenuConditionsPour((prev) =>
                     prev === pieceId ? null : pieceId
@@ -3743,11 +3873,14 @@ function CardSection({
 function CardActionButton({
   label,
   onClick,
-  tone
+  tone,
+  dataAttr
 }: {
   label: string
   onClick: () => void
   tone: 'damage' | 'heal' | 'neutral'
+  // V1 2.3 — marqueur pour le click-outside du menu de conditions.
+  dataAttr?: string
 }) {
   const colorClass =
     tone === 'damage'
@@ -3759,6 +3892,7 @@ function CardActionButton({
     <button
       type="button"
       onClick={onClick}
+      data-cond-menu={dataAttr}
       className={`px-2 py-1.5 rounded border bg-transparent text-[10px] tracking-[0.18em] font-bold uppercase transition ${colorClass}`}
     >
       {label}

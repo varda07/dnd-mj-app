@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import { useFavoris, type FavoriType } from '@/app/lib/favoris'
@@ -70,7 +70,6 @@ export default function Dashboard() {
   })
   const { favoris } = useFavoris()
   const router = useRouter()
-  const pathname = usePathname()
   const t = useTranslations('dashboard')
 
   // Charge la config custom du dashboard (si l'utilisateur en a sauvegardé
@@ -895,29 +894,10 @@ export default function Dashboard() {
         </div>
       )}
 
-      <nav
-        className="md:hidden fixed bottom-0 inset-x-0 bg-[#12141a] border-t border-[rgba(201,168,76,0.15)] z-[60] flex items-stretch theme-no-deco"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-      >
-        {[
-          { id: 'accueil', label: t('nav_home'), icon: '⌂', active: pathname === '/dashboard', onClick: () => router.push('/dashboard') },
-          { id: 'combat', label: t('nav_combat'), icon: '⚔', active: pathname?.startsWith('/dashboard/combat'), onClick: () => router.push('/dashboard/combat') },
-          { id: 'aventure', label: t('nav_adventure'), icon: '🗡', active: pathname?.startsWith('/dashboard/aventure') || pathname?.startsWith('/dashboard/exploration'), onClick: () => router.push('/dashboard/aventure') },
-          { id: 'sons', label: t('nav_sounds'), icon: '🎵', active: false, onClick: () => window.dispatchEvent(new CustomEvent('soundbox:open')) }
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={tab.onClick}
-            aria-label={tab.label}
-            className="flex-1 h-14 flex flex-col items-center justify-center gap-0.5 transition"
-            style={{ color: tab.active ? '#C9A84C' : '#6a6a72' }}
-          >
-            <span className="text-base leading-none">{tab.icon}</span>
-            <span className="text-[9px] tracking-wider uppercase">{tab.label}</span>
-          </button>
-        ))}
-      </nav>
+      {/* V1 3.3 — la barre de navigation mobile du bas a été supprimée (devenue
+          inutile : navigation via le tiroir latéral + FABs dés/sons). Elle ne
+          servait que sur l'accueil tout en réservant 56px partout, ce qui
+          décalait le lanceur de dés sur mobile. */}
     </main>
   )
 }

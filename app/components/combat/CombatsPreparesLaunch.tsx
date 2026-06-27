@@ -35,8 +35,13 @@ export default function CombatsPreparesLaunch({ scenarioId }: { scenarioId: stri
     setEnCours(true)
     const ok = await lancerCombatPrepare(cp, 'diffusion')
     if (ok && typeof window !== 'undefined') {
-      // Recharge la diffusion : roster frais (ennemis liés) + combat actif.
-      window.location.reload()
+      // V1 3.4 — recharge la diffusion AVEC ?diffuser=1 pour rouvrir directement
+      // le panneau Combat (et relancer la diffusion). Sans ce flag, on retombait
+      // sur l'accueil du mode diffusion et il fallait recliquer sur l'onglet
+      // Combat. Roster frais (ennemis liés) + combat actif au passage.
+      const url = new URL(window.location.href)
+      url.searchParams.set('diffuser', '1')
+      window.location.href = url.toString()
     } else {
       setEnCours(false)
     }

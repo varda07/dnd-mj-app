@@ -139,6 +139,40 @@ export default function AccessibilitePage() {
             </div>
           </section>
 
+          {/* ---- 3bis. Espacement du texte (V1 5.4) ---- */}
+          <section className="grim-card p-4 md:p-5">
+            <header className="mb-3">
+              <div className="flex items-baseline justify-between">
+                <h2 className="text-base font-bold text-yellow-500">
+                  ↔️ Espacement du texte
+                </h2>
+                <span className="text-sm font-mono text-yellow-300">
+                  {['Normal', 'Léger', 'Moyen', 'Large'][settings.espacementTexte] ?? 'Normal'}
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                Augmente l&apos;espacement entre lettres, mots et lignes pour
+                faciliter la lecture (utile en cas de dyslexie ou de fatigue visuelle).
+              </p>
+            </header>
+            <input
+              type="range"
+              min={0}
+              max={3}
+              step={1}
+              value={settings.espacementTexte}
+              onChange={(e) => update({ espacementTexte: parseInt(e.target.value) })}
+              className="w-full accent-yellow-500"
+              aria-label="Espacement du texte"
+            />
+            <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+              <span>Normal</span>
+              <span>Léger</span>
+              <span>Moyen</span>
+              <span>Large</span>
+            </div>
+          </section>
+
           {/* ---- 4. Haut contraste ---- */}
           <section className="grim-card p-4 md:p-5">
             <header className="flex items-center justify-between flex-wrap gap-2">

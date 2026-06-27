@@ -7,6 +7,7 @@ import GuidedTour from '@/app/components/GuidedTour'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
+import { useFocusHighlight } from '@/app/lib/useFocusHighlight'
 import ImageCropper from '@/app/components/ImageCropper'
 import StarFavori from '@/app/components/StarFavori'
 import { useFavoris } from '@/app/lib/favoris'
@@ -33,6 +34,8 @@ type Map = {
 export default function Maps() {
   const router = useRouter()
   const [maps, setMaps] = useState<Map[]>([])
+  // V1 3.5 — défilement + surlignage vers la carte ciblée depuis la carte mentale.
+  useFocusHighlight(maps.length > 0)
   const [nom, setNom] = useState('')
   const [description, setDescription] = useState('')
   const [file, setFile] = useState<File | null>(null)
@@ -282,7 +285,7 @@ export default function Maps() {
           {maps
             .filter((m) => !favorisOnly || estFavori('maps', m.id))
             .map((map) => (
-            <div key={map.id} className="grim-card grim-card-hover p-4">
+            <div key={map.id} id={`focus-${map.id}`} className="grim-card grim-card-hover p-4">
               <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <StarFavori type="maps" id={map.id} />

@@ -390,6 +390,8 @@ export default function Sorts() {
   const [filtreDegats, setFiltreDegats] = useState<Set<TypeDegats>>(new Set())
   const [filtreSauvegarde, setFiltreSauvegarde] = useState<Set<Sauvegarde>>(new Set())
   const [filtresOuvert, setFiltresOuvert] = useState(false)
+  // V1 5.2 — barre de recherche par nom.
+  const [recherche, setRecherche] = useState('')
   const { est: estFavori } = useFavoris()
   const ts = useTranslations('spells')
   const tc = useTranslations('common')
@@ -578,8 +580,17 @@ export default function Sorts() {
   }
 
   // Roadmap Affinement 2.8 — application des filtres avancés (favoris + cat + dégâts + sauvegarde)
+  // V1 5.2 — recherche texte par nom (+ description).
   const sortsAffiches = useMemo(() => {
     let list = favorisOnly ? sorts.filter((s) => estFavori('sorts', s.id)) : sorts
+    const q = recherche.trim().toLowerCase()
+    if (q) {
+      list = list.filter(
+        (s) =>
+          s.nom.toLowerCase().includes(q) ||
+          (s.description ?? '').toLowerCase().includes(q)
+      )
+    }
     if (filtreCategorie.size > 0) {
       list = list.filter((s) => {
         const cats = categoriesSort(s.description, s.nom)
@@ -599,7 +610,7 @@ export default function Sorts() {
       })
     }
     return list
-  }, [sorts, favorisOnly, estFavori, filtreCategorie, filtreDegats, filtreSauvegarde])
+  }, [sorts, favorisOnly, estFavori, recherche, filtreCategorie, filtreDegats, filtreSauvegarde])
 
   const inputCls =
     'w-full p-2.5 rounded bg-gray-700 text-white border border-gray-600 outline-none text-sm focus:border-yellow-600'
@@ -839,6 +850,15 @@ export default function Sorts() {
             </div>
           </div>
 
+          {/* V1 5.2 — recherche de sort par nom */}
+          <input
+            type="search"
+            value={recherche}
+            onChange={(e) => setRecherche(e.target.value)}
+            placeholder="🔍 Rechercher un sort…"
+            className="w-full mb-2 px-3 py-2 rounded bg-gray-800 border border-yellow-500/30 text-white text-sm outline-none focus:border-yellow-500 placeholder-gray-500"
+          />
+
           <div className="flex items-center gap-3 flex-wrap mb-2">
             <label className="inline-flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
               <input
@@ -1021,6 +1041,13 @@ function SpellLibraryImporter({
   const [selection, setSelection] = useState<Set<string>>(new Set())
   const [enImport, setEnImport] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
+  // V1 6.2 — note sur les doublons ignorés à l'import.
+  const [infoDoublons, setInfoDoublons] = useState<string | null>(null)
+  const normNom = (s: string) => s.trim().toLowerCase()
+  const existingNorm = useMemo(
+    () => new Set(Array.from(existingNames).map(normNom)),
+    [existingNames]
+  )
 
   const sortsFiltres = useMemo(() => {
     const q = recherche.trim().toLowerCase()
@@ -1049,6 +1076,7 @@ function SpellLibraryImporter({
 
   const importerSelection = async () => {
     setErreur(null)
+    setInfoDoublons(null)
     if (selection.size === 0) return
     setEnImport(true)
     const { data: { user } } = await supabase.auth.getUser()
@@ -1057,7 +1085,17 @@ function SpellLibraryImporter({
       setEnImport(false)
       return
     }
-    const choisis = SORTS_DND5E.filter((s) => selection.has(s.nom))
+    // V1 6.2 — ignore les sorts déjà présents (nom) pour ne pas créer de doublons.
+    const choisisBruts = SORTS_DND5E.filter((s) => selection.has(s.nom))
+    const choisis = choisisBruts.filter((s) => !existingNorm.has(normNom(s.nom)))
+    const nbDoublons = choisisBruts.length - choisis.length
+    if (choisis.length === 0) {
+      setEnImport(false)
+      setInfoDoublons(
+        `Tous les ${choisisBruts.length} sorts sélectionnés sont déjà dans ta bibliothèque : rien à importer.`
+      )
+      return
+    }
     const rows = choisis.map((s) => ({
       user_id: user.id,
       personnage_id: null,
@@ -1084,7 +1122,14 @@ function SpellLibraryImporter({
       return
     }
     onImported(rows.length)
-    onClose()
+    if (nbDoublons > 0) {
+      setInfoDoublons(
+        `${rows.length} importé(s). ${nbDoublons} doublon(s) déjà présent(s) ont été ignorés.`
+      )
+      setSelection(new Set())
+    } else {
+      onClose()
+    }
   }
 
   return (
@@ -1237,6 +1282,11 @@ function SpellLibraryImporter({
         {erreur && (
           <p className="px-4 py-2 text-red-300 text-xs border-t border-red-900/40">
             {erreur}
+          </p>
+        )}
+        {infoDoublons && (
+          <p className="px-4 py-2 text-yellow-300 text-xs border-t border-yellow-900/40">
+            ⚠️ {infoDoublons}
           </p>
         )}
         <div

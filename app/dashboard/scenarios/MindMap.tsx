@@ -32,7 +32,9 @@ type EntityType = 'pnj' | 'ennemi' | 'item' | 'map'
 
 // Métadonnées d'une entité liable : table Supabase, libellés, icône, couleur
 // du nœud et route vers la fiche. PNJ a une vraie fiche détaillée ; ennemis /
-// items / maps renvoient vers leur page de liste (pas de page [id] dédiée).
+// items / maps n'ont pas de page [id] dédiée → on cible leur liste avec
+// ?focus=<id> (V1 3.5) : la liste fait défiler + surligne l'élément précis au
+// lieu d'afficher juste la liste générale.
 const ENTITY_META: Record<
   EntityType,
   {
@@ -58,7 +60,7 @@ const ENTITY_META: Record<
     labelPlural: 'Ennemis',
     icon: '👹',
     color: '#ef4444',
-    route: () => `/dashboard/ennemis`
+    route: (id) => `/dashboard/ennemis?focus=${id}`
   },
   item: {
     table: 'items',
@@ -66,7 +68,7 @@ const ENTITY_META: Record<
     labelPlural: 'Items',
     icon: '🎒',
     color: '#eab308',
-    route: () => `/dashboard/items`
+    route: (id) => `/dashboard/items?focus=${id}`
   },
   map: {
     table: 'maps',
@@ -74,7 +76,7 @@ const ENTITY_META: Record<
     labelPlural: 'Cartes',
     icon: '🗺️',
     color: '#06b6d4',
-    route: () => `/dashboard/maps`
+    route: (id) => `/dashboard/maps?focus=${id}`
   }
 }
 

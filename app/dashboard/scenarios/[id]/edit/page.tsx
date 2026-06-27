@@ -7,6 +7,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import MeteoGenerator from '@/app/components/MeteoGenerator'
 import GuidedTour from '@/app/components/GuidedTour'
+import PersonnagesLiesPanel from '@/app/components/PersonnagesLiesPanel'
 
 // ============================================================================
 // Types
@@ -857,6 +858,9 @@ export default function ScenarioEditPage() {
             </span>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-4">
+            {/* V1 5.1 — lier des personnages du compte à ce scénario */}
+            <PersonnagesLiesPanel scenarioId={scenarioId} />
+
             {/* Roadmap 1.2 — accès à la Session zéro */}
             <button
               type="button"

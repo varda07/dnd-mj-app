@@ -171,12 +171,12 @@ export function useCombatEngine(scenarioId: string | null, opts?: { isMj?: boole
         supabase.from('combats').select(COMBAT_COLUMNS).eq('scenario_id', scenarioId).maybeSingle(),
         supabase
           .from('personnages')
-          .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions, ca')
+          .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions, ca, force, dexterite, constitution, intelligence, sagesse, charisme, saves_maitrises')
           .eq('scenario_id', scenarioId),
         supabase
           .from('ennemis')
           .select(
-            'id, nom, hp_actuel, hp_max, image_url, conditions, armure, attaques, resistances, immunites, vulnerabilites, comportement_tactique'
+            'id, nom, hp_actuel, hp_max, image_url, conditions, armure, attaques, resistances, immunites, vulnerabilites, comportement_tactique, force, dexterite, constitution, intelligence, sagesse, charisme'
           )
           .eq('scenario_id', scenarioId)
       ])
@@ -360,12 +360,12 @@ export function useCombatEngine(scenarioId: string | null, opts?: { isMj?: boole
     const [persosRes, ennemisRes] = await Promise.all([
       supabase
         .from('personnages')
-        .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions, ca')
+        .select('id, nom, classe, niveau, hp_actuel, hp_max, image_url, conditions, ca, force, dexterite, constitution, intelligence, sagesse, charisme, saves_maitrises')
         .eq('scenario_id', scenarioId),
       supabase
         .from('ennemis')
         .select(
-          'id, nom, hp_actuel, hp_max, image_url, conditions, armure, attaques, resistances, immunites, vulnerabilites, comportement_tactique'
+          'id, nom, hp_actuel, hp_max, image_url, conditions, armure, attaques, resistances, immunites, vulnerabilites, comportement_tactique, force, dexterite, constitution, intelligence, sagesse, charisme'
         )
         .eq('scenario_id', scenarioId)
     ])

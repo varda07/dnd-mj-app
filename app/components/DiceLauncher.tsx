@@ -948,8 +948,10 @@ export default function DiceLauncher() {
           // Roadmap 1.7 — sidebar passée à droite : on déplace le FAB en bas
           // à gauche pour éviter le chevauchement.
           left: 'max(24px, env(safe-area-inset-left))',
-          // Mobile : laisse de la place à la bottom bar (56px + 24px de marge).
-          bottom: `calc(56px + env(safe-area-inset-bottom) + 24px)`
+          // V1 3.3 — la bottom bar mobile a été supprimée : on ancre simplement
+          // au-dessus de la safe-area (plus de réserve de 56px qui décalait le
+          // lanceur de dés sur mobile).
+          bottom: `calc(env(safe-area-inset-bottom) + 24px)`
         }}
         aria-label={open ? 'Fermer le lanceur de dés' : 'Ouvrir le lanceur de dés'}
         aria-pressed={open}

@@ -88,10 +88,16 @@ export default function SituationsRandom({ scenarioId, ouvert, onClose, onCreate
       setErreur(error.message)
       return
     }
-    onCreated?.(((data ?? []) as { id: string }[]).map((r) => r.id))
     onClose()
-    // Redirige vers le combat avec ce scénario actif.
-    router.push(`/dashboard/combat?scenario_id=${scenarioId}`)
+    if (onCreated) {
+      // V1 2.8 — le parent (combat rapide / grille) gère le rafraîchissement
+      // sur place : on NE redirige PAS, sinon une rencontre lancée depuis le
+      // combat rapide basculait vers le combat grille classique.
+      onCreated(((data ?? []) as { id: string }[]).map((r) => r.id))
+    } else {
+      // Usage autonome : on ouvre le combat avec ce scénario actif.
+      router.push(`/dashboard/combat?scenario_id=${scenarioId}`)
+    }
   }
 
   // Réinitialise quand on ferme.

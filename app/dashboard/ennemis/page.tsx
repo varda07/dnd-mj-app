@@ -7,6 +7,7 @@ import GuidedTour from '@/app/components/GuidedTour'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
+import { useFocusHighlight } from '@/app/lib/useFocusHighlight'
 import ImageCropper from '@/app/components/ImageCropper'
 import NumberInput from '@/app/components/NumberInput'
 import StarFavori from '@/app/components/StarFavori'
@@ -201,6 +202,8 @@ export default function Ennemis() {
   const [cropperKey, setCropperKey] = useState(0)
   const [bestiaireOuvert, setBestiaireOuvert] = useState(false)
   const [favorisOnly, setFavorisOnly] = useState(false)
+  // V1 5.2 — recherche dans la liste des ennemis.
+  const [rechercheListe, setRechercheListe] = useState('')
   // Roadmap 2.3 — palier de CR choisi pour le générateur de loot.
   const [lootPalier, setLootPalier] = useState<PalierCR>('cr_0_4')
   // Roadmap 2.4 — vue compacte / détaillée des fiches ennemi (localStorage).
@@ -260,6 +263,8 @@ export default function Ennemis() {
   const t = useTranslations('enemies')
   const tc = useTranslations('common')
   const ti = useTranslations('items')
+  // V1 3.5 — défilement + surlignage vers l'ennemi ciblé depuis la carte mentale.
+  useFocusHighlight(ennemis.length > 0)
 
   useEffect(() => {
     fetchEnnemis()
@@ -718,6 +723,14 @@ export default function Ennemis() {
             </div>
           </div>
           {ennemis.length === 0 && <p className="text-gray-400">{t('empty')}</p>}
+          {/* V1 5.2 — recherche d'ennemi par nom */}
+          <input
+            type="search"
+            value={rechercheListe}
+            onChange={(e) => setRechercheListe(e.target.value)}
+            placeholder="🔍 Rechercher un ennemi…"
+            className="w-full px-3 py-2 rounded bg-gray-800 border border-yellow-500/30 text-white text-sm outline-none focus:border-yellow-500 placeholder-gray-500"
+          />
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <label className="inline-flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
               <input
@@ -740,8 +753,12 @@ export default function Ennemis() {
           </div>
           {ennemis
             .filter((e) => !favorisOnly || estFavori('ennemis', e.id))
+            .filter((e) => {
+              const q = rechercheListe.trim().toLowerCase()
+              return !q || e.nom.toLowerCase().includes(q)
+            })
             .map((ennemi) => (
-            <div key={ennemi.id} className="grim-card grim-card-hover p-4">
+            <div key={ennemi.id} id={`focus-${ennemi.id}`} className="grim-card grim-card-hover p-4">
               <div className="flex gap-4">
                 {ennemi.image_url && (
                   <img
@@ -960,6 +977,15 @@ function BestiaireImporter({
   const [selection, setSelection] = useState<Set<string>>(new Set())
   const [enImport, setEnImport] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
+  // V1 6.2 — note d'information sur les doublons ignorés à l'import.
+  const [infoDoublons, setInfoDoublons] = useState<string | null>(null)
+
+  // Ensemble normalisé des noms déjà présents (insensible casse/espaces).
+  const norm = (s: string) => s.trim().toLowerCase()
+  const existingNorm = useMemo(
+    () => new Set(Array.from(existingNames).map(norm)),
+    [existingNames]
+  )
 
   const filtres = useMemo(() => {
     const q = recherche.trim().toLowerCase()
@@ -987,6 +1013,7 @@ function BestiaireImporter({
 
   const importer = async () => {
     setErreur(null)
+    setInfoDoublons(null)
     if (selection.size === 0) return
     setEnImport(true)
     const { data: { user } } = await supabase.auth.getUser()
@@ -996,7 +1023,20 @@ function BestiaireImporter({
       return
     }
     const choisis = BESTIAIRE_DND5E.filter((m) => selection.has(m.nom))
-    const rows = choisis.map((m: Monstre) => monstreVersEnnemi(m, user.id))
+    // V1 6.2 — détection des doublons (nom déjà présent dans la bibliothèque)
+    // pour ne pas la polluer. Les doublons sont ignorés et signalés.
+    const aImporter = choisis.filter((m) => !existingNorm.has(norm(m.nom)))
+    const nbDoublons = choisis.length - aImporter.length
+
+    if (aImporter.length === 0) {
+      setEnImport(false)
+      setInfoDoublons(
+        `Tous les ${choisis.length} monstres sélectionnés sont déjà dans ta bibliothèque : rien à importer.`
+      )
+      return
+    }
+
+    const rows = aImporter.map((m: Monstre) => monstreVersEnnemi(m, user.id))
     const { error } = await supabase.from('ennemis').insert(rows)
     setEnImport(false)
     if (error) {
@@ -1005,7 +1045,16 @@ function BestiaireImporter({
       return
     }
     onImported(rows.length)
-    onClose()
+    if (nbDoublons > 0) {
+      // On garde la modale ouverte le temps d'afficher la note, mais on retire
+      // les doublons de la sélection pour clarté.
+      setInfoDoublons(
+        `${rows.length} importé(s). ${nbDoublons} doublon(s) déjà présent(s) ont été ignorés.`
+      )
+      setSelection(new Set())
+    } else {
+      onClose()
+    }
   }
 
   return (
@@ -1158,6 +1207,11 @@ function BestiaireImporter({
         {erreur && (
           <p className="px-4 py-2 text-red-300 text-xs border-t border-red-900/40">
             {erreur}
+          </p>
+        )}
+        {infoDoublons && (
+          <p className="px-4 py-2 text-yellow-300 text-xs border-t border-yellow-900/40">
+            ⚠️ {infoDoublons}
           </p>
         )}
         <div

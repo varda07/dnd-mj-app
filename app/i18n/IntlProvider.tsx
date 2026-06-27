@@ -5,9 +5,10 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { supabase } from '@/lib/supabase'
 import fr from '@/messages/fr.json'
 import en from '@/messages/en.json'
+import es from '@/messages/es.json'
 
-export type Locale = 'fr' | 'en'
-const MESSAGES = { fr, en } as const
+export type Locale = 'fr' | 'en' | 'es'
+const MESSAGES = { fr, en, es } as const
 const STORAGE_KEY = 'dnd-mj-locale'
 
 type Ctx = {
@@ -32,7 +33,7 @@ function readStoredLocale(): Locale | null {
   if (typeof window === 'undefined') return null
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY)
-    if (stored === 'fr' || stored === 'en') return stored
+    if (stored === 'fr' || stored === 'en' || stored === 'es') return stored
   } catch {
     /* accès storage refusé (mode privé / iframe sandboxée) */
   }
@@ -44,6 +45,7 @@ function readNavigatorLocale(): Locale | null {
   const nav = window.navigator?.language?.toLowerCase() ?? ''
   if (nav.startsWith('en')) return 'en'
   if (nav.startsWith('fr')) return 'fr'
+  if (nav.startsWith('es')) return 'es'
   return null
 }
 
@@ -78,7 +80,7 @@ export default function IntlProvider({ children }: { children: ReactNode }) {
         .eq('id', user.id)
         .maybeSingle()
       const raw = (data?.langue as string | undefined) ?? null
-      if (raw === 'fr' || raw === 'en') {
+      if (raw === 'fr' || raw === 'en' || raw === 'es') {
         if (cancelled) return
         setLocaleState(raw)
         writeStoredLocale(raw)

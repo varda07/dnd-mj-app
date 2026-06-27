@@ -6,6 +6,8 @@ import OnboardingTutorial from '@/app/components/OnboardingTutorial'
 import NotificationCenter from '@/app/components/NotificationCenter'
 import HomeButton from '@/app/components/HomeButton'
 import ThemeLoader from './ThemeLoader'
+import SessionGuard from '@/app/components/SessionGuard'
+import AdminAlert from '@/app/components/AdminAlert'
 import PageTransition from '@/app/components/ui/PageTransition'
 import ToastHost from '@/app/components/ui/Toast'
 import ConfirmDialogHost from '@/app/components/ui/ConfirmDialog'
@@ -20,6 +22,8 @@ export default function DashboardLayout({
   return (
     <>
       <ThemeLoader />
+      <SessionGuard />
+      <AdminAlert />
       <Sidebar />
       <HomeButton />
       {/* Roadmap 1.7 — sidebar à droite : on padd à droite plutôt qu'à gauche.

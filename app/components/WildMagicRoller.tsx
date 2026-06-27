@@ -11,7 +11,7 @@
 // ============================================================================
 
 import { useState } from 'react'
-import { rollWildMagic, type WildMagicEffet } from '@/app/data/wild_magic_table'
+import { rollWildMagicAvecValeur, type WildMagicEffet } from '@/app/data/wild_magic_table'
 import { supabase } from '@/lib/supabase'
 
 const STORAGE_KEY = 'wild_magic_last'
@@ -28,6 +28,7 @@ type Props = {
 export default function WildMagicRoller({ scenarioId, flottant = true, ouvert: ouvertProp, onClose }: Props) {
   const [ouvertInterne, setOuvertInterne] = useState(false)
   const [effet, setEffet] = useState<WildMagicEffet | null>(null)
+  const [valeur, setValeur] = useState<number | null>(null)
   const [visiblePourJoueurs, setVisiblePourJoueurs] = useState(false)
 
   const ouvert = ouvertProp ?? ouvertInterne
@@ -38,8 +39,9 @@ export default function WildMagicRoller({ scenarioId, flottant = true, ouvert: o
   }
 
   const lancer = () => {
-    const e = rollWildMagic()
+    const { valeur, effet: e } = rollWildMagicAvecValeur()
     setEffet(e)
+    setValeur(valeur)
     setVisiblePourJoueurs(false)
     try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(e)) } catch {}
   }
@@ -66,11 +68,11 @@ export default function WildMagicRoller({ scenarioId, flottant = true, ouvert: o
           title="Wild Magic — roll un effet de magie sauvage"
           // Roadmap 1.7 — sidebar à droite : le FAB est en bas-gauche, juste
           // au-dessus du lanceur de dés (60px de dé + 12px de gap = ~72px).
-          // Mobile : on tient compte de la bottom-bar (56+24+24=104) + dé (72).
+          // V1 3.3 — bottom bar mobile supprimée : plus de réserve de 56px.
           className="wild-magic-fab fixed z-[60] h-11 w-11 rounded-full bg-gradient-to-br from-purple-700 to-fuchsia-900 border border-[#C9A84C] text-white shadow-lg hover:scale-105 active:scale-95 transition-all"
           style={{
             left: 'calc(max(24px, env(safe-area-inset-left)) + 8px)',
-            bottom: `calc(56px + env(safe-area-inset-bottom) + 24px + 60px + 12px)`
+            bottom: `calc(env(safe-area-inset-bottom) + 24px + 60px + 12px)`
           }}
         >
           <span aria-hidden="true">✨</span>
@@ -127,8 +129,13 @@ export default function WildMagicRoller({ scenarioId, flottant = true, ouvert: o
             ) : (
               <div className="space-y-4">
                 <div className="rounded p-4 border border-fuchsia-800/40 bg-fuchsia-950/30">
-                  <p className="text-[10px] uppercase tracking-[0.22em] text-fuchsia-300 mb-1">
-                    Effet déclenché
+                  <p className="text-[10px] uppercase tracking-[0.22em] text-fuchsia-300 mb-1 flex items-center justify-between">
+                    <span>Effet déclenché</span>
+                    {valeur != null && (
+                      <span className="text-fuchsia-200 font-mono normal-case tracking-normal">
+                        🎲 d100 = {valeur}
+                      </span>
+                    )}
                   </p>
                   <h3 className="text-xl font-bold text-white mb-2" style={{ fontFamily: 'Georgia, serif' }}>
                     {effet.titre}

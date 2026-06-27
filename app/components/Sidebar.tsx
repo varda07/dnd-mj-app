@@ -732,7 +732,7 @@ export default function Sidebar() {
               t('params_language'),
               langueOuvert,
               () => setLangueOuvert((v) => !v),
-              locale === 'fr' ? '🇫🇷' : '🇬🇧'
+              locale === 'fr' ? '🇫🇷' : locale === 'es' ? '🇪🇸' : '🇬🇧'
             )}
             {!compact && langueOuvert && (
               <div className="bg-[rgba(0,0,0,0.3)] border-y border-[rgba(201,168,76,0.08)] p-2 space-y-1">
@@ -761,6 +761,20 @@ export default function Sidebar() {
                 >
                   <span className="flex-1">{tLang('en')}</span>
                   {locale === 'en' && <span className="text-green-400">✓</span>}
+                </button>
+                {/* V1 7.2 — Espagnol */}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await setLocale('es')
+                    setLangueOuvert(false)
+                  }}
+                  className={`w-full flex items-center gap-2 p-1.5 rounded text-left text-[12px] transition-all ${
+                    locale === 'es' ? 'bg-[rgba(201,168,76,0.12)] text-white font-bold' : 'text-[#a8a8b0] hover:bg-[rgba(201,168,76,0.06)]'
+                  }`}
+                >
+                  <span className="flex-1">{tLang('es')}</span>
+                  {locale === 'es' && <span className="text-green-400">✓</span>}
                 </button>
               </div>
             )}
@@ -845,6 +859,13 @@ export default function Sidebar() {
               label: t('tools_accessibility'),
               icon: '♿',
               href: '/dashboard/accessibilite'
+            })}
+
+            {/* Mon compte — changer mot de passe (V1 1.3) */}
+            {renderNavItem({
+              label: t('params_account'),
+              icon: '🔐',
+              href: '/dashboard/compte'
             })}
 
             {/* Refaire le tutoriel */}

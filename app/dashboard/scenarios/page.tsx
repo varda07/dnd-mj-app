@@ -70,25 +70,32 @@ export default function Scenarios() {
     if (!code) return setMessageJoueur(td('enter_code'))
     if (!scenarioCibleId) return setMessageJoueur(td('choose_scenario'))
 
-    const { data: invit, error: err1 } = await supabase
-      .from('codes_invitation')
-      .select('id, personnage_id, utilise')
-      .eq('code', code)
-      .maybeSingle()
-    if (err1 || !invit) return setMessageJoueur(td('code_not_found'))
-    if (invit.utilise) return setMessageJoueur(td('code_already_used'))
-    if (!invit.personnage_id) return setMessageJoueur(td('code_not_player'))
+    // La liaison passe par une RPC SECURITY DEFINER : la RLS empêche le MJ
+    // de modifier directement le personnage d'un joueur qui n'a pas encore
+    // rejoint le scénario (œuf / poule). La fonction lie le perso, inscrit le
+    // joueur dans scenarios_joueurs et consomme le code, atomiquement.
+    const { data: res, error } = await supabase.rpc('lier_personnage_via_code', {
+      p_code: code,
+      p_scenario_id: scenarioCibleId
+    })
+    if (error) return setMessageJoueur(td('cannot_link', { message: error.message }))
 
-    const { error: err2 } = await supabase
-      .from('personnages')
-      .update({ scenario_id: scenarioCibleId })
-      .eq('id', invit.personnage_id)
-    if (err2) return setMessageJoueur(td('cannot_link', { message: err2.message }))
-
-    await supabase.from('codes_invitation').update({ utilise: true }).eq('id', invit.id)
+    const result = res as { ok: boolean; error?: string } | null
+    if (!result?.ok) {
+      const map: Record<string, string> = {
+        scenario_not_found: td('choose_scenario'),
+        not_mj: td('cannot_link', { message: td('code_not_player') }),
+        code_not_found: td('code_not_found'),
+        code_already_used: td('code_already_used'),
+        code_not_player: td('code_not_player'),
+        personnage_not_found: td('code_not_found')
+      }
+      return setMessageJoueur(map[result?.error ?? ''] ?? td('code_not_found'))
+    }
 
     setMessageJoueur(td('character_added_ok'))
     setCodeJoueur('')
+    fetchScenarios()
   }
 
   const resetForm = () => {
@@ -321,7 +328,10 @@ export default function Scenarios() {
       {vue === 'carte' && <GuidedTour tourId="mindmap" />}
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center gap-4 mb-6">
-          <button type="button" onClick={() => router.back()} className="text-gray-400 hover:text-white">
+          {/* V1 3.6 — retour déterministe vers le dashboard (router.back()
+              bouclait depuis la carte mentale, dont les liens entités empilent
+              de l'historique). */}
+          <button type="button" onClick={() => router.push('/dashboard')} className="text-gray-400 hover:text-white">
             {tc('back')}
           </button>
           <h1 className="text-2xl grim-title">{t('title')}</h1>

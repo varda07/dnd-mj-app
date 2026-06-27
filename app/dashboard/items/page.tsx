@@ -6,6 +6,7 @@ import { useMemo, useState, useEffect } from 'react'
 import GuidedTour from '@/app/components/GuidedTour'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { useFocusHighlight } from '@/app/lib/useFocusHighlight'
 import { supabase } from '@/lib/supabase'
 import ImageCropper from '@/app/components/ImageCropper'
 import StarFavori from '@/app/components/StarFavori'
@@ -77,6 +78,8 @@ function vueJoueurItem(item: Item): { nom: string; type: string; rarete: string;
 export default function Items() {
   const router = useRouter()
   const [items, setItems] = useState<Item[]>([])
+  // V1 3.5 — défilement + surlignage vers l'item ciblé depuis la carte mentale.
+  useFocusHighlight(items.length > 0)
   const [nom, setNom] = useState('')
   const [description, setDescription] = useState('')
   const [type, setType] = useState(TYPES[0])
@@ -91,6 +94,8 @@ export default function Items() {
   const [cropperKey, setCropperKey] = useState(0)
   const [importerOuvert, setImporterOuvert] = useState(false)
   const [favorisOnly, setFavorisOnly] = useState(false)
+  // V1 5.2 — recherche dans la liste des items.
+  const [rechercheListe, setRechercheListe] = useState('')
   // Roadmap 4.1 — filtre de rareté pour le générateur d'item magique ('' = au hasard).
   const [genRarete, setGenRarete] = useState<RareteItem | ''>('')
   // Roadmap 3.3 — composeur de propriétés d'item custom (inséré dans la
@@ -571,6 +576,14 @@ export default function Items() {
             </div>
           </div>
           {items.length === 0 && <p className="text-gray-400">{t('empty')}</p>}
+          {/* V1 5.2 — recherche d'item par nom */}
+          <input
+            type="search"
+            value={rechercheListe}
+            onChange={(e) => setRechercheListe(e.target.value)}
+            placeholder="🔍 Rechercher un item…"
+            className="w-full px-3 py-2 rounded bg-gray-800 border border-yellow-500/30 text-white text-sm outline-none focus:border-yellow-500 placeholder-gray-500"
+          />
           <label className="inline-flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
             <input
               type="checkbox"
@@ -582,8 +595,12 @@ export default function Items() {
           </label>
           {items
             .filter((it) => !favorisOnly || estFavori('items', it.id))
+            .filter((it) => {
+              const q = rechercheListe.trim().toLowerCase()
+              return !q || it.nom.toLowerCase().includes(q)
+            })
             .map((item) => (
-            <div key={item.id} className="grim-card grim-card-hover p-4">
+            <div key={item.id} id={`focus-${item.id}`} className="grim-card grim-card-hover p-4">
               <div className="flex gap-4">
                 {item.image_url && (
                   <img

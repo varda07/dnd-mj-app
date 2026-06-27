@@ -83,6 +83,8 @@ export default function PnjPage() {
   const [cropperKey, setCropperKey] = useState(0)
   const [importerOuvert, setImporterOuvert] = useState(false)
   const [favorisOnly, setFavorisOnly] = useState(false)
+  // V1 5.2 — recherche dans la liste des PNJ.
+  const [rechercheListe, setRechercheListe] = useState('')
   const [mesTemplatesOuvert, setMesTemplatesOuvert] = useState(false)
   // Roadmap 2.1 — générateur de noms : culture + genre sélectionnés.
   const [cultureNom, setCultureNom] = useState('humain')
@@ -525,6 +527,14 @@ export default function PnjPage() {
             </div>
           </div>
           {pnjs.length === 0 && <p className="text-gray-400">{t('empty')}</p>}
+          {/* V1 5.2 — recherche PNJ par nom / race / rôle */}
+          <input
+            type="search"
+            value={rechercheListe}
+            onChange={(e) => setRechercheListe(e.target.value)}
+            placeholder="🔍 Rechercher un PNJ…"
+            className="w-full px-3 py-2 rounded bg-gray-800 border border-yellow-500/30 text-white text-sm outline-none focus:border-yellow-500 placeholder-gray-500"
+          />
           <label className="inline-flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
             <input
               type="checkbox"
@@ -536,6 +546,13 @@ export default function PnjPage() {
           </label>
           {pnjs
             .filter((p) => !favorisOnly || estFavori('pnj', p.id))
+            .filter((p) => {
+              const q = rechercheListe.trim().toLowerCase()
+              if (!q) return true
+              return [p.nom, p.race, p.role]
+                .filter(Boolean)
+                .some((v) => String(v).toLowerCase().includes(q))
+            })
             .map((p) => (
             <div key={p.id} className="grim-card grim-card-hover p-4">
               <div className="flex gap-4">

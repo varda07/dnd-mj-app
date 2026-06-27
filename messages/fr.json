@@ -132,6 +132,7 @@
     "params_language": "Langue",
     "params_tutorial": "Refaire le tutoriel",
     "params_join": "Rejoindre un scénario",
+    "params_account": "Mon compte",
     "params_logout": "Déconnexion",
     "forge_scenarios": "Scénarios",
     "forge_personnages": "Personnages",
@@ -150,6 +151,22 @@
     "tools_soundbox": "Sound Box",
     "tools_customize": "Personnaliser l'accueil",
     "tools_accessibility": "Accessibilité"
+  },
+  "compte": {
+    "title": "Mon compte",
+    "back": "Retour",
+    "change_password": "Changer mon mot de passe",
+    "connected_as": "Connecté en tant que",
+    "current_password": "Mot de passe actuel",
+    "new_password": "Nouveau mot de passe",
+    "confirm_password": "Confirmer le nouveau mot de passe",
+    "min_chars": "6 caractères minimum",
+    "save": "Enregistrer le nouveau mot de passe",
+    "success": "✓ Mot de passe modifié avec succès.",
+    "err_too_short": "Le nouveau mot de passe doit faire au moins 6 caractères.",
+    "err_mismatch": "Les deux mots de passe ne correspondent pas.",
+    "err_same": "Le nouveau mot de passe doit être différent de l'actuel.",
+    "err_current_wrong": "Mot de passe actuel incorrect."
   },
   "palette": {
     "placeholder": "Rechercher ou exécuter une action…",
@@ -179,7 +196,8 @@
   "language": {
     "select": "Choisir la langue",
     "fr": "🇫🇷 Français",
-    "en": "🇬🇧 English"
+    "en": "🇬🇧 English",
+    "es": "🇪🇸 Español"
   },
   "scenarios": {
     "title": "Scenarios",
@@ -417,6 +435,7 @@
     "next_turn": "⏭ Tour suivant",
     "end_combat": "🏆 Terminer le combat",
     "no_initiative_yet": "Lance l'initiative pour déterminer l'ordre du tour (d20 + modificateur de Dextérité).",
+    "remove_all_conditions": "Tout retirer",
     "grid_title": "Grille de combat",
     "grid_legend": "1 case = 1,5 m",
     "choose_bg": "🖼️ Choisir une image de fond",

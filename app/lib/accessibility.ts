@@ -21,6 +21,9 @@ export type AccessibilitySettings = {
   hautContraste: boolean
   reduireAnimations: boolean
   ariaImproved: boolean
+  // V1 5.4 — espacement du texte (0 = normal … 3 = très aéré) : agit sur
+  // letter-spacing / word-spacing / line-height pour faciliter la lecture.
+  espacementTexte: number
 }
 
 export const DEFAULT_A11Y: AccessibilitySettings = {
@@ -29,7 +32,8 @@ export const DEFAULT_A11Y: AccessibilitySettings = {
   fontScale: 100,
   hautContraste: false,
   reduireAnimations: false,
-  ariaImproved: false
+  ariaImproved: false,
+  espacementTexte: 0
 }
 
 const LS_KEY = 'codex-a11y'
@@ -46,6 +50,10 @@ export function appliquerA11y(s: AccessibilitySettings): void {
   html.dataset.a11yContrast = s.hautContraste ? 'high' : 'normal'
   html.dataset.a11yReduceMotion = s.reduireAnimations ? 'true' : 'false'
   html.dataset.a11yAria = s.ariaImproved ? 'true' : 'false'
+
+  // Espacement du texte : niveau 0..3 → variable CSS utilisée par globals.css.
+  const niveau = Math.max(0, Math.min(3, Math.round(s.espacementTexte ?? 0)))
+  html.dataset.a11yTextSpacing = String(niveau)
 
   // Font scale via CSS variable (multiplie tous les rem si on l'utilise sur
   // html.font-size). Ici on l'applique directement sur le font-size de html

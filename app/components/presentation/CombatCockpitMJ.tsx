@@ -14,7 +14,7 @@
 // Tout passe par les handlers fournis (qui persistent en base + temps réel).
 // ============================================================================
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   CONDITIONS,
   CONDITIONS_MAP,
@@ -78,6 +78,16 @@ function HpControls({
         <button type="button" className="combatmj-mini" onClick={() => onDelta(5)}>
           +5
         </button>
+        {/* V1 2.6 — remettre les PV au max. */}
+        <button
+          type="button"
+          className="combatmj-mini is-heal"
+          title="Remettre les PV au max"
+          disabled={hp >= hpMax}
+          onClick={() => onDelta(hpMax - hp)}
+        >
+          MAX
+        </button>
         <input
           type="number"
           min={1}
@@ -119,6 +129,16 @@ function ConditionsEditor({
   onClear: () => void
 }) {
   const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  // V1 2.3 — ferme le menu de conditions au clic en dehors.
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
   // Niveau d'épuisement actuellement actif (0 = aucun).
   const niveauEpuisement = conditions.reduce(
     (max, c) => Math.max(max, epuisementNiveau(c)),
@@ -134,7 +154,7 @@ function ConditionsEditor({
     onToggle(cible)
   }
   return (
-    <div className="combatmj-cond">
+    <div className="combatmj-cond" ref={rootRef}>
       <div className="combatmj-cond-pills">
         {conditions.map((c) => {
           const cond = isConditionKey(c) ? CONDITIONS_MAP[c] : null

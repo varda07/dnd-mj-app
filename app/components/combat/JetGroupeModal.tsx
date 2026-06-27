@@ -101,8 +101,11 @@ export default function JetGroupeModal({
         <div className="grid grid-cols-2 gap-2">
           <label className="text-xs text-gray-400">Caractéristique
             <select value={carac} onChange={(e) => setCarac(e.target.value as 'FOR' | 'DEX' | 'CON' | 'INT' | 'SAG' | 'CHA')}
+              style={{ colorScheme: 'dark' }}
               className="mt-1 w-full p-2 rounded bg-gray-800 border border-gray-700 text-white">
-              {CARAC_LABELS.map((c) => <option key={c.k} value={c.k}>{c.label} ({c.k})</option>)}
+              {CARAC_LABELS.map((c) => (
+                <option key={c.k} value={c.k} className="bg-gray-800 text-white">{c.label} ({c.k})</option>
+              ))}
             </select>
           </label>
           <label className="text-xs text-gray-400">Difficulté (DC)

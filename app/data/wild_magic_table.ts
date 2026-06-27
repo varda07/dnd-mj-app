@@ -72,10 +72,15 @@ export const WILD_MAGIC_TABLE: WildMagicEffet[] = [
 // Helpers ---------------------------------------------------------------------
 
 export function rollWildMagic(): WildMagicEffet {
+  return rollWildMagicAvecValeur().effet
+}
+
+// V1 4.1 — variante qui expose AUSSI le nombre tiré (1..100), pour l'afficher et
+// rendre visible que le tirage est bien sur d100 (pas de biais / pas un d20).
+export function rollWildMagicAvecValeur(): { valeur: number; effet: WildMagicEffet } {
   const n = Math.floor(Math.random() * 100) + 1
   const found = WILD_MAGIC_TABLE.find((e) => n >= e.min && n <= e.max)
-  if (found) return found
-  return WILD_MAGIC_TABLE[WILD_MAGIC_TABLE.length - 1]
+  return { valeur: n, effet: found ?? WILD_MAGIC_TABLE[WILD_MAGIC_TABLE.length - 1] }
 }
 
 export function rollD20DeclencheSurge(): boolean {

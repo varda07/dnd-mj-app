@@ -111,8 +111,8 @@ function clamp(v: number, min: number, max: number) {
 function defaultPos(w: number, h: number): Pos {
   const x = BTN / 2 + 22
   if (w >= 768) return { x, y: h - BTN / 2 - 22 }
-  // Mobile : au-dessus de la bottom-bar (56px) avec marge.
-  return { x, y: h - (56 + 16 + BTN / 2) }
+  // Mobile : ancré en bas avec marge (V1 3.3 — bottom bar supprimée).
+  return { x, y: h - (16 + BTN / 2) }
 }
 
 // Calcule les offsets (dx,dy) de chaque pétale par rapport au centre du bouton.
@@ -132,18 +132,39 @@ function computeOffsets(pos: Pos, w: number, h: number): Array<{ x: number; y: n
   const nearB = pos.y > h * 0.75
   const horiz = nearL || nearR
   const vert = nearT || nearB
-  const spanDeg = horiz && vert ? 100 : horiz || vert ? 170 : 250
+  // Coin = quart de cercle (90°), bord = ~demi, espace libre = large arc.
+  const spanDeg = horiz && vert ? 90 : horiz || vert ? 170 : 250
   const span = (spanDeg * Math.PI) / 180
-  // Rayon : assez grand pour éviter le chevauchement des pétales sur l'arc.
+  // Rayon : assez grand pour éviter le chevauchement des pétales SUR l'arc
+  // (corde entre 2 pétales adjacents ≥ diamètre d'un pétale).
   const stepDeg = spanDeg / (N - 1)
   let R = PETAL / (2 * Math.sin(((stepDeg / 2) * Math.PI) / 180)) + 8
   R = clamp(R, 150, 210)
-  return PETALS.map((_, i) => {
+
+  // Positions brutes des pétales sur l'arc (coords écran).
+  const raw = PETALS.map((_, i) => {
     const a = base - span / 2 + (span * i) / (N - 1)
-    const ax = clamp(pos.x + Math.cos(a) * R, margin, w - margin)
-    const ay = clamp(pos.y + Math.sin(a) * R, margin, h - margin)
-    return { x: ax - pos.x, y: ay - pos.y }
+    return { x: pos.x + Math.cos(a) * R, y: pos.y + Math.sin(a) * R }
   })
+
+  // V1 3.2 — anti-superposition : plutôt que de borner CHAQUE pétale à l'écran
+  // (ce qui les empilait tous sur un même bord dans un coin), on translate
+  // l'ENSEMBLE du groupe vers l'intérieur, en bloc, ce qui préserve l'espacement
+  // angulaire → aucun chevauchement.
+  const xs = raw.map((p) => p.x)
+  const ys = raw.map((p) => p.y)
+  let shiftX = 0
+  let shiftY = 0
+  const minX = Math.min(...xs)
+  const maxX = Math.max(...xs)
+  const minY = Math.min(...ys)
+  const maxY = Math.max(...ys)
+  if (minX < margin) shiftX = margin - minX
+  else if (maxX > w - margin) shiftX = w - margin - maxX
+  if (minY < margin) shiftY = margin - minY
+  else if (maxY > h - margin) shiftY = h - margin - maxY
+
+  return raw.map((p) => ({ x: p.x + shiftX - pos.x, y: p.y + shiftY - pos.y }))
 }
 
 export default function ActionWheelMJ({

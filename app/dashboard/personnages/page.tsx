@@ -155,6 +155,8 @@ export default function Personnages() {
   >([])
   const [sortsInitiauxIds, setSortsInitiauxIds] = useState<Set<string>>(new Set())
   const [sortsPanelOuvert, setSortsPanelOuvert] = useState(false)
+  // V1 5.2 — recherche de sort à la création de personnage.
+  const [rechercheSort, setRechercheSort] = useState('')
   const t = useTranslations('characters')
   const tc = useTranslations('common')
 
@@ -172,21 +174,29 @@ export default function Personnages() {
     fetchSortsTemplates()
   }, [])
 
-  // Recalcul automatique des HP quand classe ou Constitution changent à la
-  // création (pas en édition, pour ne pas écraser un PV manuellement saisi).
-  // L'utilisateur peut toujours surcharger la valeur ensuite : on n'incluant
-  // pas hpMax dans les deps, son édition manuelle ne déclenche pas de
-  // reset.
+  // Recalcul automatique des HP quand classe, Constitution OU niveau changent à
+  // la création (pas en édition, pour ne pas écraser un PV manuellement saisi).
+  // L'utilisateur peut toujours surcharger la valeur ensuite : hpMax n'est pas
+  // dans les deps, son édition manuelle ne déclenche pas de reset.
+  // V1 4.2 — les PV scalent désormais avec le niveau (D&D 5e) : niveau 1 = dé de
+  // vie max + mod Con ; chaque niveau suivant = moyenne du dé (⌊dé/2⌋+1) + mod Con.
   useEffect(() => {
     if (editingId) return
     const c = findClasse(classe)
     if (!c) return
     const con = parseInt(constitution)
     if (Number.isNaN(con)) return
-    const hp = c.hpNiveau1Base + modificateur(con)
+    const conMod = modificateur(con)
+    const niv = parseInt(niveau) || 1
+    const dieSize = parseInt((c.deVie ?? 'd8').replace(/\D/g, '')) || 8
+    const moyenneParNiveau = Math.floor(dieSize / 2) + 1
+    const hp = Math.max(
+      1,
+      c.hpNiveau1Base + conMod + (niv - 1) * (moyenneParNiveau + conMod)
+    )
     setHpMax(String(hp))
     setHpActuel(String(hp))
-  }, [classe, constitution, editingId])
+  }, [classe, constitution, niveau, editingId])
 
   const fetchSortsTemplates = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -901,12 +911,18 @@ export default function Personnages() {
             {classeObj && !editingId && (() => {
               const conMod = modificateur(conNum)
               const signe = conMod >= 0 ? '+' : '−'
+              // V1 4.2 — PV totaux scalés par niveau (cohérent avec l'auto-calcul).
+              const dieSize = parseInt((classeObj.deVie ?? 'd8').replace(/\D/g, '')) || 8
+              const moyenne = Math.floor(dieSize / 2) + 1
+              const total = Math.max(
+                1,
+                classeObj.hpNiveau1Base + conMod + (niveauNum - 1) * (moyenne + conMod)
+              )
               return (
                 <p className="text-[11px] text-gray-500 italic -mt-1">
-                  {classeObj.hpNiveau1Base} ({deVie}) {signe} {Math.abs(conMod)} (Con) ={' '}
-                  <span className="text-yellow-500 font-bold">
-                    {classeObj.hpNiveau1Base + conMod} HP
-                  </span>
+                  Niv {niveauNum} : {classeObj.hpNiveau1Base} ({deVie}) {signe} {Math.abs(conMod)} (Con)
+                  {niveauNum > 1 ? ` + ${niveauNum - 1}×(${moyenne}${signe}${Math.abs(conMod)})` : ''} ={' '}
+                  <span className="text-yellow-500 font-bold">{total} PV</span>
                   <span className="ml-2 text-gray-600">— modifiable manuellement</span>
                 </p>
               )
@@ -1246,7 +1262,19 @@ export default function Personnages() {
                     <p className="text-[11px] text-gray-500 italic mb-2">
                       Optionnel — tu pourras toujours en ajouter depuis la fiche du personnage.
                     </p>
-                    {sortsTemplates.map((tpl) => {
+                    {/* V1 5.2 — recherche de sort */}
+                    <input
+                      type="search"
+                      value={rechercheSort}
+                      onChange={(e) => setRechercheSort(e.target.value)}
+                      placeholder="🔍 Rechercher un sort…"
+                      className="w-full mb-2 px-2.5 py-1.5 rounded bg-gray-900 border border-gray-600 text-white text-xs outline-none focus:border-yellow-500 placeholder-gray-500"
+                    />
+                    {sortsTemplates
+                      .filter((tpl) =>
+                        tpl.nom.toLowerCase().includes(rechercheSort.trim().toLowerCase())
+                      )
+                      .map((tpl) => {
                       const checked = sortsInitiauxIds.has(tpl.id)
                       return (
                         <label
