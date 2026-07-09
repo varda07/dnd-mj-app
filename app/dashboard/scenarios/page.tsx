@@ -18,6 +18,8 @@ import GuidedTour from '@/app/components/GuidedTour'
 import StarFavori from '@/app/components/StarFavori'
 import ActionMenu from '@/app/components/ui/ActionMenu'
 import TemplatesScenariosGallery from '@/app/components/TemplatesScenariosGallery'
+import AssistantScenario from '@/app/components/scenarios/AssistantScenario'
+import { ChoiceCard, ChoiceGrid, FormActions } from '@/app/components/ui/FormKit'
 import { useFavoris } from '@/app/lib/favoris'
 import { unlockAchievement } from '@/app/lib/achievements'
 import {
@@ -58,6 +60,8 @@ export default function Scenarios() {
   const [vue, setVue] = useState<'liste' | 'carte'>('liste')
   const [favorisOnly, setFavorisOnly] = useState(false)
   const [templatesOuvert, setTemplatesOuvert] = useState(false)
+  // Phase 1 — assistant guidé de création de scénario.
+  const [assistantOuvert, setAssistantOuvert] = useState(false)
   // 1.1 — modale « Inviter des joueurs » (code + lien + QR + inscrits).
   const [inviteScenario, setInviteScenario] = useState<Scenario | null>(null)
   const [inviteCode, setInviteCode] = useState('')
@@ -383,7 +387,37 @@ export default function Scenarios() {
           <MindMap scenarios={scenarios.map((s) => ({ id: s.id, nom: s.nom }))} />
         ) : (
         <>
-        <div className="grim-card p-6 mb-6">
+        {/* Phase 1 — point de départ : Guidé / Modèle / Page blanche. */}
+        {!editingId && (
+          <div className="mb-6">
+            <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-2">Nouvelle aventure — par où commencer ?</p>
+            <ChoiceGrid cols={3}>
+              <ChoiceCard
+                icon="🪄"
+                title="Guidé"
+                subtitle="L'app te pose des questions et prépare le squelette"
+                recommended
+                onClick={() => setAssistantOuvert(true)}
+              />
+              <ChoiceCard
+                icon="📐"
+                title="Un modèle"
+                subtitle="Partir d'un des scénarios pré-faits"
+                onClick={() => setTemplatesOuvert(true)}
+              />
+              <ChoiceCard
+                icon="📄"
+                title="Page blanche"
+                subtitle="Le formulaire classique, ci-dessous"
+                onClick={() => {
+                  const el = document.getElementById('form-scenario-blank')
+                  el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                }}
+              />
+            </ChoiceGrid>
+          </div>
+        )}
+        <div id="form-scenario-blank" className="grim-card p-6 mb-6">
           <div className="flex items-center justify-between gap-2 mb-4">
             <h2 className="text-lg grim-h2">{editingId ? t('edit_title') : t('create_title')}</h2>
             {!editingId && (
@@ -402,16 +436,17 @@ export default function Scenarios() {
             <textarea placeholder={tc('description')} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none h-24" />
             <textarea placeholder={tc('notes')} value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none h-24" />
             {message && <p className="text-yellow-400 text-sm">{message}</p>}
-            <div className="flex gap-2">
-              <button type="button" onClick={sauvegarderScenario} disabled={loading} className="flex-1 p-3 bg-yellow-500 text-gray-900 font-bold rounded">
+            <FormActions onCancel={editingId ? resetForm : undefined} cancelLabel={tc('cancel')}>
+              <button
+                type="button"
+                onClick={sauvegarderScenario}
+                disabled={loading}
+                className="min-h-[44px] px-5 rounded-lg font-bold text-gray-900 disabled:opacity-60"
+                style={{ background: '#C9A84C' }}
+              >
                 {loading ? tc('loading') : editingId ? tc('modify') : tc('create')}
               </button>
-              {editingId && (
-                <button type="button" onClick={resetForm} className="px-4 p-3 bg-gray-700 text-white font-bold rounded hover:bg-gray-600">
-                  {tc('cancel')}
-                </button>
-              )}
-            </div>
+            </FormActions>
           </div>
         </div>
 
@@ -716,6 +751,16 @@ export default function Scenarios() {
         onClose={() => setTemplatesOuvert(false)}
         onCreated={() => fetchScenarios()}
       />
+
+      {assistantOuvert && (
+        <AssistantScenario
+          onClose={() => setAssistantOuvert(false)}
+          onCreated={(id) => {
+            setAssistantOuvert(false)
+            router.push(`/dashboard/scenarios/${id}/edit`)
+          }}
+        />
+      )}
     </main>
   )
 }

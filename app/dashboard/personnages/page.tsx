@@ -9,6 +9,8 @@ import { supabase } from '@/lib/supabase'
 import ImageCropper from '@/app/components/ImageCropper'
 import StarFavori from '@/app/components/StarFavori'
 import ActionMenu from '@/app/components/ui/ActionMenu'
+import AssistantPersonnage from '@/app/components/personnages/AssistantPersonnage'
+import { ChoiceCard, ChoiceGrid } from '@/app/components/ui/FormKit'
 import { useFavoris } from '@/app/lib/favoris'
 import {
   construireEnveloppe,
@@ -141,6 +143,8 @@ export default function Personnages() {
   const { est: estFavori } = useFavoris()
   const [codesVisibles, setCodesVisibles] = useState<Record<string, string>>({})
   const [aideOuverte, setAideOuverte] = useState(false)
+  // Phase 2 — assistant guidé de personnage ('guided' | 'surprise' | null).
+  const [assistantMode, setAssistantMode] = useState<null | 'guided' | 'surprise'>(null)
   const [fichePanelOuvert, setFichePanelOuvert] = useState(true)
   const [methodeStats, setMethodeStats] = useState<'27pts' | '4d6'>('4d6')
   const [rolled4d6, setRolled4d6] = useState<Roll4d6[]>([])
@@ -778,7 +782,37 @@ export default function Personnages() {
           </button>
         </div>
 
-        <div className="grim-card p-5 md:p-6 mb-6">
+        {/* Phase 2 — point de départ : Guidé / Rapide / Surprends-moi. */}
+        {!editingId && (
+          <div className="mb-6">
+            <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-2">Nouveau personnage — comment le créer ?</p>
+            <ChoiceGrid cols={3}>
+              <ChoiceCard
+                icon="🪄"
+                title="Guidé"
+                subtitle="Étape par étape, avec les règles expliquées"
+                recommended
+                onClick={() => setAssistantMode('guided')}
+              />
+              <ChoiceCard
+                icon="⚡"
+                title="Rapide"
+                subtitle="Le formulaire complet, ci-dessous"
+                onClick={() => {
+                  document.getElementById('form-perso-rapide')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                }}
+              />
+              <ChoiceCard
+                icon="🎲"
+                title="Surprends-moi"
+                subtitle="Un personnage complet, généré au hasard"
+                onClick={() => setAssistantMode('surprise')}
+              />
+            </ChoiceGrid>
+          </div>
+        )}
+
+        <div id="form-perso-rapide" className="grim-card p-5 md:p-6 mb-6">
           <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
             <h2 className="text-lg grim-h2">
               {editingId ? t('edit_title') : t('create_title')}
@@ -1612,6 +1646,17 @@ export default function Personnages() {
             </div>
           </div>
         </div>
+      )}
+
+      {assistantMode && (
+        <AssistantPersonnage
+          initialSurprise={assistantMode === 'surprise'}
+          onClose={() => setAssistantMode(null)}
+          onCreated={(id) => {
+            setAssistantMode(null)
+            router.push(`/dashboard/personnages/${id}`)
+          }}
+        />
       )}
     </main>
   )

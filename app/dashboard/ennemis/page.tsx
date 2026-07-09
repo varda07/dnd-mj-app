@@ -34,6 +34,7 @@ import {
   type TailleMonstre
 } from '@/app/data/bestiaire_dnd5e'
 import { genererLoot, formaterLoot, type PalierCR } from '@/app/data/loot_tables'
+import { GenerateButton } from '@/app/components/ui/FormKit'
 
 type Ennemi = {
   id: string
@@ -83,6 +84,25 @@ function suggestionTactique(int: number): string {
   if (int <= 12)
     return 'Cible la proie la plus faible ou isolée. Se replie de façon coordonnée sous 25 % PV.'
   return 'Stratégie complexe : vise en priorité les lanceurs de sorts et les soigneurs, exploite le terrain et les couverts, garde une porte de sortie.'
+}
+
+// Roadmap Créations Phase 3 — générateur léger de nom d'ennemi (épithète +
+// racine évocatrice), pour le bouton 🎲 et « Surprends-moi ».
+const ENN_RACINES = [
+  'Grok', 'Vorth', 'Xal', 'Mor', 'Zeth', 'Ur', 'Krul', 'Naz', 'Skarn', 'Thog',
+  'Vex', 'Drûk', 'Ghul', 'Rask', 'Orim'
+]
+const ENN_SUFFIXES = ['nak', 'drek', 'gor', 'thul', 'zar', 'mok', 'grim', 'vok', 'esh', 'ax']
+const ENN_EPITHETES = [
+  'l’Affamé', 'la Ruine', 'aux Crocs Noirs', 'le Sans-Nom', 'la Terreur des marais',
+  'le Briseur d’os', 'l’Ombre rampante', 'la Gueule béante', 'le Traqueur', 'aux Mille yeux',
+  'le Charognard', 'la Peste', 'le Maudit', 'la Faucheuse'
+]
+const pickE = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)]
+function genererNomEnnemi(): string {
+  const base = `${pickE(ENN_RACINES)}${pickE(ENN_SUFFIXES)}`
+  // 50 % : ajoute une épithète.
+  return Math.random() < 0.5 ? `${base} ${pickE(ENN_EPITHETES)}` : base
 }
 
 // Roadmap 2.5 — archétypes de variante : modifient les stats du monstre source.
@@ -308,6 +328,14 @@ export default function Ennemis() {
     setVariantDe(null)
   }
 
+  // Phase 3 — « 🎲 Surprends-moi » : nom + comportement + butin d'un coup.
+  const toutRelancerEnnemi = () => {
+    setNom(genererNomEnnemi())
+    setComportementTactique(suggestionTactique(parseInt(intelligence) || 10))
+    const loot = formaterLoot(genererLoot(lootPalier))
+    setNotes((n) => (n.trim() ? `${n}\n\n${loot}` : loot))
+  }
+
   const commencerEdition = (ennemi: Ennemi) => {
     setEditingId(ennemi.id)
     setVariantDe(null)
@@ -478,9 +506,36 @@ export default function Ennemis() {
           <h1 className="text-2xl grim-title">{t('title')}</h1>
         </div>
         <div className="grim-card p-4 md:p-6 mb-6">
-          <h2 className="text-lg grim-h2 mb-4">{editingId ? t('edit_title') : t('create_title')}</h2>
+          <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+            <h2 className="text-lg grim-h2">{editingId ? t('edit_title') : t('create_title')}</h2>
+            {/* Phase 3 — point de départ rapide (pas de wizard). */}
+            {!editingId && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setBestiaireOuvert(true)}
+                  className="min-h-[40px] px-3 rounded-lg text-sm border border-gray-600 text-gray-300 hover:text-white transition"
+                  title="Importer depuis le bestiaire D&D 5e"
+                >
+                  📖 Du bestiaire
+                </button>
+                <button
+                  type="button"
+                  onClick={toutRelancerEnnemi}
+                  className="min-h-[40px] px-3 rounded-lg font-bold text-sm border transition inline-flex items-center gap-1.5"
+                  style={{ background: 'rgba(201,168,76,0.12)', borderColor: 'rgba(201,168,76,0.5)', color: '#C9A84C' }}
+                  title="Générer nom, comportement et butin"
+                >
+                  🎲 Surprends-moi
+                </button>
+              </div>
+            )}
+          </div>
           <div className="space-y-3">
-            <input type="text" placeholder={t('name_ph')} value={nom} onChange={(e) => setNom(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
+            <div className="flex items-center gap-2">
+              <input type="text" placeholder={t('name_ph')} value={nom} onChange={(e) => setNom(e.target.value)} className="flex-1 min-w-0 p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
+              <GenerateButton onClick={() => setNom(genererNomEnnemi())} title="Générer un nom d'ennemi" />
+            </div>
             <div>
               <label className="text-gray-400 text-sm">{ti('scenario')}</label>
               <select value={scenarioId} onChange={(e) => setScenarioId(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none">

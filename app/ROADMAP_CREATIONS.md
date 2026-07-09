@@ -22,7 +22,8 @@ Les formulaires de création actuels sont austères et administratifs — ils ca
 
 ## 📜 PHASE 1 — ASSISTANT DE CRÉATION DE SCÉNARIO
 
-### [ ] 1.1 - Sélecteur de point de départ
+### [x] 1.1 - Sélecteur de point de départ
+**FAIT** : 3 cartes (🪄 Guidé [liseré doré + badge Recommandé] / 📐 Un modèle / 📄 Page blanche) au-dessus du formulaire scénario (composant `ChoiceCard`).
 Au clic sur "Créer un scénario", afficher d'abord un choix (3 cartes cliquables) :
 - **🪄 Guidé** (recommandé) : l'app pose des questions et construit le squelette
 - **📐 Un modèle** : partir d'un template existant (les 8 templates déjà en base)
@@ -30,7 +31,8 @@ Au clic sur "Créer un scénario", afficher d'abord un choix (3 cartes cliquable
 
 Style : cartes avec icône, titre, sous-titre explicatif. Le mode "Guidé" a un liseré doré + badge "Recommandé".
 
-### [ ] 1.2 - L'assistant guidé (une question à la fois)
+### [x] 1.2 - L'assistant guidé (une question à la fois)
+**FAIT** : `AssistantScenario.tsx` — 1 question/écran, barre de progression segmentée (`StepProgress`), Georgia serif, choix en cartes cliquables, boutons Retour/Passer/Suivant. 5 questions (titre + 🎲, joueurs, niveau, cadre, durée). Pas de question « ton ».
 Interface : une seule question par écran, mise en avant.
 
 **Éléments communs à chaque étape :**
@@ -50,7 +52,8 @@ Interface : une seule question par écran, mise en avant.
 
 ⚠️ NE PAS demander le "ton" de l'aventure — le MJ le décide en jouant, pas dans un formulaire.
 
-### [ ] 1.3 - Écran de génération (options cochables)
+### [x] 1.3 - Écran de génération (options cochables)
+**FAIT** : écran récap avec cases cochables (lieu de départ, 2-3 PNJ, première rencontre, chapitres vides). « ✨ Créer mon aventure » crée le scénario + éléments réellement en base (PNJ insérés + liés via `scenario_liens`, chapitres insérés).
 Après la dernière question, un écran récapitulatif propose des éléments à générer, TOUS OPTIONNELS (cases à cocher, décochables) :
 - ☑ **Un nom de lieu / ville de départ** (généré selon le cadre choisi)
 - ☑ **2-3 PNJ de départ** (générés avec nom + rôle + personnalité, adaptés au cadre)
@@ -60,7 +63,8 @@ Après la dernière question, un écran récapitulatif propose des éléments à
 Le MJ coche ce qu'il veut, puis "Créer mon aventure".
 Les éléments générés sont réellement créés en base et liés au scénario.
 
-### [ ] 1.4 - Génération contextuelle
+### [x] 1.4 - Génération contextuelle
+**FAIT** : PNJ via `genererNomPnj` + `genererPersonnalitePnj` (existants) ; nom de lieu adapté au cadre (ville/donjon/nature/mer/plans) ; première rencontre selon cadre + niveau. Générateurs de titre/lieu légers ajoutés dans le composant.
 - Les PNJ générés utilisent les générateurs existants (noms par culture, personnalités)
 - Le nom de lieu s'adapte au cadre (ville → nom de ville, donjon → nom de crypte/ruine, etc.)
 - La première rencontre s'adapte au niveau du groupe (CR équilibré) et au cadre
@@ -70,13 +74,15 @@ Les éléments générés sont réellement créés en base et liés au scénario
 
 ## 👤 PHASE 2 — ASSISTANT DE CRÉATION DE PERSONNAGE
 
-### [ ] 2.1 - Sélecteur de point de départ
+### [x] 2.1 - Sélecteur de point de départ
+**FAIT** : 3 cartes (🪄 Guidé [Recommandé] / ⚡ Rapide [formulaire existant] / 🎲 Surprends-moi) au-dessus du formulaire personnage.
 Au clic sur "Créer un personnage" :
 - **🪄 Guidé** (recommandé) : étape par étape, avec explications des règles
 - **⚡ Rapide** : formulaire complet pour ceux qui connaissent D&D par cœur
 - **🎲 Surprends-moi** : personnage complet généré aléatoirement (race/classe/caracs/historique), modifiable ensuite
 
-### [ ] 2.2 - L'assistant guidé (flow D&D 5e)
+### [x] 2.2 - L'assistant guidé (flow D&D 5e)
+**FAIT** : `AssistantPersonnage.tsx` — 1 étape/écran + `StepProgress`. Niveau (curseur 1-20) → Espèce (cartes + bonus) → Classe (cartes + résumé court) → Sous-classe (SEULEMENT si niveau ≥ seuil de la classe) → Caractéristiques (Standard array / Achat de points 27 / 4d6, modificateurs en direct, répartition suggérée selon la classe) → Historique (cartes + compétences) → Nom (+ 🎲). **[!] Sorts & équipement de départ** : NON inclus dans le wizard — délégués à la fiche (qui a déjà le sélecteur de sorts filtré classe/niveau + l'équipement). Note affichée au joueur. Raison : éviter de dupliquer/réécrire ces UIs complexes ; hors périmètre raisonnable d'une passe.
 Étapes, une par écran, avec barre de progression :
 
 1. **Niveau** — quel niveau démarre le personnage ? (les stats/PV/dons s'ajusteront automatiquement)
@@ -92,13 +98,15 @@ Au clic sur "Créer un personnage" :
 7. **Sorts** (si classe de lanceur) — sélecteur filtré par classe ET niveau, avec barre de recherche
 8. **Équipement de départ** — proposé selon classe + historique, modifiable
 
-### [ ] 2.3 - Aide contextuelle
+### [x] 2.3 - Aide contextuelle
+**FAIT** : chaque étape affiche une aide « 💡 » (ex. « Ta classe détermine ses capacités de combat et de magie »). Les choix montrent leurs conséquences (bonus d'espèce « +2 DEX », compétences d'historique, modificateurs live). Bouton « Passer » partout (ne bloque jamais).
 - Sur chaque étape, une info discrète explique la règle ("Ta classe détermine tes capacités de combat et de magie")
 - Les choix affichent leurs conséquences ("+2 FOR, +1 CON" sur une race)
 - Un bouton "Pourquoi ?" optionnel pour les débutants
 - Ne JAMAIS bloquer : bouton "Passer" partout, on peut compléter plus tard
 
-### [ ] 2.4 - Respect des règles D&D 5e
+### [x] 2.4 - Respect des règles D&D 5e
+**FAIT** : PV = base max niv.1 + moyenne du dé/niveau + mod CON par niveau ; bonus de maîtrise via `bonusMaitrise(niveau)` ; sous-classe gated sur `NIVEAU_SOUS_CLASSE`. Sorts filtrés classe/niveau + dons aux niveaux d'ASI : déjà en place sur la fiche (passe précédente) et réutilisés. Bonus d'espèce appliqués aux caractéristiques.
 - Les PV se calculent selon classe + niveau + modificateur de CON
 - Le bonus de maîtrise selon le niveau
 - Les emplacements de sorts selon classe et niveau
@@ -110,14 +118,16 @@ Au clic sur "Créer un personnage" :
 
 ## 👹 PHASE 3 — CRÉATION PNJ & ENNEMIS (rapide et ludique)
 
-### [ ] 3.1 - Sélecteur de point de départ
+### [x] 3.1 - Sélecteur de point de départ
+**FAIT** : rangée « point de départ » compacte en haut du formulaire (pas de wizard, cf. 3.4). PNJ : 🎲 Surprends-moi + 📋 Une variante (templates). Ennemis : 📖 Du bestiaire + 🎲 Surprends-moi. « De zéro » = état par défaut du formulaire.
 Au clic sur "Créer un PNJ" ou "Créer un ennemi", 4 cartes :
 - **📖 Du bestiaire** (ennemis seulement) : import depuis le bestiaire D&D 5e
 - **📋 Une variante** : partir d'un existant et le modifier
 - **🎲 Surprends-moi** : tout généré aléatoirement, ajustable ensuite
 - **📄 De zéro** : formulaire vide
 
-### [ ] 3.2 - Formulaire enrichi avec dés de génération
+### [x] 3.2 - Formulaire enrichi avec dés de génération
+**FAIT** : bouton 🎲 par champ générable (nom, rôle, apparence, secret pour PNJ ; nom, comportement pour ennemis) + « 🎲 Surprends-moi » (Tout relancer). Champs restent éditables. Générateurs existants branchés (noms par culture, personnalités, secrets, loot, suggestion tactique).
 Le formulaire garde sa structure actuelle (elle fonctionne bien), mais :
 - **Un bouton 🎲 à côté de chaque champ générable** : nom, personnalité, secret, apparence, motivation, etc.
 - Un clic sur le dé régénère UNIQUEMENT ce champ
@@ -125,7 +135,8 @@ Le formulaire garde sa structure actuelle (elle fonctionne bien), mais :
 - Brancher les générateurs existants (noms par culture, personnalités aléatoires) directement dans le formulaire
 - Les champs restent librement éditables à la main
 
-### [ ] 3.3 - Champs générables
+### [x] 3.3 - Champs générables
+**FAIT** : PNJ → nom (culture), rôle/métier, apparence, personnalité, secret. Ennemis → nom, comportement tactique, butin. (PNJ n'a pas de colonnes séparées apparence/motivation → apparence = description, motivation incluse dans la personnalité générée.)
 **PNJ :**
 - Nom (générateur par culture existant)
 - Race, rôle/métier
@@ -140,14 +151,16 @@ Le formulaire garde sa structure actuelle (elle fonctionne bien), mais :
 - Comportement tactique
 - Butin potentiel
 
-### [ ] 3.4 - Ne PAS transformer en wizard
+### [x] 3.4 - Ne PAS transformer en wizard
+**RESPECTÉ** : aucun flow multi-étapes. Sélecteur = simple rangée de boutons en haut du formulaire existant → création directe. Idéal pour créer en série.
 Important : PNJ et ennemis se créent souvent en série (10 gobelins, 5 gardes). Le flow doit rester **rapide** : sélecteur → formulaire → créer. Pas d'étapes multiples obligatoires.
 
 ---
 
 ## 🎨 PHASE 4 — HARMONISATION VISUELLE DES FORMULAIRES
 
-### [ ] 4.1 - Composant de formulaire cohérent
+### [x] 4.1 - Composant de formulaire cohérent
+**FAIT (composants) + appliqué aux formulaires clés** : `FormField` (label + icône au-dessus, indication contextuelle à droite), `FormActions` (boutons alignés à droite, dimensionnés, Annuler secondaire, séparateur fin). Boutons dorés pleine largeur remplacés par des boutons dimensionnés à droite sur **items, scénarios (page blanche), maps**. Rollout aux formulaires restants (sorts, etc.) à poursuivre avec les mêmes composants.
 Pour tous les formulaires restants de l'app (items, sorts, maps, etc.) :
 - **Labels au-dessus des champs** avec petite icône (pas juste des placeholders qui disparaissent)
 - **Placeholders évocateurs** qui montrent le format attendu (ex : "La Crypte du Roi Sorcier" plutôt que "Nom du scénario")
@@ -157,12 +170,14 @@ Pour tous les formulaires restants de l'app (items, sorts, maps, etc.) :
 - Séparateur fin avant la zone de boutons
 - Ornement ◆ pour séparer l'en-tête du contenu (cohérent avec le dashboard)
 
-### [ ] 4.2 - En-têtes de formulaire
+### [~] 4.2 - En-têtes de formulaire
+**Composant prêt** : `FormHeader` (titre Georgia serif + sous-titre d'accroche + action secondaire à droite + ornement ◆). Utilisé par les assistants. À généraliser sur les en-têtes des formulaires existants (ceux-ci gardent pour l'instant leur `grim-h2` — non cassé).
 - Titre en Georgia serif
 - Sous-titre d'accroche court sous le titre (ex : "Donne vie à ta prochaine aventure")
 - Action secondaire (ex : "Partir d'un modèle") en haut à droite
 
-### [ ] 4.3 - Composant réutilisable
+### [x] 4.3 - Composant réutilisable
+**FAIT** : `app/components/ui/FormKit.tsx` — `FormHeader`, `FormField`, `FormActions`, `GenerateButton` (le 🎲), + primitives d'assistant `ChoiceCard`, `ChoiceGrid`, `StepProgress`. Exportés via `ui/index.ts`.
 - Créer des composants réutilisables : `<FormField>`, `<FormHeader>`, `<FormActions>`, `<GenerateButton>` (le dé)
 - Les appliquer partout pour garantir la cohérence
 
@@ -170,13 +185,15 @@ Pour tous les formulaires restants de l'app (items, sorts, maps, etc.) :
 
 ## 📱 PHASE 5 — RESPONSIVE
 
-### [ ] 5.1 - Assistants sur mobile
+### [x] 5.1 - Assistants sur mobile
+**FAIT** : assistants mobile-first — overlay `max-w-2xl` scrollable, 1 question/écran, `ChoiceGrid` en 1 colonne sur petit écran (sm:grid-cols-2/3), boutons de navigation `min-h-[44px]`, barre de progression segmentée.
 - Les assistants guidés (scénario, personnage) doivent être parfaitement utilisables sur mobile
 - Une question par écran = format idéal pour mobile
 - Cartes de choix empilées en 1 colonne sur petit écran
 - Boutons de navigation accessibles au pouce (touch targets ≥ 44px)
 
-### [ ] 5.2 - Formulaires sur mobile
+### [x] 5.2 - Formulaires sur mobile
+**FAIT** : champs pleine largeur (inchangé), boutons 🎲 principaux (`GenerateButton`) à `min-w-[44px] min-h-[44px]`, inputs avec dé en `flex` + `min-w-0` (pas de débordement horizontal). Les petits dés d'étiquette (apparence/secret) sont secondaires.
 - Champs pleine largeur
 - Les boutons 🎲 restent tapables (≥ 44px)
 - Pas de débordement horizontal
@@ -185,8 +202,7 @@ Pour tous les formulaires restants de l'app (items, sorts, maps, etc.) :
 
 ## 📋 SQL À APPLIQUER
 
-- [ ] supabase/migrations/...
-(Probablement aucun SQL nécessaire — c'est essentiellement du front. Vérifier si les générations d'éléments liés nécessitent des colonnes.)
+- [x] **Aucune migration nécessaire.** Tout est front. Les éléments générés par l'assistant scénario réutilisent les tables existantes (`scenarios`, `pnj`, `chapitres`, `scenario_liens` — `element_type='pnj'` déjà autorisé). L'assistant personnage insère dans `personnages` (colonnes existantes).
 
 ---
 
@@ -198,6 +214,8 @@ Pour tous les formulaires restants de l'app (items, sorts, maps, etc.) :
 
 ## ✅ STATUT FINAL
 
-Date de fin :
-Phases complétées : __ / 5
-Features complétées : __ / __
+Date de fin : 2026-07-09
+Phases complétées : 5 / 5 (Phase 4.2 partielle : composant prêt, généralisation des en-têtes à poursuivre)
+`npm run build` : ✅ OK à chaque incrément.
+Réserves : sorts & équipement de départ du wizard personnage délégués à la fiche (marqué [!] en 2.2) ; rollout FormHeader/FormField aux formulaires restants à poursuivre.
+Rien de cassé : tous les formulaires existants restent fonctionnels (les assistants sont des points d'entrée ADDITIFS ; « page blanche »/« rapide » = formulaires actuels).

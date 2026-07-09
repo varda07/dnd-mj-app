@@ -9,6 +9,7 @@ import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
 import { useFocusHighlight } from '@/app/lib/useFocusHighlight'
 import ActionMenu from '@/app/components/ui/ActionMenu'
+import { FormActions } from '@/app/components/ui/FormKit'
 import ImageCropper from '@/app/components/ImageCropper'
 import StarFavori from '@/app/components/StarFavori'
 import { useFavoris } from '@/app/lib/favoris'
@@ -266,16 +267,17 @@ export default function Maps() {
               label={editingId ? t('image_edit_label') : t('image_label')}
             />
             {message && <p className="text-yellow-400 text-sm">{message}</p>}
-            <div className="flex gap-2">
-              <button type="button" onClick={sauvegarderMap} disabled={loading} className="flex-1 p-3 bg-yellow-500 text-gray-900 font-bold rounded">
+            <FormActions onCancel={editingId ? resetForm : undefined} cancelLabel={tc('cancel')}>
+              <button
+                type="button"
+                onClick={sauvegarderMap}
+                disabled={loading}
+                className="min-h-[44px] px-5 rounded-lg font-bold text-gray-900 disabled:opacity-60"
+                style={{ background: '#C9A84C' }}
+              >
                 {loading ? tc('loading') : editingId ? tc('modify') : tc('create')}
               </button>
-              {editingId && (
-                <button type="button" onClick={resetForm} className="px-4 p-3 bg-gray-700 text-white font-bold rounded hover:bg-gray-600">
-                  {tc('cancel')}
-                </button>
-              )}
-            </div>
+            </FormActions>
           </div>
         </div>
         <div className="space-y-4">
