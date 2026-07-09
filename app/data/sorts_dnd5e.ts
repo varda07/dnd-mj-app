@@ -6,7 +6,7 @@
 export type ClasseSort =
   | 'Magicien'
   | 'Ensorceleur'
-  | 'Sorcier'
+  | 'Occultiste'
   | 'Clerc'
   | 'Druide'
   | 'Barde'
@@ -81,7 +81,7 @@ export const SORTS_DND5E: SortOfficiel[] = [
     composantes_materiel: '',
     concentration: false,
     rituel: false,
-    classes_compatibles: ['Barde', 'Ensorceleur', 'Magicien', 'Sorcier', 'Artificier'],
+    classes_compatibles: ['Barde', 'Ensorceleur', 'Magicien', 'Occultiste', 'Artificier'],
     description:
       "Petits effets de magie : sons, étincelles, allumer/éteindre une flamme, salir/nettoyer, marquer un objet, créer un babiole illusoire."
   },
@@ -117,7 +117,7 @@ export const SORTS_DND5E: SortOfficiel[] = [
     composantes_materiel: '',
     concentration: false,
     rituel: false,
-    classes_compatibles: ['Sorcier'],
+    classes_compatibles: ['Occultiste'],
     description:
       "Rayon d'énergie crépitante. Attaque de sort à distance, 1d10 dégâts de force en cas de coup. +1 rayon aux niveaux 5/11/17."
   },
@@ -352,7 +352,7 @@ export const SORTS_DND5E: SortOfficiel[] = [
     composantes_materiel: 'Une pincée de suie et de sel',
     concentration: false,
     rituel: true,
-    classes_compatibles: ['Barde', 'Ensorceleur', 'Magicien', 'Sorcier'],
+    classes_compatibles: ['Barde', 'Ensorceleur', 'Magicien', 'Occultiste'],
     description:
       "Tu comprends toute langue parlée que tu entends et toute langue écrite que tu touches. Mots sacrés / textes secrets non concernés."
   },
@@ -388,7 +388,7 @@ export const SORTS_DND5E: SortOfficiel[] = [
     composantes_materiel: '',
     concentration: false,
     rituel: false,
-    classes_compatibles: ['Barde', 'Druide', 'Ensorceleur', 'Magicien', 'Sorcier'],
+    classes_compatibles: ['Barde', 'Druide', 'Ensorceleur', 'Magicien', 'Occultiste'],
     description:
       "Sauvegarde de Sagesse (avantage si tu es en combat avec elle). Échec : la cible est charmée par toi et te considère comme une connaissance amicale jusqu'à la fin du sort."
   },
@@ -533,7 +533,7 @@ export const SORTS_DND5E: SortOfficiel[] = [
     composantes_materiel: 'Un cil dans une gomme arabique',
     concentration: true,
     rituel: false,
-    classes_compatibles: ['Barde', 'Ensorceleur', 'Magicien', 'Sorcier', 'Artificier'],
+    classes_compatibles: ['Barde', 'Ensorceleur', 'Magicien', 'Occultiste', 'Artificier'],
     description:
       "Une créature touchée devient invisible jusqu'à ce qu'elle attaque ou lance un sort. Niveau supérieur : +1 cible par niveau."
   },
@@ -587,7 +587,7 @@ export const SORTS_DND5E: SortOfficiel[] = [
     composantes_materiel: 'Une petite tour modèle d\'argile',
     concentration: false,
     rituel: false,
-    classes_compatibles: ['Barde', 'Clerc', 'Ensorceleur', 'Magicien', 'Sorcier'],
+    classes_compatibles: ['Barde', 'Clerc', 'Ensorceleur', 'Magicien', 'Occultiste'],
     description:
       "La cible peut comprendre toute langue parlée et toute créature qui peut comprendre une langue qu'elle parle la comprend."
   },
@@ -605,7 +605,7 @@ export const SORTS_DND5E: SortOfficiel[] = [
     composantes_materiel: '',
     concentration: false,
     rituel: false,
-    classes_compatibles: ['Ensorceleur', 'Magicien', 'Sorcier'],
+    classes_compatibles: ['Ensorceleur', 'Magicien', 'Occultiste'],
     description:
       "Trois doubles illusoires. Chaque attaque dirigée contre toi peut frapper un double (CA 10 + mod Dex). Un double détruit disparaît."
   },
@@ -751,7 +751,7 @@ export const SORTS_DND5E: SortOfficiel[] = [
     composantes_materiel: 'Une plume d\'aile d\'oiseau',
     concentration: true,
     rituel: false,
-    classes_compatibles: ['Ensorceleur', 'Magicien', 'Sorcier', 'Artificier'],
+    classes_compatibles: ['Ensorceleur', 'Magicien', 'Occultiste', 'Artificier'],
     description:
       "Une créature volontaire touchée gagne une vitesse de vol de 18 m. Niveau supérieur : +1 cible par niveau."
   },
@@ -769,7 +769,7 @@ export const SORTS_DND5E: SortOfficiel[] = [
     composantes_materiel: '',
     concentration: false,
     rituel: false,
-    classes_compatibles: ['Ensorceleur', 'Magicien', 'Sorcier'],
+    classes_compatibles: ['Ensorceleur', 'Magicien', 'Occultiste'],
     description:
       "Réaction quand tu vois une créature lancer un sort. Annule automatiquement les sorts ≤ niveau 3 ; au-delà, test de magie DD 10 + niveau du sort."
   },
@@ -787,7 +787,7 @@ export const SORTS_DND5E: SortOfficiel[] = [
     composantes_materiel: '',
     concentration: false,
     rituel: false,
-    classes_compatibles: ['Barde', 'Clerc', 'Druide', 'Ensorceleur', 'Magicien', 'Paladin', 'Sorcier'],
+    classes_compatibles: ['Barde', 'Clerc', 'Druide', 'Ensorceleur', 'Magicien', 'Paladin', 'Occultiste'],
     description:
       "Met fin à un effet magique. Sorts ≤ niveau 3 : automatique. Au-delà : test de magie DD 10 + niveau de l'effet."
   },
@@ -1063,7 +1063,7 @@ export const SORTS_DND5E: SortOfficiel[] = [
     composantes_materiel: '',
     concentration: false,
     rituel: false,
-    classes_compatibles: ['Barde', 'Ensorceleur', 'Magicien', 'Sorcier'],
+    classes_compatibles: ['Barde', 'Ensorceleur', 'Magicien', 'Occultiste'],
     description:
       "Cible avec ≤ 150 PV : étourdie. Elle peut faire une sauvegarde de Con à la fin de chacun de ses tours pour mettre fin à l'effet."
   },
@@ -1110,7 +1110,7 @@ export const SORTS_DND5E: SortOfficiel[] = [
     temps_incantation: '1 action', action_type: 'action', portee: '9 m', duree: '1 minute',
     composantes_verbal: true, composantes_somatique: true, composantes_materiel: '',
     concentration: false, rituel: false,
-    classes_compatibles: ['Barde', 'Ensorceleur', 'Magicien', 'Sorcier', 'Artificier'],
+    classes_compatibles: ['Barde', 'Ensorceleur', 'Magicien', 'Occultiste', 'Artificier'],
     description: "Main spectrale flottante (jusqu'à 4,5 kg). En action : prendre/lâcher un objet, l'utiliser, ouvrir un récipient, sans déclencher de pièges."
   },
   {
@@ -1118,7 +1118,7 @@ export const SORTS_DND5E: SortOfficiel[] = [
     temps_incantation: '1 action', action_type: 'action', portee: '9 m', duree: '1 minute',
     composantes_verbal: false, composantes_somatique: true, composantes_materiel: 'Un peu de laine',
     concentration: false, rituel: false,
-    classes_compatibles: ['Barde', 'Ensorceleur', 'Magicien', 'Sorcier'],
+    classes_compatibles: ['Barde', 'Ensorceleur', 'Magicien', 'Occultiste'],
     description: "Crée un son ou une image visuelle (cube de 1,50 m). Investigation Int DD = DD sort pour détecter la supercherie."
   },
   {
@@ -1160,7 +1160,7 @@ export const SORTS_DND5E: SortOfficiel[] = [
     temps_incantation: '1 action', action_type: 'action', portee: '9 m', duree: 'Concentration jusqu\'à 1 min',
     composantes_verbal: true, composantes_somatique: true, composantes_materiel: 'Petites tartes et une plume agitée',
     concentration: true, rituel: false,
-    classes_compatibles: ['Barde', 'Magicien', 'Sorcier'],
+    classes_compatibles: ['Barde', 'Magicien', 'Occultiste'],
     description: "Cible Sag (Int < 5 immunise) ou à terre, hilare et incapacitée. Sag à chaque tour pour résister, ou si subit dégâts."
   },
   {
@@ -1176,7 +1176,7 @@ export const SORTS_DND5E: SortOfficiel[] = [
     temps_incantation: '1 action', action_type: 'action', portee: '18 m', duree: 'Concentration jusqu\'à 1 min',
     composantes_verbal: true, composantes_somatique: true, composantes_materiel: 'Un petit fer droit',
     concentration: true, rituel: false,
-    classes_compatibles: ['Barde', 'Clerc', 'Druide', 'Ensorceleur', 'Magicien', 'Sorcier'],
+    classes_compatibles: ['Barde', 'Clerc', 'Druide', 'Ensorceleur', 'Magicien', 'Occultiste'],
     description: "Humanoïde Sag ou paralysé. Sag à la fin de chaque tour. Slot +1 = +1 cible (chacune doit être à 9 m d'une autre cible)."
   },
   {
@@ -1192,7 +1192,7 @@ export const SORTS_DND5E: SortOfficiel[] = [
     temps_incantation: '1 action', action_type: 'action', portee: '18 m', duree: 'Concentration jusqu\'à 1 min',
     composantes_verbal: true, composantes_somatique: true, composantes_materiel: "Un objet repoussant à la cible",
     concentration: true, rituel: false,
-    classes_compatibles: ['Clerc', 'Magicien', 'Paladin', 'Sorcier'],
+    classes_compatibles: ['Clerc', 'Magicien', 'Paladin', 'Occultiste'],
     description: "Cible Cha ou bannie vers un demi-plan (revient en 1 min). Si extra-planaire, bannie définitivement. Slot +1 = +1 cible."
   },
 
@@ -1210,7 +1210,7 @@ export const SORTS_DND5E: SortOfficiel[] = [
     temps_incantation: '1 action', action_type: 'action', portee: '27 m', duree: 'Concentration jusqu\'à 1 min',
     composantes_verbal: true, composantes_somatique: true, composantes_materiel: 'Un petit fer droit',
     concentration: true, rituel: false,
-    classes_compatibles: ['Barde', 'Ensorceleur', 'Magicien', 'Sorcier'],
+    classes_compatibles: ['Barde', 'Ensorceleur', 'Magicien', 'Occultiste'],
     description: "Comme Immobilisation de personne mais s'applique à toute créature (sauf morts-vivants). Slot +1 = +1 cible."
   },
   {
@@ -1226,7 +1226,7 @@ export const SORTS_DND5E: SortOfficiel[] = [
     temps_incantation: '1 action', action_type: 'action', portee: 'Contact', duree: '1 heure',
     composantes_verbal: true, composantes_somatique: true, composantes_materiel: 'Onguent de 25 PO de poudre de champignons et safran',
     concentration: false, rituel: false,
-    classes_compatibles: ['Barde', 'Clerc', 'Magicien', 'Sorcier'],
+    classes_compatibles: ['Barde', 'Clerc', 'Magicien', 'Occultiste'],
     description: "La créature touchée voit la vérité : magie invisible révélée, illusions percées, objets cachés visibles, vision dans le noir 36 m, voit le plan éthéré."
   },
   {
@@ -1244,7 +1244,7 @@ export const SORTS_DND5E: SortOfficiel[] = [
     temps_incantation: '1 action', action_type: 'action', portee: 'Contact', duree: 'Instantanée',
     composantes_verbal: true, composantes_somatique: true, composantes_materiel: "Un diapason d'une matière liée au plan ciblé (au moins 250 PO)",
     concentration: false, rituel: false,
-    classes_compatibles: ['Clerc', 'Druide', 'Ensorceleur', 'Magicien', 'Sorcier'],
+    classes_compatibles: ['Clerc', 'Druide', 'Ensorceleur', 'Magicien', 'Occultiste'],
     description: "Transporte jusqu'à 8 créatures consentantes vers un autre plan. Ou bannit une cible non consentante (jet Cha pour résister)."
   },
   {
@@ -1276,7 +1276,7 @@ export const SORTS_DND5E: SortOfficiel[] = [
     temps_incantation: '1 action', action_type: 'action', portee: '18 m', duree: 'Instantanée',
     composantes_verbal: true, composantes_somatique: false, composantes_materiel: '',
     concentration: false, rituel: false,
-    classes_compatibles: ['Barde', 'Ensorceleur', 'Magicien', 'Sorcier'],
+    classes_compatibles: ['Barde', 'Ensorceleur', 'Magicien', 'Occultiste'],
     description: "Cible avec PV ≤ 100 meurt instantanément, sans jet de sauvegarde. Aucun effet sur les créatures à plus de 100 PV."
   },
   {
@@ -1284,7 +1284,7 @@ export const SORTS_DND5E: SortOfficiel[] = [
     temps_incantation: '1 minute', action_type: 'rituel', portee: 'Contact', duree: '8 heures',
     composantes_verbal: true, composantes_somatique: true, composantes_materiel: "Une plume d'oiseau-tonnerre",
     concentration: false, rituel: false,
-    classes_compatibles: ['Barde', 'Druide', 'Magicien', 'Sorcier'],
+    classes_compatibles: ['Barde', 'Druide', 'Magicien', 'Occultiste'],
     description: "La créature touchée a avantage à toutes les attaques, jets de sauvegarde et tests de caractéristique ; les attaques contre elle ont désavantage. Ne peut être surprise."
   },
   {
@@ -1385,7 +1385,7 @@ const TIERS_CASTEUR: Record<string, number>[] = [
   /*20*/ { '1': 4, '2': 3, '3': 3, '4': 3, '5': 2 }
 ]
 
-// Sorcier (Warlock) — table de Pacte Magique (slots particuliers, repos COURT)
+// Occultiste (Warlock) — table de Pacte Magique (slots particuliers, repos COURT)
 const WARLOCK: Record<string, number>[] = [
   /*1*/  { '1': 1 },
   /*2*/  { '1': 2 },
@@ -1423,7 +1423,7 @@ export const SLOTS_PAR_CLASSE: SlotProgression = {
   Paladin: tableParPerso(DEMI_CASTEUR),
   'Rôdeur': tableParPerso(DEMI_CASTEUR),
   Artificier: tableParPerso(TIERS_CASTEUR),
-  Sorcier: tableParPerso(WARLOCK)
+  Occultiste: tableParPerso(WARLOCK)
 }
 
 // Renvoie les slots max recommandés pour une classe + niveau donnés.
@@ -1440,7 +1440,47 @@ export const slotsRecommandes = (
 
 // Le sorcier récupère ses slots sur repos COURT.
 export const usesShortRest = (classe: string | null | undefined): boolean =>
-  classe === 'Sorcier'
+  classe === 'Occultiste'
+
+// ----------------------------------------------------------------------------
+// Filtrage des sorts par classe + niveau (Corrections V1 Vague 2 — 2.5)
+// ----------------------------------------------------------------------------
+// Niveau de sort MAX accessible pour une classe donnée à un niveau de classe
+// donné = le plus haut niveau d'emplacement disponible dans sa table de slots.
+// 0 pour une classe non-lanceuse (table vide) → seuls les tours de magie
+// (niveau 0) restent autorisés via la compatibilité de classe.
+export const niveauMaxSortClasse = (
+  classe: string | null | undefined,
+  niveauClasse: number
+): number => {
+  const slots = slotsRecommandes(classe, niveauClasse)
+  let max = 0
+  for (const k of Object.keys(slots)) {
+    if ((slots[k] ?? 0) > 0) max = Math.max(max, parseInt(k, 10))
+  }
+  return max
+}
+
+export type ClassePerso = { classe: string; niveau: number }
+
+// Un sort est autorisé si AU MOINS une des classes du perso :
+//  - figure dans la liste des classes compatibles du sort (ou liste vide =
+//    homebrew sans classe → on n'impose pas la classe), ET
+//  - donne accès à ce niveau de sort (tour de magie toujours OK si la classe
+//    correspond ; sinon niveau du sort ≤ niveau de sort max de la classe).
+export const sortAutorisePourPerso = (
+  sortNiveau: number,
+  sortClasses: string[] | null | undefined,
+  classesPerso: ClassePerso[]
+): boolean => {
+  return classesPerso.some((cp) => {
+    const classeOk =
+      !sortClasses || sortClasses.length === 0 || sortClasses.includes(cp.classe)
+    if (!classeOk) return false
+    if (sortNiveau === 0) return true // tour de magie
+    return sortNiveau <= niveauMaxSortClasse(cp.classe, cp.niveau)
+  })
+}
 
 // Détecte les expressions de dés dans une description ("3d6", "1d8 + 4", etc.)
 const DICE_RE = /(\d+)d(4|6|8|10|12|20)/gi

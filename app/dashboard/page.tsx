@@ -148,10 +148,10 @@ export default function Dashboard() {
         { table: 'scenarios', type: 'scenarios', icone: '📖', route: (id) => `/dashboard/scenarios/${id}/edit` },
         { table: 'personnages', type: 'personnages', icone: '🎭', route: (id) => `/dashboard/personnages/${id}` },
         { table: 'pnj', type: 'pnj', icone: '🧑', route: (id) => `/dashboard/pnj/${id}` },
-        { table: 'ennemis', type: 'ennemis', icone: '👹', route: () => `/dashboard/ennemis` },
-        { table: 'items', type: 'items', icone: '🎒', route: () => `/dashboard/items` },
-        { table: 'maps', type: 'maps', icone: '🗺️', route: () => `/dashboard/maps` },
-        { table: 'sorts', type: 'sorts', icone: '✨', route: () => `/dashboard/sorts` }
+        { table: 'ennemis', type: 'ennemis', icone: '👹', route: (id) => `/dashboard/ennemis?focus=${id}` },
+        { table: 'items', type: 'items', icone: '🎒', route: (id) => `/dashboard/items?focus=${id}` },
+        { table: 'maps', type: 'maps', icone: '🗺️', route: (id) => `/dashboard/maps?focus=${id}` },
+        { table: 'sorts', type: 'sorts', icone: '✨', route: (id) => `/dashboard/sorts?focus=${id}` }
       ]
       for (const conf of tables) {
         const ids = favoris[conf.type] ?? []

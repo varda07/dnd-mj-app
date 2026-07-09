@@ -658,7 +658,7 @@ export const CLASSES: Classe[] = [
     ]
   },
   {
-    nom: 'Sorcier',
+    nom: 'Occultiste',
     nomEn: 'Warlock',
     deVie: 'd8',
     hpNiveau1Base: 8,
@@ -688,20 +688,6 @@ export const CLASSES: Classe[] = [
       'Artilleur',
       'Forgemage',
       'Armurier'
-    ]
-  },
-  {
-    nom: 'Sang-de-dragon',
-    nomEn: 'Dragonblood',
-    deVie: 'd8',
-    hpNiveau1Base: 8,
-    jetsSauvegarde: ['con', 'cha'],
-    caracteristiquesPrincipales: ['cha', 'for'],
-    sousClasses: [
-      'Lignée chromatique',
-      'Lignée métallique',
-      'Lignée gemme',
-      'Sang ancien'
     ]
   }
 ]
@@ -908,7 +894,7 @@ export const facesDeVie = (deVie: string | null | undefined): number => {
 export const NIVEAU_SOUS_CLASSE: Record<string, number> = {
   Clerc: 1,
   Ensorceleur: 1,
-  Sorcier: 1,
+  Occultiste: 1,
   Druide: 2,
   Magicien: 2,
   Barbare: 3,
@@ -918,8 +904,7 @@ export const NIVEAU_SOUS_CLASSE: Record<string, number> = {
   Paladin: 3,
   'Rôdeur': 3,
   Roublard: 3,
-  Artificier: 3,
-  'Sang-de-dragon': 3
+  Artificier: 3
 }
 
 // Niveaux où la classe gagne une augmentation de caractéristique (ASI).
@@ -950,9 +935,8 @@ export const PREREQUIS_MULTICLASSE: Record<string, StatKey[]> = {
   Paladin: ['for', 'cha'],
   'Rôdeur': ['dex', 'sag'],
   Roublard: ['dex'],
-  Sorcier: ['cha'],
-  Artificier: ['int'],
-  'Sang-de-dragon': ['cha']
+  Occultiste: ['cha'],
+  Artificier: ['int']
 }
 
 // Renvoie la liste des stats < 13 qui empêchent de multiclasser. Vide = OK.
@@ -970,7 +954,7 @@ export const prerequisManquants = (
 export const CLASSES_SORTS_CONNUS: readonly string[] = [
   'Barde',
   'Ensorceleur',
-  'Sorcier',
+  'Occultiste',
   'Magicien',
   'Rôdeur',
   'Paladin'

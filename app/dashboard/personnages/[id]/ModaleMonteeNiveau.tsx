@@ -18,6 +18,7 @@ import {
   type ClasseMultiple
 } from '@/app/data/dnd5e'
 import { slotsRecommandes } from '@/app/data/sorts_dnd5e'
+import { DONS, donAccessible, type DonContext } from '@/app/data/dons_dnd5e'
 
 type StatKey = 'force' | 'dexterite' | 'constitution' | 'intelligence' | 'sagesse' | 'charisme'
 
@@ -64,6 +65,8 @@ export type MonteeResult = {
   charisme?: number
   sorts_slots_max?: Record<string, number>
   classes_multiples: ClasseMultiple[]
+  // Don (feat) choisi à la place de l'ASI — le parent l'ajoute aux « Exploits ».
+  donAjoute?: string
   // Pour résumé visuel
   resume: {
     classeMontee: string
@@ -101,10 +104,11 @@ export default function ModaleMonteeNiveau({
   // -- Sous-classe --
   const [sousClasseChoix, setSousClasseChoix] = useState<string>('')
 
-  // -- ASI --
-  const [asiMode, setAsiMode] = useState<'plus2' | 'deuxplus1' | null>(null)
+  // -- ASI / Don --
+  const [asiMode, setAsiMode] = useState<'plus2' | 'deuxplus1' | 'don' | null>(null)
   const [asiTarget1, setAsiTarget1] = useState<StatKey | null>(null)
   const [asiTarget2, setAsiTarget2] = useState<StatKey | null>(null)
+  const [donChoisi, setDonChoisi] = useState<string | null>(null)
 
   // -- Étape courante --
   const [etape, setEtape] = useState<Etape>('class-choice')
@@ -121,6 +125,7 @@ export default function ModaleMonteeNiveau({
     setAsiMode(null)
     setAsiTarget1(null)
     setAsiTarget2(null)
+    setDonChoisi(null)
     setEtape('class-choice')
     setAnimKey((k) => k + 1)
   }, [open, perso.classe])
@@ -152,22 +157,43 @@ export default function ModaleMonteeNiveau({
   // Vérif sous-classe : on la propose si :
   //  - le perso n'a pas déjà de sous-classe pour CETTE classe
   //  - le nouveau niveau de classe atteint le seuil
+  // Règle D&D 5e : la sous-classe (archétype) se choisit au niveau DANS cette
+  // classe précise (seuil variable selon la classe), pas au niveau total. On
+  // ne la propose donc que si le niveau ATTEINT dans la classe ciblée == seuil
+  // ET qu'aucune sous-classe n'a encore été choisie pour cette classe.
   const declenchSousClasse = useMemo(() => {
     const seuil = NIVEAU_SOUS_CLASSE[classeCible]
     if (!seuil) return false
     if (niveauClasseApres !== seuil) return false
-    // En mono-classe : on regarde perso.sous_classe
+    // Multiclasse dans une NOUVELLE classe : aucune sous-classe encore → on
+    // propose dès que le niveau dans cette classe atteint son seuil.
+    if (multiclasseEnabled) return true
+    // Classe existante. Si le perso est encore mono-classe, la classe ciblée
+    // est forcément la principale → on regarde perso.sous_classe.
     if (perso.classes_multiples.length === 0) {
-      return !perso.sous_classe && classeCible === perso.classe
+      return !perso.sous_classe
     }
-    // En multi : on regarde l'entrée pour cette classe
+    // Perso multiclasse : on regarde l'entrée dédiée à cette classe. À défaut
+    // (classe principale sans entrée), on retombe sur perso.sous_classe.
     const entry = perso.classes_multiples.find((c) => c.classe === classeCible)
-    return !entry?.sous_classe
-  }, [classeCible, niveauClasseApres, perso])
+    if (!entry) {
+      return classeCible === perso.classe ? !perso.sous_classe : true
+    }
+    return !entry.sous_classe
+  }, [multiclasseEnabled, classeCible, niveauClasseApres, perso])
 
   const declenchASI = useMemo(
     () => estNiveauASI(classeCible, niveauClasseApres),
     [classeCible, niveauClasseApres]
+  )
+
+  // Le perso est-il lanceur de sorts ? (prérequis de certains dons)
+  const lanceurDeSorts = useMemo(
+    () =>
+      apprendSorts(perso.classe) ||
+      Object.values(perso.sorts_slots_max ?? {}).some((n) => (n ?? 0) > 0) ||
+      perso.classes_multiples.some((c) => apprendSorts(c.classe)),
+    [perso]
   )
 
   // Prérequis multiclasse manquants
@@ -230,6 +256,9 @@ export default function ModaleMonteeNiveau({
       nouvelleStats[asiTarget1] = Math.min(20, perso[asiTarget1] + 1)
       nouvelleStats[asiTarget2] = Math.min(20, perso[asiTarget2] + 1)
     }
+    // Mode « don » : on ne touche pas aux stats, on renvoie le don choisi.
+    const donAjoute =
+      asiMode === 'don' && donChoisi ? donChoisi : undefined
 
     // ClassesMultiples : on met à jour ou on crée l'entrée pour la classe ciblée
     const cm = [...perso.classes_multiples]
@@ -289,6 +318,7 @@ export default function ModaleMonteeNiveau({
       ...nouvelleStats,
       sorts_slots_max: nouveauxSlots,
       classes_multiples: cm,
+      donAjoute,
       resume: {
         classeMontee: classeCible,
         hpGagnes,
@@ -302,6 +332,8 @@ export default function ModaleMonteeNiveau({
             ? `+2 ${asiTarget1.toUpperCase()}`
             : asiMode === 'deuxplus1' && asiTarget1 && asiTarget2
             ? `+1 ${asiTarget1.toUpperCase()} & +1 ${asiTarget2.toUpperCase()}`
+            : asiMode === 'don' && donChoisi
+            ? `Don : ${donChoisi}`
             : undefined,
         slotsModifies: slotsModifies.length > 0 ? slotsModifies : undefined,
         multiclasse: multiclasseEnabled
@@ -338,6 +370,7 @@ export default function ModaleMonteeNiveau({
     if (etape === 'asi') {
       if (asiMode === 'plus2') return !!asiTarget1
       if (asiMode === 'deuxplus1') return !!asiTarget1 && !!asiTarget2 && asiTarget1 !== asiTarget2
+      if (asiMode === 'don') return !!donChoisi
       return false
     }
     if (etape === 'sorts') return true
@@ -481,6 +514,9 @@ export default function ModaleMonteeNiveau({
                 setTarget1={setAsiTarget1}
                 target2={asiTarget2}
                 setTarget2={setAsiTarget2}
+                donChoisi={donChoisi}
+                setDonChoisi={setDonChoisi}
+                lanceurDeSorts={lanceurDeSorts}
               />
             )}
 
@@ -770,29 +806,47 @@ function EtapeASI({
   target1,
   setTarget1,
   target2,
-  setTarget2
+  setTarget2,
+  donChoisi,
+  setDonChoisi,
+  lanceurDeSorts
 }: {
   perso: PersoSnapshot
-  mode: 'plus2' | 'deuxplus1' | null
-  setMode: (m: 'plus2' | 'deuxplus1' | null) => void
+  mode: 'plus2' | 'deuxplus1' | 'don' | null
+  setMode: (m: 'plus2' | 'deuxplus1' | 'don' | null) => void
   target1: StatKey | null
   setTarget1: (s: StatKey | null) => void
   target2: StatKey | null
   setTarget2: (s: StatKey | null) => void
+  donChoisi: string | null
+  setDonChoisi: (d: string | null) => void
+  lanceurDeSorts: boolean
 }) {
+  const donCtx: DonContext = {
+    for: perso.force,
+    dex: perso.dexterite,
+    con: perso.constitution,
+    int: perso.intelligence,
+    sag: perso.sagesse,
+    cha: perso.charisme,
+    lanceurDeSorts
+  }
   return (
     <div className="space-y-4">
-      <h3 className="text-amber-100 font-serif text-lg">Augmentation de caractéristique</h3>
-      <p className="text-stone-400 text-sm">Choisis comment répartir tes 2 points (max 20 par stat).</p>
+      <h3 className="text-amber-100 font-serif text-lg">Amélioration ou don</h3>
+      <p className="text-stone-400 text-sm">
+        Augmente tes caractéristiques (max 20) OU choisis un don (feat).
+      </p>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <button
           type="button"
           onClick={() => {
             setMode('plus2')
             setTarget2(null)
+            setDonChoisi(null)
           }}
-          className={`flex-1 py-2 px-3 rounded border-2 transition-all text-sm font-bold ${
+          className={`flex-1 min-w-[120px] py-2 px-3 rounded border-2 transition-all text-sm font-bold ${
             mode === 'plus2'
               ? 'border-amber-400 bg-amber-900/30 text-amber-100'
               : 'border-stone-700 hover:border-amber-700/60 bg-stone-900/40 text-stone-300'
@@ -802,8 +856,11 @@ function EtapeASI({
         </button>
         <button
           type="button"
-          onClick={() => setMode('deuxplus1')}
-          className={`flex-1 py-2 px-3 rounded border-2 transition-all text-sm font-bold ${
+          onClick={() => {
+            setMode('deuxplus1')
+            setDonChoisi(null)
+          }}
+          className={`flex-1 min-w-[120px] py-2 px-3 rounded border-2 transition-all text-sm font-bold ${
             mode === 'deuxplus1'
               ? 'border-amber-400 bg-amber-900/30 text-amber-100'
               : 'border-stone-700 hover:border-amber-700/60 bg-stone-900/40 text-stone-300'
@@ -811,9 +868,62 @@ function EtapeASI({
         >
           +1 à deux stats
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            setMode('don')
+            setTarget1(null)
+            setTarget2(null)
+          }}
+          className={`flex-1 min-w-[120px] py-2 px-3 rounded border-2 transition-all text-sm font-bold ${
+            mode === 'don'
+              ? 'border-amber-400 bg-amber-900/30 text-amber-100'
+              : 'border-stone-700 hover:border-amber-700/60 bg-stone-900/40 text-stone-300'
+          }`}
+        >
+          🎖 Prendre un don
+        </button>
       </div>
 
-      {mode && (
+      {mode === 'don' && (
+        <div className="space-y-1.5 max-h-[320px] overflow-y-auto step-anim pr-1">
+          {DONS.map((don) => {
+            const accessible = donAccessible(don, donCtx)
+            const selected = donChoisi === don.nom
+            return (
+              <button
+                key={don.nom}
+                type="button"
+                disabled={!accessible}
+                onClick={() => setDonChoisi(don.nom)}
+                className={`w-full text-left rounded-lg border px-3 py-2 transition-all ${
+                  !accessible
+                    ? 'border-stone-800 bg-stone-900/30 opacity-50 cursor-not-allowed'
+                    : selected
+                    ? 'border-amber-400 bg-amber-900/30'
+                    : 'border-stone-700 hover:border-amber-700/60 bg-stone-900/40'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-amber-100 font-bold text-sm">{don.nom}</span>
+                  {don.prerequisTexte && (
+                    <span
+                      className={`text-[10px] ${
+                        accessible ? 'text-amber-400/70' : 'text-red-400/80'
+                      }`}
+                    >
+                      {accessible ? don.prerequisTexte : `🔒 ${don.prerequisTexte}`}
+                    </span>
+                  )}
+                </div>
+                <p className="text-stone-400 text-xs mt-0.5">{don.description}</p>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {(mode === 'plus2' || mode === 'deuxplus1') && (
         <div className="grid grid-cols-3 gap-2 step-anim">
           {STATS.map((s) => {
             const val = perso[s.key]

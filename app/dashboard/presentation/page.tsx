@@ -19,6 +19,7 @@ import CombatVueJoueurs from '@/app/components/presentation/CombatVueJoueurs'
 import type { FogState } from '@/app/components/presentation/CombatCarte'
 import CombatsPreparesLaunch from '@/app/components/combat/CombatsPreparesLaunch'
 import ActionWheelMJ, { type ActionWheelKey } from '@/app/components/presentation/ActionWheelMJ'
+import ElementsScenarioPanel from '@/app/components/presentation/ElementsScenarioPanel'
 import WildMagicRoller from '@/app/components/WildMagicRoller'
 import SituationsRandom from '@/app/components/SituationsRandom'
 import { rollInitiative } from '@/app/lib/combat-engine'
@@ -147,6 +148,7 @@ const SETUP_LABEL: Record<SetupMode, string> = {
 type PanelKey =
   | 'narration'
   | 'combat'
+  | 'elements'
   | 'carte'
   | 'image'
   | 'sons'
@@ -163,6 +165,7 @@ const COCKPIT_PANELS: Array<{
 }> = [
   { key: 'narration', icon: '📜', label: 'Narration' },
   { key: 'combat', icon: '⚔️', label: 'Combat' },
+  { key: 'elements', icon: '📦', label: 'Contenu' },
   { key: 'carte', icon: '🗺️', label: 'Carte' },
   { key: 'image', icon: '🖼️', label: 'Image' },
   { key: 'sons', icon: '🎵', label: 'Ambiance' },
@@ -1798,6 +1801,15 @@ function PresentationInner() {
                   </div>
                 </div>
               </>
+            )}
+
+            {/* --- 📦 Contenu du scénario (ennemis/PNJ/maps/items liés) --- */}
+            {activePanel === 'elements' && (
+              <ElementsScenarioPanel
+                scenarioId={scenario?.id}
+                imageActive={etat?.image_plein_ecran ?? null}
+                onAfficherImage={(url) => sauverChamp({ image_plein_ecran: url })}
+              />
             )}
 
             {/* --- 🗺️ Carte & lieu + brouillard de guerre --- */}

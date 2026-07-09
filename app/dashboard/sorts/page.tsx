@@ -8,6 +8,7 @@ import ActionMenu from '@/app/components/ui/ActionMenu'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { supabase } from '@/lib/supabase'
+import { useFocusHighlight } from '@/app/lib/useFocusHighlight'
 import {
   construireEnveloppe,
   lireFichierJSON,
@@ -56,7 +57,7 @@ type Sort = {
 const CLASSES_DISPO: ClasseSort[] = [
   'Magicien',
   'Ensorceleur',
-  'Sorcier',
+  'Occultiste',
   'Clerc',
   'Druide',
   'Barde',
@@ -400,6 +401,9 @@ export default function Sorts() {
   useEffect(() => {
     fetchSorts()
   }, [])
+
+  // Surligne le sort ciblé via ?focus=<id> (clic depuis un favori).
+  useFocusHighlight(sorts.length > 0)
 
   const resetForm = () => {
     setNom('')
@@ -947,7 +951,7 @@ export default function Sorts() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {sortsAffiches.map((sort) => (
-              <div key={sort.id} className="flex flex-col gap-2 relative">
+              <div key={sort.id} id={`focus-${sort.id}`} className="flex flex-col gap-2 relative">
                 <div className="absolute top-1 left-1 z-10 bg-gray-900/80 rounded-full p-0.5">
                   <StarFavori type="sorts" id={sort.id} />
                 </div>

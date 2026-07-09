@@ -45,6 +45,7 @@ type Personnage = {
   nom: string
   race: string
   classe: string
+  historique?: string | null
   niveau: number
   hp_max: number
   hp_actuel: number
@@ -307,9 +308,14 @@ export default function Personnages() {
     setNom(perso.nom)
     setRace(RACE_NOMS.includes(perso.race) ? perso.race : RACE_NOMS[0])
     setClasse(CLASSE_NOMS.includes(perso.classe) ? perso.classe : CLASSE_NOMS[0])
-    // Historique / alignement / saves / compétences ne sont pas persistés :
-    // on laisse les valeurs courantes du formulaire (le joueur peut les
-    // ré-ajuster s'il le souhaite).
+    // Historique : désormais persisté → on recharge la valeur du perso si elle
+    // existe (sinon défaut). Alignement / saves / compétences ne sont pas
+    // persistés : on laisse les valeurs courantes du formulaire.
+    setHistorique(
+      perso.historique && HISTORIQUE_NOMS.includes(perso.historique)
+        ? perso.historique
+        : HISTORIQUE_NOMS[0]
+    )
     setNiveau(String(perso.niveau))
     setHpMax(String(perso.hp_max))
     setHpActuel(String(perso.hp_actuel))
@@ -608,6 +614,7 @@ export default function Personnages() {
       nom,
       race,
       classe,
+      historique,
       scenario_id: scenarioId || null,
       niveau: parseInt(niveau),
       hp_max: parseInt(hpMax),

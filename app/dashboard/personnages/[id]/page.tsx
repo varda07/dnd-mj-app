@@ -11,6 +11,9 @@ import {
   slotsRecommandes,
   usesShortRest,
   extraireDes,
+  sortAutorisePourPerso,
+  niveauMaxSortClasse,
+  type ClassePerso,
   type DiceExpr
 } from '@/app/data/sorts_dnd5e'
 import {
@@ -100,6 +103,7 @@ type SortTemplate = {
   niveau: number
   ecole: string | null
   description: string | null
+  classes_compatibles: string[] | null
 }
 
 type SaveState = 'saved' | 'pending' | 'saving' | 'error'
@@ -218,6 +222,9 @@ export default function FichePersonnage() {
   const [sortsTemplates, setSortsTemplates] = useState<SortTemplate[]>([])
   const [templatesLoading, setTemplatesLoading] = useState(false)
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<Set<string>>(new Set())
+  // 2.5 — toggle MJ « autoriser tous les sorts » (contourne le filtre
+  // classe/niveau pour les cas homebrew / particuliers).
+  const [autoriserTousSorts, setAutoriserTousSorts] = useState(false)
   const [saveState, setSaveState] = useState<SaveState>('saved')
   const [saveError, setSaveError] = useState<string | null>(null)
   const [colonnesManquantes, setColonnesManquantes] = useState<string[]>([])
@@ -437,6 +444,39 @@ export default function FichePersonnage() {
 
   const modStat = (key: StatKey) => (perso ? modifier(perso[key] ?? 10) : 0)
 
+  // 2.5 — Classes du perso (avec niveau par classe) pour filtrer les sorts.
+  const classesPerso = useMemo<ClassePerso[]>(() => {
+    if (!perso) return []
+    if (perso.classes_multiples.length > 0) {
+      return perso.classes_multiples.map((c) => ({
+        classe: c.classe,
+        niveau: c.niveau
+      }))
+    }
+    return [{ classe: perso.classe ?? '', niveau: perso.niveau }]
+  }, [perso])
+
+  // Décrit pourquoi un sort n'est pas accessible (null = accessible).
+  const raisonSortBloque = (tpl: SortTemplate): string | null => {
+    if (autoriserTousSorts) return null
+    if (sortAutorisePourPerso(tpl.niveau, tpl.classes_compatibles, classesPerso)) {
+      return null
+    }
+    // Classe compatible mais niveau trop haut → message de niveau requis.
+    const classeCompatible =
+      !tpl.classes_compatibles ||
+      tpl.classes_compatibles.length === 0 ||
+      classesPerso.some((cp) => tpl.classes_compatibles?.includes(cp.classe))
+    if (classeCompatible && tpl.niveau > 0) {
+      const maxAccessible = Math.max(
+        0,
+        ...classesPerso.map((cp) => niveauMaxSortClasse(cp.classe, cp.niveau))
+      )
+      return `Niveau de sort ${tpl.niveau} inaccessible (max ${maxAccessible})`
+    }
+    return 'Classe incompatible'
+  }
+
   const toast = (msg: string) => {
     setRollMessage(msg)
     setTimeout(() => setRollMessage(null), 3500)
@@ -596,7 +636,7 @@ export default function FichePersonnage() {
     const assignedIds = new Set(sorts.map((s) => s.id))
     const { data } = await supabase
       .from('sorts')
-      .select('id, nom, niveau, ecole, description')
+      .select('id, nom, niveau, ecole, description, classes_compatibles')
       .eq('user_id', user.id)
       .order('niveau')
       .order('nom')
@@ -807,7 +847,7 @@ export default function FichePersonnage() {
   }
 
   // Repos court : dépense un dé de vie pour récupérer (1d{deVie} + mod Con) PV.
-  // Pour le Sorcier, restaure aussi les emplacements (Pacte Magique).
+  // Pour l'Occultiste, restaure aussi les emplacements (Pacte Magique).
   const depenserDeVie = () => {
     if (!perso) return
     if (perso.de_vie_utilises >= niveau) {
@@ -833,14 +873,14 @@ export default function FichePersonnage() {
     const totalHp = shortRestLog.reduce((s, e) => s + e.gained, 0)
     let resume = `🌙 Repos court : +${totalHp} PV (${shortRestLog.length} dé${shortRestLog.length > 1 ? 's' : ''} de vie dépensé${shortRestLog.length > 1 ? 's' : ''}).`
     if (usesShortRest(perso.classe)) {
-      // Sorcier : restaure tous les emplacements
-      const restauresSorcier = Object.values(perso.sorts_slots_used).reduce(
+      // Occultiste : restaure tous les emplacements
+      const restauresOccultiste = Object.values(perso.sorts_slots_used).reduce(
         (a, b) => a + (b || 0),
         0
       )
       setPerso({ ...perso, sorts_slots_used: {} })
-      if (restauresSorcier > 0) {
-        resume += ` Pacte Magique : ${restauresSorcier} emplacement${restauresSorcier > 1 ? 's' : ''} restauré${restauresSorcier > 1 ? 's' : ''}.`
+      if (restauresOccultiste > 0) {
+        resume += ` Pacte Magique : ${restauresOccultiste} emplacement${restauresOccultiste > 1 ? 's' : ''} restauré${restauresOccultiste > 1 ? 's' : ''}.`
       }
       setShortRestSlotsRestores(true)
     }
@@ -940,6 +980,13 @@ export default function FichePersonnage() {
       payload.sorts_slots_max = result.sorts_slots_max
     for (const k of ['force', 'dexterite', 'constitution', 'intelligence', 'sagesse', 'charisme'] as const) {
       if (result[k] !== undefined) payload[k] = result[k]
+    }
+    // 2.4 — Don choisi à la place de l'ASI : on l'ajoute au champ « Exploits ».
+    if (result.donAjoute) {
+      const actuel = (perso.exploits ?? '').trim()
+      payload.exploits = actuel
+        ? `${actuel}\n• ${result.donAjoute}`
+        : `• ${result.donAjoute}`
     }
 
     const { error } = await supabase
@@ -2217,16 +2264,33 @@ export default function FichePersonnage() {
             className="bg-stone-800 border-2 border-yellow-600 rounded-lg shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-4 border-b border-yellow-800/50 flex items-center justify-between">
-              <h3 className="text-yellow-500 font-bold">➕ Attribuer des sorts</h3>
-              <button
-                type="button"
-                onClick={() => setSortsModalOpen(false)}
-                className="text-gray-400 hover:text-white text-2xl leading-none w-8 h-8"
-                aria-label="Fermer"
-              >
-                ×
-              </button>
+            <div className="p-4 border-b border-yellow-800/50">
+              <div className="flex items-center justify-between">
+                <h3 className="text-yellow-500 font-bold">➕ Attribuer des sorts</h3>
+                <button
+                  type="button"
+                  onClick={() => setSortsModalOpen(false)}
+                  className="text-gray-400 hover:text-white text-2xl leading-none w-8 h-8"
+                  aria-label="Fermer"
+                >
+                  ×
+                </button>
+              </div>
+              {/* 2.5 — Filtre classe/niveau + contournement MJ. */}
+              <label className="mt-2 flex items-center gap-2 cursor-pointer text-xs text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={autoriserTousSorts}
+                  onChange={(e) => {
+                    setAutoriserTousSorts(e.target.checked)
+                    if (!e.target.checked) setSelectedTemplateIds(new Set())
+                  }}
+                  className="w-4 h-4 accent-yellow-500"
+                />
+                <span>
+                  🔓 Mode MJ : autoriser tous les sorts (ignorer classe &amp; niveau)
+                </span>
+              </label>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
               {templatesLoading ? (
@@ -2239,20 +2303,25 @@ export default function FichePersonnage() {
                 <ul className="space-y-1">
                   {sortsTemplates.map((tpl) => {
                     const checked = selectedTemplateIds.has(tpl.id)
+                    const raison = raisonSortBloque(tpl)
+                    const bloque = raison !== null
                     return (
                       <li key={tpl.id}>
                         <label
-                          className={`flex items-start gap-3 p-2 rounded cursor-pointer border ${
-                            checked
-                              ? 'bg-yellow-500/10 border-yellow-600/60'
-                              : 'bg-stone-900/50 border-stone-700 hover:bg-stone-700/40'
+                          className={`flex items-start gap-3 p-2 rounded border ${
+                            bloque
+                              ? 'bg-stone-900/30 border-stone-800 opacity-60 cursor-not-allowed'
+                              : checked
+                              ? 'bg-yellow-500/10 border-yellow-600/60 cursor-pointer'
+                              : 'bg-stone-900/50 border-stone-700 hover:bg-stone-700/40 cursor-pointer'
                           }`}
                         >
                           <input
                             type="checkbox"
                             checked={checked}
+                            disabled={bloque}
                             onChange={() => toggleTemplateSelection(tpl.id)}
-                            className="mt-1 w-4 h-4 accent-yellow-500 flex-shrink-0"
+                            className="mt-1 w-4 h-4 accent-yellow-500 flex-shrink-0 disabled:cursor-not-allowed"
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-baseline gap-2 flex-wrap">
@@ -2261,7 +2330,15 @@ export default function FichePersonnage() {
                                 {tpl.niveau === 0 ? 'Tour' : `Niv. ${tpl.niveau}`}
                                 {tpl.ecole ? ` · ${tpl.ecole}` : ''}
                               </span>
+                              {tpl.classes_compatibles && tpl.classes_compatibles.length > 0 && (
+                                <span className="text-[11px] text-gray-600">
+                                  {tpl.classes_compatibles.join(', ')}
+                                </span>
+                              )}
                             </div>
+                            {bloque && (
+                              <p className="text-[11px] text-red-400/80 mt-0.5">🔒 {raison}</p>
+                            )}
                             {tpl.description && (
                               <p className="text-gray-400 text-xs italic mt-1 line-clamp-2">
                                 {tpl.description}

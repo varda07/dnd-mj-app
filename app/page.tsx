@@ -15,11 +15,21 @@ export default function Home() {
   const [message, setMessage] = useState('')
   const t = useTranslations('login')
 
+  // 1.1 — après connexion, si une invitation est en attente (lien /rejoindre),
+  // on y retourne directement plutôt que vers le dashboard.
+  const destinationApresAuth = () => {
+    try {
+      const code = localStorage.getItem('pending_invite_code')
+      if (code) return `/rejoindre/${code}`
+    } catch {}
+    return '/dashboard'
+  }
+
   const handleLogin = async () => {
     setLoading(true)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) setMessage(error.message)
-    else window.location.href = '/dashboard'
+    else window.location.href = destinationApresAuth()
     setLoading(false)
   }
 
@@ -47,7 +57,7 @@ export default function Home() {
       // Si l'inscription a immédiatement renvoyé une session (confirm email
       // désactivé côté Supabase), bascule directement sur le dashboard.
       if (data.session) {
-        window.location.href = '/dashboard'
+        window.location.href = destinationApresAuth()
         return
       }
       setMessage(t('account_created'))

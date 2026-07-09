@@ -52,13 +52,20 @@ export default function Scenarios() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [codesVisibles, setCodesVisibles] = useState<Record<string, string>>({})
   const [codeJoueur, setCodeJoueur] = useState('')
   const [scenarioCibleId, setScenarioCibleId] = useState('')
   const [messageJoueur, setMessageJoueur] = useState('')
   const [vue, setVue] = useState<'liste' | 'carte'>('liste')
   const [favorisOnly, setFavorisOnly] = useState(false)
   const [templatesOuvert, setTemplatesOuvert] = useState(false)
+  // 1.1 — modale « Inviter des joueurs » (code + lien + QR + inscrits).
+  const [inviteScenario, setInviteScenario] = useState<Scenario | null>(null)
+  const [inviteCode, setInviteCode] = useState('')
+  const [inviteJoueurs, setInviteJoueurs] = useState<
+    { joueur_id: string; username: string; personnages: { id: string; nom: string; classe: string | null; niveau: number | null }[] }[]
+  >([])
+  const [inviteLoading, setInviteLoading] = useState(false)
+  const [inviteCopie, setInviteCopie] = useState<'' | 'code' | 'lien'>('')
   const { est: estFavori } = useFavoris()
   const router = useRouter()
   const t = useTranslations('scenarios')
@@ -261,7 +268,8 @@ export default function Scenarios() {
     return `DND-${suffix}`
   }
 
-  const inviterJoueur = async (scenarioId: string) => {
+  // Récupère (ou crée) un code d'invitation RÉUTILISABLE pour un scénario.
+  const obtenirCodeInvitation = async (scenarioId: string): Promise<string | null> => {
     const { data: existing } = await supabase
       .from('codes_invitation')
       .select('code')
@@ -270,23 +278,45 @@ export default function Scenarios() {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-
-    if (existing?.code) {
-      setCodesVisibles((prev) => ({ ...prev, [scenarioId]: existing.code }))
-      return
-    }
+    if (existing?.code) return existing.code
 
     for (let i = 0; i < 5; i++) {
       const code = genererCode()
       const { error } = await supabase
         .from('codes_invitation')
         .insert({ code, scenario_id: scenarioId })
-      if (!error) {
-        setCodesVisibles((prev) => ({ ...prev, [scenarioId]: code }))
-        return
-      }
+      if (!error) return code
     }
-    setMessage(t('cannot_generate_code'))
+    return null
+  }
+
+  // 1.1 — Ouvre la modale d'invitation : code + lien + QR + joueurs inscrits.
+  const ouvrirInvitation = async (scenario: Scenario) => {
+    setInviteScenario(scenario)
+    setInviteCode('')
+    setInviteJoueurs([])
+    setInviteCopie('')
+    setInviteLoading(true)
+    const code = await obtenirCodeInvitation(scenario.id)
+    if (code) setInviteCode(code)
+    else setMessage(t('cannot_generate_code'))
+    const { data } = await supabase.rpc('joueurs_du_scenario', {
+      p_scenario_id: scenario.id
+    })
+    const res = data as { ok: boolean; joueurs?: typeof inviteJoueurs } | null
+    if (res?.ok && res.joueurs) setInviteJoueurs(res.joueurs)
+    setInviteLoading(false)
+  }
+
+  const lienInvitation = (code: string) =>
+    typeof window !== 'undefined' ? `${window.location.origin}/rejoindre/${code}` : ''
+
+  const copierInvite = async (quoi: 'code' | 'lien', valeur: string) => {
+    try {
+      await navigator.clipboard?.writeText(valeur)
+      setInviteCopie(quoi)
+      setTimeout(() => setInviteCopie(''), 1800)
+    } catch {}
   }
 
   const exporterScenario = (s: Scenario) => {
@@ -311,14 +341,6 @@ export default function Scenarios() {
         const msg = err instanceof Error ? err.message : String(err)
         setMessage(tc('import_error', { message: msg }))
       }
-    })
-  }
-
-  const cacherCode = (scenarioId: string) => {
-    setCodesVisibles((prev) => {
-      const next = { ...prev }
-      delete next[scenarioId]
-      return next
     })
   }
 
@@ -495,6 +517,15 @@ export default function Scenarios() {
                   >
                     {scenario.actif ? `★ ${t('active_badge')}` : `☆ ${t('set_active')}`}
                   </button>
+                  {/* 1.1 — bouton évident pour inviter des joueurs. */}
+                  <button
+                    type="button"
+                    onClick={() => ouvrirInvitation(scenario)}
+                    className="text-sm font-bold px-2 py-1.5 rounded transition text-gray-300 hover:text-yellow-300 border border-yellow-700/40 hover:border-yellow-500/70"
+                    title="Inviter des joueurs"
+                  >
+                    👥 Inviter
+                  </button>
                   <ActionMenu
                     actions={[
                       {
@@ -505,7 +536,7 @@ export default function Scenarios() {
                       {
                         label: t('invite_player'),
                         icon: '✉️',
-                        onClick: () => inviterJoueur(scenario.id)
+                        onClick: () => ouvrirInvitation(scenario)
                       },
                       {
                         label: 'Quêtes',
@@ -545,31 +576,6 @@ export default function Scenarios() {
                   />
                 </div>
               </div>
-              {codesVisibles[scenario.id] && (
-                <div className="mt-2 p-2 rounded bg-gray-900 border border-green-600/50 flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-gray-400 text-xs">{t('invite_code_label')}</p>
-                    <code className="text-green-300 font-mono font-bold text-lg break-all">{codesVisibles[scenario.id]}</code>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => navigator.clipboard?.writeText(codesVisibles[scenario.id])}
-                      className="text-gray-400 hover:text-white text-xs"
-                      title={tc('copy')}
-                    >
-                      📋 {tc('copy')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => cacherCode(scenario.id)}
-                      className="text-gray-400 hover:text-white text-xs"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              )}
               {scenario.description && <p className="text-gray-400 text-sm mt-2">{scenario.description}</p>}
             </div>
           ))}
@@ -577,6 +583,134 @@ export default function Scenarios() {
         </>
         )}
       </div>
+
+      {/* 1.1 — Modale « Inviter des joueurs » : code + lien + QR + inscrits. */}
+      {inviteScenario && (
+        <div
+          className="fixed inset-0 z-[95] bg-black/75 flex items-center justify-center p-4"
+          onClick={() => setInviteScenario(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border-2 shadow-2xl flex flex-col max-h-[88vh]"
+            style={{ background: '#15110a', borderColor: 'rgba(201,168,76,0.5)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: 'rgba(201,168,76,0.2)' }}>
+              <h3 className="font-bold text-lg" style={{ color: '#C9A84C', fontFamily: 'Georgia, serif' }}>
+                👥 Inviter des joueurs
+              </h3>
+              <button
+                type="button"
+                onClick={() => setInviteScenario(null)}
+                className="text-gray-400 hover:text-white text-2xl leading-none w-8 h-8"
+                aria-label="Fermer"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <p className="text-stone-300 text-sm">
+                Partage ce lien ou ce code. Le joueur arrive directement sur «&nbsp;Rejoindre{' '}
+                <span className="text-yellow-200 font-bold">{inviteScenario.nom}</span>&nbsp;»,
+                choisit son personnage, et c'est fait.
+              </p>
+
+              {inviteLoading && !inviteCode ? (
+                <p className="text-stone-400 text-sm italic">Génération du code…</p>
+              ) : inviteCode ? (
+                <>
+                  {/* Code en gros */}
+                  <div className="rounded-xl bg-black/50 border border-yellow-800/50 p-3 text-center">
+                    <p className="text-stone-500 text-[11px] uppercase tracking-widest mb-1">Code d'invitation</p>
+                    <code className="text-yellow-300 font-mono font-bold text-2xl tracking-wider break-all">
+                      {inviteCode}
+                    </code>
+                    <div className="mt-2 flex gap-2 justify-center">
+                      <button
+                        type="button"
+                        onClick={() => copierInvite('code', inviteCode)}
+                        className="text-xs px-3 py-1.5 rounded border border-yellow-700/50 text-yellow-200 hover:bg-yellow-500/10"
+                      >
+                        {inviteCopie === 'code' ? '✓ Copié' : '📋 Copier le code'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => copierInvite('lien', lienInvitation(inviteCode))}
+                        className="text-xs px-3 py-1.5 rounded font-bold text-gray-900"
+                        style={{ background: '#C9A84C' }}
+                      >
+                        {inviteCopie === 'lien' ? '✓ Lien copié' : '🔗 Copier le lien'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* QR code */}
+                  <div className="flex flex-col items-center gap-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&bgcolor=21-17-10&color=201-168-76&data=${encodeURIComponent(
+                        lienInvitation(inviteCode)
+                      )}`}
+                      alt="QR code d'invitation"
+                      width={180}
+                      height={180}
+                      className="rounded-lg border border-yellow-800/40 bg-black/30 p-1"
+                    />
+                    <p className="text-stone-500 text-[11px]">Scanne pour rejoindre</p>
+                  </div>
+                </>
+              ) : (
+                <p className="text-red-300 text-sm">Impossible de générer le code.</p>
+              )}
+
+              {/* Joueurs déjà inscrits */}
+              <div>
+                <p className="text-stone-400 text-xs uppercase tracking-widest mb-2">
+                  Joueurs inscrits ({inviteJoueurs.length})
+                </p>
+                {inviteLoading ? (
+                  <p className="text-stone-500 text-sm italic">Chargement…</p>
+                ) : inviteJoueurs.length === 0 ? (
+                  <p className="text-stone-500 text-sm italic">
+                    Personne n'a encore rejoint. Partage le lien&nbsp;!
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {inviteJoueurs.map((j) => (
+                      <li
+                        key={j.joueur_id}
+                        className="rounded-lg border border-stone-700 bg-stone-900/40 px-3 py-2"
+                      >
+                        <p className="text-yellow-100 font-bold text-sm">🧑 {j.username}</p>
+                        {j.personnages.length > 0 ? (
+                          <div className="mt-1 flex flex-wrap gap-1.5">
+                            {j.personnages.map((p) => (
+                              <span
+                                key={p.id}
+                                className="text-[11px] px-2 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-700/40 text-yellow-200"
+                              >
+                                {p.nom}
+                                {p.classe ? ` · ${p.classe}` : ''}
+                                {p.niveau ? ` (Niv. ${p.niveau})` : ''}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-stone-500 text-[11px] mt-0.5 italic">
+                            Pas encore de personnage lié
+                          </p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <TemplatesScenariosGallery
         open={templatesOuvert}
         onClose={() => setTemplatesOuvert(false)}
