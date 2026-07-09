@@ -248,7 +248,23 @@ Produire un RAPPORT D'AUDIT avec recommandations avant toute suppression.
 - Lot 3 (petit) : sélecteur de création (Dessiner / Générer / Template) sur la page Maps + redirections.
 - Lot 4 (petit) : retrait des anciennes routes après validation.
 
-**✅ PLAN VALIDÉ par le user (2026-07-09).** À réaliser dans une **SESSION DÉDIÉE** (pas maintenant). Ce plan reste documenté ici tel quel comme référence du chantier.
+**✅ PLAN VALIDÉ par le user (2026-07-09).** Ce plan reste documenté ci-dessus comme référence.
+
+### G) ✅ FAIT — Chantier « Éditeur unifié » réalisé (4 lots, `build` ✅ après chacun)
+
+**Architecture retenue** (monter l'existant sans réécrire) : chaque page conserve son code mais expose un **composant de contenu sans chrome** ; l'éditeur unifié (`maps/editor`) est un **shell à onglets** qui les monte.
+
+- **Lot 1 — Shell + Atelier** : `maps/editor/page.tsx` devient un shell à onglets (`MapsEditorShell`) piloté par `?tab=draw|generate|gm`. L'éditeur de tuiles existant est extrait en `TileEditorContent` (chrome retiré, même fichier). L'Atelier est extrait en `AtelierPanelContent` (export depuis `builder/page.tsx`) et monté dans l'onglet **🏗 Outils MJ**.
+- **Lot 2 — Générateur** : générateur procédural extrait en `DungeonGeneratorContent` (export depuis `generer-donjon/page.tsx`), monté dans l'onglet **🏰 Générer**.
+- **Lot 3 — Sélecteur de création** : page **Maps** → bouton **« ➕ Créer une carte »** (menu : 🎨 Dessiner → `editor?tab=draw`, 🏰 Générer → `editor?tab=generate`, 📚 Template → page templates comme **source**). Action per-carte **🏗 Outils MJ** → `editor?tab=gm&id=<map>`. **Carte du monde** (Hexcrawl) reste un bouton distinct.
+- **Lot 4 — Redirections** : `maps/builder` → `editor?tab=gm` (préserve `?id=`) et `maps/generer-donjon` → `editor?tab=generate`. **Aucune route supprimée** : les fichiers exposent toujours leur composant de contenu (importé par le shell) et redirigent seulement leur export par défaut.
+- **Nav** : hub « Cartes » = **Mes cartes** + **Éditeur de cartes** (les 3 entrées séparées fusionnées).
+
+**Ce qui reste en redirection** : `maps/builder`, `maps/generer-donjon` (clientes, `router.replace`). À supprimer définitivement plus tard une fois l'usage confirmé (les composants de contenu, eux, restent nécessaires).
+
+**À tester en priorité** : (1) création via chaque mode du sélecteur ; (2) onglet Outils MJ avec sélection de carte + `?id=` depuis la liste ; (3) que les cartes existantes s'ouvrent/éditent toujours ; (4) responsive de l'éditeur (grilles `md:grid-cols`), (5) anciennes URLs `builder`/`generer-donjon` redirigent bien.
+
+**Risques de régression** : double `<div max-w>` imbriqué (cosmétique, inoffensif) ; `AtelierPanelContent` & `DungeonGeneratorContent` sous une seule frontière Suspense du shell (OK) ; le générateur/éditeur de tuiles créent toujours de **nouvelles** cartes (ils n'éditent pas le canvas d'une carte existante — comportement inchangé, hors périmètre du chantier).
 
 ---
 

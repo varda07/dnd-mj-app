@@ -415,7 +415,23 @@ function dessinerDonjon(ctx: CanvasRenderingContext2D, cell: number, d: Donjon) 
 // Composant
 // ----------------------------------------------------------------------------
 
+// Route héritée : redirige vers l'éditeur unifié (onglet « Générer »). Le
+// contenu reste exporté via `DungeonGeneratorContent` pour l'éditeur unifié.
 export default function GenererDonjonPage() {
+  const router = useRouter()
+  useEffect(() => {
+    router.replace('/dashboard/maps/editor?tab=generate')
+  }, [router])
+  return (
+    <main className="min-h-screen bg-[#050608] text-gray-200 p-6">
+      <p className="text-gray-400">Redirection vers l&apos;éditeur…</p>
+    </main>
+  )
+}
+
+// Contenu « Générer » (générateur procédural), sans chrome de page → monté tel
+// quel dans l'éditeur unifié.
+export function DungeonGeneratorContent() {
   const router = useRouter()
   const [taille, setTaille] = useState<Taille>('moyen')
   const [theme, setTheme] = useState<Theme>('crypte')
@@ -502,24 +518,7 @@ export default function GenererDonjonPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#050608] text-gray-200 p-4 md:p-6">
       <div className="max-w-[1400px] mx-auto">
-        <header className="flex items-center gap-4 mb-4 flex-wrap">
-          <button
-            type="button"
-            onClick={() => router.push('/dashboard/maps')}
-            className="text-gray-500 hover:text-gray-200 text-sm"
-          >
-            ← Maps
-          </button>
-          <h1 className="text-xl md:text-2xl font-bold text-[#C9A84C]">
-            🏰 Générateur de donjons
-          </h1>
-          <span className="text-[11px] uppercase tracking-[0.25em] text-gray-500 ml-auto">
-            Procédural
-          </span>
-        </header>
-
         <div className="grid grid-cols-1 md:grid-cols-[230px_1fr_280px] gap-4">
           {/* === Paramètres === */}
           <aside className="bg-[#12141a] border border-[rgba(201,168,76,0.18)] rounded-lg p-3 space-y-4">
@@ -686,6 +685,5 @@ export default function GenererDonjonPage() {
           </aside>
         </div>
       </div>
-    </main>
   )
 }

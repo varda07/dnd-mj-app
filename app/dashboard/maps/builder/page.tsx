@@ -36,15 +36,33 @@ type ZoneRow = {
   contenu: Record<string, unknown>
 }
 
+// Route héritée : redirige vers l'éditeur unifié (onglet « Outils MJ »), en
+// préservant ?id=. Le contenu reste exporté via `AtelierPanelContent`.
 export default function DonjonBuilderPage() {
   return (
-    <Suspense fallback={<main className="min-h-screen bg-gray-900 text-white p-6"><p className="text-gray-400">Chargement…</p></main>}>
-      <DonjonBuilderInner />
+    <Suspense fallback={<main className="min-h-screen bg-gray-900 text-white p-6"><p className="text-gray-400">Redirection…</p></main>}>
+      <BuilderRedirect />
     </Suspense>
   )
 }
 
-function DonjonBuilderInner() {
+function BuilderRedirect() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const id = searchParams.get('id')
+  useEffect(() => {
+    router.replace(`/dashboard/maps/editor?tab=gm${id ? `&id=${id}` : ''}`)
+  }, [router, id])
+  return (
+    <main className="min-h-screen bg-gray-900 text-white p-6">
+      <p className="text-gray-400">Redirection vers l&apos;éditeur…</p>
+    </main>
+  )
+}
+
+// Contenu « Outils MJ » (ex-Atelier), sans chrome de page (pas de <main> ni de
+// bouton retour) → montable tel quel dans l'éditeur unifié.
+export function AtelierPanelContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const mapParam = searchParams.get('id')
@@ -139,16 +157,8 @@ function DonjonBuilderInner() {
   const mapCourante = maps.find((m) => m.id === mapId) ?? null
 
   return (
-    <main className="min-h-screen bg-gray-900 text-white p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center gap-3 mb-4 flex-wrap">
-          <button
-            type="button"
-            onClick={() => router.push('/dashboard/maps')}
-            className="text-gray-400 hover:text-white text-sm"
-          >
-            ← Cartes
-          </button>
           <h1 className="text-2xl grim-title">🏗 Atelier de donjon</h1>
           <div className="ml-auto">
             <GmViewToggle mode={vue} onChange={setVue} />
@@ -189,13 +199,6 @@ function DonjonBuilderInner() {
                   className="h-16 rounded object-cover border border-gray-700"
                 />
               )}
-              <button
-                type="button"
-                onClick={() => router.push(`/dashboard/maps/editor?id=${mapId}`)}
-                className="text-xs px-3 py-2 rounded bg-gray-800 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/10"
-              >
-                🎨 Ouvrir dans l&apos;éditeur
-              </button>
             </div>
           )}
           {vue === 'joueurs' && (
@@ -319,6 +322,5 @@ function DonjonBuilderInner() {
           </div>
         )}
       </div>
-    </main>
   )
 }

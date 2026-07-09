@@ -3,15 +3,18 @@
 export const dynamic = 'force-dynamic'
 
 import {
+  Suspense,
   useCallback,
   useEffect,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent
 } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import NumberInput from '@/app/components/NumberInput'
+import { AtelierPanelContent } from '../builder/page'
+import { DungeonGeneratorContent } from '../generer-donjon/page'
 
 // ============================================================================
 // Tile editor — Eclipsed Forge style
@@ -264,7 +267,9 @@ const genererMontagne = (cols: number, rows: number): MapData => {
 
 const HISTORY_MAX = 30
 
-export default function MapEditorPage() {
+// Contenu « Dessiner » (éditeur de tuiles), sans chrome de page → monté dans
+// l'éditeur unifié (onglet par défaut) ou via le wrapper de route hérité.
+export function TileEditorContent() {
   const router = useRouter()
   const [cols, setCols] = useState(20)
   const [rows, setRows] = useState(15)
@@ -666,24 +671,8 @@ export default function MapEditorPage() {
   // -----------------------------------------------------------------------
 
   return (
-    <main className="min-h-screen bg-[#050608] text-gray-200 p-4 md:p-6">
+    <>
       <div className="max-w-[1400px] mx-auto">
-        <header className="flex items-center gap-4 mb-4 flex-wrap">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="text-gray-500 hover:text-gray-200 text-sm"
-          >
-            ← Retour
-          </button>
-          <h1 className="text-xl md:text-2xl font-bold text-[#C9A84C]">
-            🎨 Créateur de cartes
-          </h1>
-          <span className="text-[11px] uppercase tracking-[0.25em] text-gray-500 ml-auto">
-            Tile editor
-          </span>
-        </header>
-
         <div className="grid grid-cols-1 md:grid-cols-[200px_1fr_180px] gap-4">
           {/* === Palette gauche === */}
           <aside className="bg-[#12141a] border border-[rgba(201,168,76,0.18)] rounded-lg p-3 space-y-4 max-h-[80vh] overflow-y-auto">
@@ -948,6 +937,97 @@ export default function MapEditorPage() {
           </div>
         </div>
       )}
+    </>
+  )
+}
+
+// ============================================================================
+// Éditeur de cartes UNIFIÉ (Corrections V1 Vague 2 — chantier fusion)
+// ----------------------------------------------------------------------------
+// Une seule porte : maps/editor. Des onglets montent les modes existants sans
+// les réécrire :
+//   • 🎨 Dessiner   → TileEditorContent (éditeur de tuiles, ce fichier)
+//   • 🏗 Outils MJ  → AtelierPanelContent (ex-Atelier, maps/builder)
+//   • 🏰 Générer    → ajouté au Lot 2
+// Le mode initial est piloté par ?tab=draw|gm|generate (et ?id= pour la carte
+// des outils MJ).
+// ============================================================================
+
+type EditorTab = 'draw' | 'generate' | 'gm'
+
+const EDITOR_TABS: { key: EditorTab; icon: string; label: string }[] = [
+  { key: 'draw', icon: '🎨', label: 'Dessiner' },
+  { key: 'generate', icon: '🏰', label: 'Générer' },
+  { key: 'gm', icon: '🏗', label: 'Outils MJ' }
+]
+
+export default function MapsEditorShell() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-[#050608] text-gray-200 p-6">
+          <p className="text-gray-400">Chargement de l&apos;éditeur…</p>
+        </main>
+      }
+    >
+      <MapsEditorShellInner />
+    </Suspense>
+  )
+}
+
+function MapsEditorShellInner() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const initialTab: EditorTab =
+    tabParam === 'gm' || tabParam === 'generate' ? tabParam : 'draw'
+  const [tab, setTab] = useState<EditorTab>(initialTab)
+
+  return (
+    <main className="min-h-screen bg-[#050608] text-gray-200 p-4 md:p-6">
+      <div className="max-w-[1400px] mx-auto">
+        <header className="flex items-center gap-3 mb-4 flex-wrap">
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard/maps')}
+            className="text-gray-500 hover:text-gray-200 text-sm"
+          >
+            ← Cartes
+          </button>
+          <h1 className="text-xl md:text-2xl font-bold text-[#C9A84C]">
+            🗺️ Éditeur de cartes
+          </h1>
+        </header>
+
+        {/* Onglets de mode */}
+        <nav className="flex flex-wrap gap-1.5 mb-5" aria-label="Mode d'édition">
+          {EDITOR_TABS.map((t) => {
+            const actif = tab === t.key
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTab(t.key)}
+                aria-pressed={actif}
+                className={`px-3 py-1.5 rounded-lg text-sm font-bold border transition ${
+                  actif
+                    ? 'bg-[#C9A84C]/20 text-[#e6c878] border-[#C9A84C]'
+                    : 'bg-[#12141a] text-gray-400 border-[rgba(201,168,76,0.18)] hover:border-[rgba(201,168,76,0.4)] hover:text-gray-200'
+                }`}
+              >
+                <span aria-hidden>{t.icon}</span> {t.label}
+              </button>
+            )
+          })}
+        </nav>
+      </div>
+
+      {/* Contenu du mode actif (un seul monté à la fois) */}
+      <div className="max-w-[1400px] mx-auto">
+        {tab === 'draw' && <TileEditorContent />}
+        {tab === 'gm' && <AtelierPanelContent />}
+        {tab === 'generate' && <DungeonGeneratorContent />}
+      </div>
     </main>
   )
 }

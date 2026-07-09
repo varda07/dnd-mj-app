@@ -45,6 +45,8 @@ export default function Maps() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [imageActuelle, setImageActuelle] = useState('')
   const [cropperKey, setCropperKey] = useState(0)
+  // Chantier fusion : menu « Créer une carte » (dessiner / générer / template).
+  const [createMenuOpen, setCreateMenuOpen] = useState(false)
   const [favorisOnly, setFavorisOnly] = useState(false)
   const { est: estFavori } = useFavoris()
   const t = useTranslations('maps')
@@ -196,14 +198,52 @@ export default function Maps() {
             {tc('back')}
           </button>
           <h1 className="text-2xl grim-title">{t('title')}</h1>
-          <button
-            type="button"
-            onClick={() => router.push('/dashboard/maps/generer-donjon')}
-            className="ml-auto px-4 py-2 rounded font-bold bg-[#C9A84C]/15 text-[#e6c878] border border-[#C9A84C] hover:bg-[#C9A84C]/25 text-sm transition"
-            title="Générer un donjon procédural"
-          >
-            🏰 Générer un donjon
-          </button>
+
+          {/* Sélecteur unifié « Créer une carte » : dessiner / générer /
+              template → tout ouvre l'éditeur unifié (maps/editor). */}
+          <div className="ml-auto relative">
+            <button
+              type="button"
+              onClick={() => setCreateMenuOpen((v) => !v)}
+              aria-expanded={createMenuOpen}
+              className="px-4 py-2 rounded font-bold bg-[#C9A84C] text-gray-900 hover:bg-[#e6c878] text-sm transition"
+            >
+              ➕ Créer une carte ▾
+            </button>
+            {createMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-20"
+                  onClick={() => setCreateMenuOpen(false)}
+                  aria-hidden
+                />
+                <div className="absolute right-0 mt-1 z-30 w-64 rounded-lg border border-[#C9A84C]/50 bg-[#15110a] shadow-2xl overflow-hidden">
+                  {[
+                    { icon: '🎨', label: 'Dessiner (tuiles)', desc: 'Éditeur manuel', href: '/dashboard/maps/editor?tab=draw' },
+                    { icon: '🏰', label: 'Générer (procédural)', desc: 'Donjon aléatoire', href: '/dashboard/maps/editor?tab=generate' },
+                    { icon: '📚', label: 'Partir d’un template', desc: 'Bibliothèque de donjons', href: '/dashboard/maps/templates' }
+                  ].map((opt) => (
+                    <button
+                      key={opt.href}
+                      type="button"
+                      onClick={() => {
+                        setCreateMenuOpen(false)
+                        router.push(opt.href)
+                      }}
+                      className="w-full text-left px-3 py-2.5 hover:bg-[#C9A84C]/10 border-b border-white/5 last:border-b-0"
+                    >
+                      <p className="text-yellow-100 font-bold text-sm">
+                        {opt.icon} {opt.label}
+                      </p>
+                      <p className="text-gray-500 text-[11px]">{opt.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Carte du monde (ex-Hexcrawl) : concept distinct, hors éditeur. */}
           <button
             type="button"
             onClick={() => router.push('/dashboard/maps/hexcrawl')}
@@ -211,30 +251,6 @@ export default function Maps() {
             title="Explorer le monde en grille hexagonale"
           >
             🧭 Carte du monde
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push('/dashboard/maps/editor')}
-            className="px-4 py-2 rounded font-bold bg-[#C9A84C]/15 text-[#e6c878] border border-[#C9A84C] hover:bg-[#C9A84C]/25 text-sm transition"
-            title="Créer une carte avec l'éditeur de tuiles"
-          >
-            🎨 Créer une map
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push('/dashboard/maps/builder')}
-            className="px-4 py-2 rounded font-bold bg-[#C9A84C]/15 text-[#e6c878] border border-[#C9A84C] hover:bg-[#C9A84C]/25 text-sm transition"
-            title="Outils MJ avancés : triggers, annotations, liens, zones de rencontre"
-          >
-            🏗 Atelier de donjon
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push('/dashboard/maps/templates')}
-            className="px-4 py-2 rounded font-bold bg-[#C9A84C]/15 text-[#e6c878] border border-[#C9A84C] hover:bg-[#C9A84C]/25 text-sm transition"
-            title="Parcourir et appliquer des templates de donjons"
-          >
-            📚 Templates
           </button>
         </div>
         <div className="grim-card p-4 md:p-6 mb-6">
@@ -303,6 +319,12 @@ export default function Maps() {
                   </button>
                   <ActionMenu
                     actions={[
+                      {
+                        label: 'Outils MJ',
+                        icon: '🏗',
+                        onClick: () =>
+                          router.push(`/dashboard/maps/editor?tab=gm&id=${map.id}`)
+                      },
                       {
                         label: map.public ? `Public (${map.nb_copies})` : 'Privé',
                         icon: map.public ? '🌍' : '🔒',

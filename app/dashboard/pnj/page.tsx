@@ -28,8 +28,10 @@ import {
 import { CULTURES_NOMS, genererNomPnj, type GenrePnj } from '@/app/data/noms_pnj'
 import {
   genererPersonnalitePnj,
-  formaterPersonnalitePnj
+  formaterPersonnalitePnj,
+  SECRETS as SECRETS_PNJ
 } from '@/app/data/personnalites_pnj'
+import { GenerateButton } from '@/app/components/ui/FormKit'
 import StarFavori from '@/app/components/StarFavori'
 import TemplatesPicker, { sauvegarderCommeTemplate } from '@/app/components/TemplatesPicker'
 import { useFavoris } from '@/app/lib/favoris'
@@ -57,6 +59,28 @@ type Pnj = {
   nb_copies: number
   auteur_username: string | null
 }
+
+// Roadmap Créations Phase 3 — générateurs légers pour les champs PNJ qui n'ont
+// pas encore de générateur dédié (rôle/métier + apparence).
+const ROLES_PNJ = [
+  'Aubergiste', 'Marchand ambulant', 'Garde de la cité', 'Prêtre', 'Forgeron',
+  'Érudit', 'Noble déchu', 'Mendiant', 'Capitaine de navire', 'Guérisseuse',
+  'Voleur repenti', 'Chasseur de primes', 'Ménestrel', 'Alchimiste', 'Fermier',
+  'Contrebandier', 'Bibliothécaire', 'Sage ermite', 'Tavernier', 'Cartographe'
+]
+const APP_ALLURE = ['élancé', 'trapu', 'voûté', 'athlétique', 'frêle', 'imposant']
+const APP_TRAIT = [
+  'une cicatrice barrant la joue', 'des yeux d’un vert perçant', 'une chevelure grisonnante',
+  'des mains calleuses', 'un sourire en coin', 'un regard fuyant', 'une voix rauque',
+  'des vêtements élimés mais soignés', 'un tatouage ancien au poignet', 'une démarche claudicante'
+]
+const APP_DETAIL = [
+  'sent la fumée de bois', 'porte toujours un pendentif terni', 'parle avec un léger accent',
+  'garde une main près de sa bourse', 'observe tout sans en avoir l’air', 'rit trop fort'
+]
+const pickR = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)]
+const genererApparence = () =>
+  `Physique ${pickR(APP_ALLURE)}, ${pickR(APP_TRAIT)}. ${pickR(APP_DETAIL)}.`
 
 export default function PnjPage() {
   const router = useRouter()
@@ -118,6 +142,16 @@ export default function PnjPage() {
     setFile(null)
     setImageActuelle('')
     setCropperKey((k) => k + 1)
+  }
+
+  // Phase 3 — « 🎲 Surprends-moi / Tout relancer » : remplit tous les champs
+  // narratifs générables d'un coup (réutilise les générateurs existants).
+  const toutRelancer = () => {
+    setNom(genererNomPnj(cultureNom, genreNom))
+    setRole(pickR(ROLES_PNJ))
+    setDescriptionTxt(genererApparence())
+    setPersonnalite(formaterPersonnalitePnj(genererPersonnalitePnj()))
+    setSecrets(pickR(SECRETS_PNJ))
   }
 
   const commencerEdition = (p: Pnj) => {
@@ -287,9 +321,33 @@ export default function PnjPage() {
         </div>
 
         <div className="grim-card p-4 md:p-6 mb-6">
-          <h2 className="text-lg grim-h2 mb-4">
-            {editingId ? t('edit_title') : t('create_title')}
-          </h2>
+          <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+            <h2 className="text-lg grim-h2">
+              {editingId ? t('edit_title') : t('create_title')}
+            </h2>
+            {/* Phase 3 — point de départ rapide (pas de wizard). */}
+            {!editingId && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={toutRelancer}
+                  className="min-h-[40px] px-3 rounded-lg font-bold text-sm border transition inline-flex items-center gap-1.5"
+                  style={{ background: 'rgba(201,168,76,0.12)', borderColor: 'rgba(201,168,76,0.5)', color: '#C9A84C' }}
+                  title="Générer nom, rôle, apparence, personnalité et secret"
+                >
+                  🎲 Surprends-moi
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMesTemplatesOuvert(true)}
+                  className="min-h-[40px] px-3 rounded-lg text-sm border border-gray-600 text-gray-300 hover:text-white transition"
+                  title="Partir d'un modèle de PNJ existant"
+                >
+                  📋 Une variante
+                </button>
+              </div>
+            )}
+          </div>
           <div className="space-y-3">
             <input
               type="text"
@@ -343,18 +401,29 @@ export default function PnjPage() {
               </div>
               <div>
                 <label className="text-gray-400 text-sm">{t('role')}</label>
-                <input
-                  type="text"
-                  placeholder={t('role_ph')}
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder={t('role_ph')}
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className="flex-1 min-w-0 p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none"
+                  />
+                  <GenerateButton onClick={() => setRole(pickR(ROLES_PNJ))} title="Générer un rôle / métier" />
+                </div>
               </div>
             </div>
 
             <div>
-              <label className="text-gray-400 text-sm">{t('description')}</label>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <label className="text-gray-400 text-sm">🧍 {t('description')}</label>
+                <GenerateButton
+                  onClick={() => setDescriptionTxt(genererApparence())}
+                  title="Générer une apparence"
+                  label="Apparence"
+                  className="!min-h-[32px] !min-w-0"
+                />
+              </div>
               <textarea
                 value={descriptionTxt}
                 onChange={(e) => setDescriptionTxt(e.target.value)}
@@ -388,9 +457,17 @@ export default function PnjPage() {
             </div>
 
             <div>
-              <label className="text-gray-400 text-sm flex items-center gap-1">
-                🔒 {t('secrets')}
-              </label>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <label className="text-gray-400 text-sm flex items-center gap-1">
+                  🔒 {t('secrets')}
+                </label>
+                <GenerateButton
+                  onClick={() => setSecrets(pickR(SECRETS_PNJ))}
+                  title="Générer un secret"
+                  label="Secret"
+                  className="!min-h-[32px] !min-w-0"
+                />
+              </div>
               <textarea
                 placeholder={t('secrets_ph')}
                 value={secrets}

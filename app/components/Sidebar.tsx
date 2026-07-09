@@ -306,14 +306,13 @@ export default function Sidebar() {
     { label: t('adv_combat'), icon: '⚔', href: '/dashboard/combat', match: (p) => p === '/dashboard/combat' },
     { label: 'Calculateur de rencontre', icon: '🧮', href: '/dashboard/combat/encounter-builder' }
   ]
-  // Audit V1 Vague 2 (P4, étapes 1 & 2) : « Cartes » ne regroupe plus que la
-  // création/édition de cartes (maps). Templates de donjons retiré de la nav
-  // (reste accessible depuis la page Maps via le bouton 📚 Templates).
+  // Chantier fusion (P4) : Éditeur + Atelier + Générateur sont désormais UN seul
+  // éditeur unifié à onglets (/dashboard/maps/editor). La nav ne montre donc que
+  // « Mes cartes » (liste) + « Éditeur de cartes » (dessiner/générer/outils MJ).
+  // Templates reste accessible via le sélecteur « Créer une carte » de la liste.
   const hubCartesItems: NavItem[] = [
     { label: t('forge_maps'), icon: '🗺', href: '/dashboard/maps', match: (p) => p === '/dashboard/maps' },
-    { label: 'Éditeur de carte', icon: '🎨', href: '/dashboard/maps/editor' },
-    { label: 'Atelier de donjon', icon: '🏗', href: '/dashboard/maps/builder' },
-    { label: 'Générateur de donjon', icon: '🏰', href: '/dashboard/maps/generer-donjon' }
+    { label: 'Éditeur de cartes', icon: '🎨', href: '/dashboard/maps/editor' }
   ]
   // Univers : Carte du monde (ex-Hexcrawl, grille hexa) + Exploration narrative
   // — concepts distincts des cartes de combat, sortis de « Cartes ». Nom de hub
