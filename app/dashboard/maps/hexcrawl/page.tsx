@@ -373,7 +373,7 @@ export default function HexcrawlPage() {
             ← Maps
           </button>
           <h1 className="text-xl md:text-2xl font-bold text-[#C9A84C]">
-            🧭 Mode hexcrawl
+            🧭 Carte du monde
           </h1>
           {selectedMap && (
             <span className="text-[11px] text-gray-500 italic ml-auto">

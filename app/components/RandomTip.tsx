@@ -22,7 +22,7 @@ const TIPS = [
   '📔 À la fin d\'une session, génère un récap automatique depuis le menu scénario.',
   '👥 Suis des MJ pour voir leurs nouvelles créations dans ton flux communauté.',
   '🏆 Débloque des achievements en jouant : lance ton premier dé, ton premier combat…',
-  '⚡ Active le mode Hexcrawl pour un voyage tour-par-tour.',
+  '⚡ Ouvre la Carte du monde pour un voyage tour-par-tour en grille hexagonale.',
   '📌 Pose des marqueurs sur les cartes pour noter pièges, trésors, ennemis.',
   '🌫 Le brouillard de guerre se peint au pinceau sur les maps en présentation.',
   '🎵 La Sound Box te permet de jouer ambiances et musiques pendant la session.',

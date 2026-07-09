@@ -315,10 +315,12 @@ export default function Sidebar() {
     { label: 'Atelier de donjon', icon: '🏗', href: '/dashboard/maps/builder' },
     { label: 'Générateur de donjon', icon: '🏰', href: '/dashboard/maps/generer-donjon' }
   ]
-  // Exploration & monde : Hexcrawl (grille hexa) + Exploration narrative — des
-  // concepts distincts des cartes de combat, sortis de « Cartes ».
+  // Univers : Carte du monde (ex-Hexcrawl, grille hexa) + Exploration narrative
+  // — concepts distincts des cartes de combat, sortis de « Cartes ». Nom de hub
+  // « Univers » choisi pour éviter la redondance avec « Carte du monde » /
+  // « Exploration ».
   const hubExplorationItems: NavItem[] = [
-    { label: 'Hexcrawl', icon: '🧭', href: '/dashboard/maps/hexcrawl' },
+    { label: 'Carte du monde', icon: '🧭', href: '/dashboard/maps/hexcrawl' },
     { label: t('adv_exploration'), icon: '🏞', href: '/dashboard/exploration' }
   ]
   const presentationItem: NavItem = {
@@ -716,7 +718,7 @@ export default function Sidebar() {
             <>
               {renderHub('hub_combat', '⚔️', 'Combat', hubCombatItems)}
               {renderHub('hub_cartes', '🗺️', 'Cartes', hubCartesItems)}
-              {renderHub('hub_exploration', '🧭', 'Exploration & monde', hubExplorationItems)}
+              {renderHub('hub_exploration', '🌍', 'Univers', hubExplorationItems)}
               {renderNavItem(presentationItem)}
             </>
           )}

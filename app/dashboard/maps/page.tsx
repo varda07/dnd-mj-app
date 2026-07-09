@@ -210,7 +210,7 @@ export default function Maps() {
             className="px-4 py-2 rounded font-bold bg-[#C9A84C]/15 text-[#e6c878] border border-[#C9A84C] hover:bg-[#C9A84C]/25 text-sm transition"
             title="Explorer le monde en grille hexagonale"
           >
-            🧭 Hexcrawl
+            🧭 Carte du monde
           </button>
           <button
             type="button"

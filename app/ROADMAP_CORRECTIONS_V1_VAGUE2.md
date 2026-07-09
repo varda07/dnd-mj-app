@@ -212,8 +212,9 @@ Produire un RAPPORT D'AUDIT avec recommandations avant toute suppression.
   - « Préparer un combat » inchangé.
 - **Étape 1 — Réorganisation nav** (`Sidebar.tsx`) :
   - Le hub « Cartes & Exploration » devient **« Cartes »** (Maps, Éditeur, Atelier, Générateur uniquement).
-  - Nouveau hub **« 🧭 Exploration & monde »** = Hexcrawl + Exploration (concepts distincts, sortis de Cartes).
+  - Nouveau hub **« 🌍 Univers »** = Carte du monde + Exploration (concepts distincts, sortis de Cartes).
 - **Étape 2 — Templates de donjons retiré de la nav** : `maps/templates` n'est plus dans la sidebar mais **reste accessible** depuis la page Maps (bouton 📚 Templates). Aucune route/logique supprimée.
+- **Renommage « Hexcrawl » → « Carte du monde »** (UI uniquement) : sidebar, bouton page Maps, titre de la page `maps/hexcrawl`, tip aléatoire. La **route** `/dashboard/maps/hexcrawl` et les **tables** `hexcrawl_maps`/`hex_tiles` restent inchangées (renommage visible seulement, zéro risque DB). Hub renommé **« Univers »** pour éviter la redondance « monde »/« exploration ».
 - `npm run build` ✅.
 
 ### F) 📐 PLAN DÉTAILLÉ — Chantier « Éditeur de cartes unifié » (À VALIDER, non commencé)
@@ -247,7 +248,7 @@ Produire un RAPPORT D'AUDIT avec recommandations avant toute suppression.
 - Lot 3 (petit) : sélecteur de création (Dessiner / Générer / Template) sur la page Maps + redirections.
 - Lot 4 (petit) : retrait des anciennes routes après validation.
 
-**➡️ À VALIDER avant de lancer le chantier. Les étapes 1 & 2 sont faites ; la fusion attend ton feu vert.**
+**✅ PLAN VALIDÉ par le user (2026-07-09).** À réaliser dans une **SESSION DÉDIÉE** (pas maintenant). Ce plan reste documenté ici tel quel comme référence du chantier.
 
 ---
 
