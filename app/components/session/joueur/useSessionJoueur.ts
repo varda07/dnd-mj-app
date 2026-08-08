@@ -181,8 +181,9 @@ export function useSessionJoueur(sessionId: string, characterId: string | null) 
       if (used <= 0) return
       const next = { ...(liveRef.current?.spell_slots_used ?? {}), [key]: used - 1 }
       await apply({ spell_slots_used: next })
+      await logSessionEvent(sessionId, 'resource_used', { slot: niveau, restitue: true }, characterId)
     },
-    [apply]
+    [apply, sessionId, characterId]
   )
 
   // --- Concentration ---
@@ -222,6 +223,25 @@ export function useSessionJoueur(sessionId: string, characterId: string | null) 
     [apply]
   )
 
+  // Consomme / restitue UN usage d'une ressource limitée, journalisé.
+  const majRessource = useCallback(
+    async (key: string, delta: 1 | -1) => {
+      const res = liveRef.current?.class_resources_used ?? {}
+      const r = res[key]
+      if (!r) return
+      const used = Math.max(0, Math.min(r.max, r.used + delta))
+      if (used === r.used) return
+      await apply({ class_resources_used: { ...res, [key]: { ...r, used } } })
+      await logSessionEvent(
+        sessionId,
+        'resource_used',
+        { ressource: r.label ?? key, restitue: delta < 0, restants: r.max - used, max: r.max },
+        characterId
+      )
+    },
+    [apply, sessionId, characterId]
+  )
+
   return {
     userId,
     sheet,
@@ -246,7 +266,8 @@ export function useSessionJoueur(sessionId: string, characterId: string | null) 
     setConcentration,
     toggleCondition,
     setDeathSaves,
-    setResources
+    setResources,
+    majRessource
   }
 }
 

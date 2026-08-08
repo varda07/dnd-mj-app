@@ -58,7 +58,18 @@ export async function patchSessionState(
 // character_live_state
 // ---------------------------------------------------------------------------
 export type DeathSaves = { success: number; fail: number }
-export type ClassResource = { label?: string; max: number; used: number }
+
+// Rythme de récupération d'une ressource limitée (règle D&D 5e). Sert aux
+// boutons Repos court / Repos long du MJ : seules les ressources « court »
+// reviennent au repos court, tout revient au repos long.
+export type RechargeRessource = 'court' | 'long' | 'jour'
+
+export type ClassResource = {
+  label?: string
+  max: number
+  used: number
+  recharge?: RechargeRessource
+}
 
 export type CharacterLiveState = {
   session_id: string

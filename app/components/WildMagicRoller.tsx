@@ -10,7 +10,8 @@
 // (presentation_etats) pour la sync avec l'écran joueurs.
 // ============================================================================
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { rollWildMagicAvecValeur, type WildMagicEffet } from '@/app/data/wild_magic_table'
 import { supabase } from '@/lib/supabase'
 
@@ -30,6 +31,10 @@ export default function WildMagicRoller({ scenarioId, flottant = true, ouvert: o
   const [effet, setEffet] = useState<WildMagicEffet | null>(null)
   const [valeur, setValeur] = useState<number | null>(null)
   const [visiblePourJoueurs, setVisiblePourJoueurs] = useState(false)
+  // Portail : la modale doit s'ancrer au viewport quel que soit son ancêtre
+  // (un parent porteur de transform / filter la décalerait — piège CSS connu).
+  const [monte, setMonte] = useState(false)
+  useEffect(() => setMonte(true), [])
 
   const ouvert = ouvertProp ?? ouvertInterne
 
@@ -86,11 +91,11 @@ export default function WildMagicRoller({ scenarioId, flottant = true, ouvert: o
         }
       `}</style>
 
-      {ouvert && (
+      {ouvert && monte && createPortal(
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-[95] flex items-center justify-center p-4"
+          className="fixed inset-0 z-[160] flex items-center justify-center p-4"
         >
           <div className="absolute inset-0 bg-black/70" onClick={fermer} />
           <div
@@ -173,7 +178,8 @@ export default function WildMagicRoller({ scenarioId, flottant = true, ouvert: o
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   )

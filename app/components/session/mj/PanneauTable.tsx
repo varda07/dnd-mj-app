@@ -1,8 +1,12 @@
 'use client'
 
-// Panneau « Ma table » (Phase 4.2) — vue temps réel de tous les PJ : PV exacts,
-// CA, conditions, ressources, concentration, connexion. Le MJ modifie
-// directement PV et ressources de n'importe quel PJ. Alerte si un PJ à 0 PV.
+// « Ma table » — colonne DROITE du cockpit MJ (Delta C.3)
+// ----------------------------------------------------------------------------
+// TOUJOURS visible, jamais masquée : une carte compacte par PJ — pastille de
+// connexion, nom, CA, barre de PV avec valeurs exactes, ressources,
+// concentration, boutons −5 / +5 et saisie libre. Toute modification part
+// immédiatement sur l'écran du joueur (character_live_state + Realtime).
+// Alerte visuelle nette à 0 PV.
 
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -15,6 +19,7 @@ import {
 } from '@/app/lib/session-live'
 import { CONDITIONS_MAP } from '@/app/data/conditions'
 import { ouvrirCanal, useSessionPresence } from '@/app/lib/session-realtime'
+import PastillesUsage from '@/app/components/ui/PastillesUsage'
 
 type Perso = { id: string; nom: string; image_url: string | null; hp_max: number; ca: number | null }
 type Ligne = {
@@ -99,12 +104,12 @@ export default function PanneauTable({ sessionId }: { sessionId: string }) {
     await patchLiveState(sessionId, l.perso.id, { class_resources_used: res }, mjId)
   }
 
-  if (loading) return <p className="text-stone-500 text-sm italic">Chargement de la table…</p>
+  if (loading) return <p className="text-stone-500 text-xs italic">Chargement de la table…</p>
   if (lignes.length === 0)
-    return <p className="text-stone-500 text-sm italic">Aucun joueur avec un personnage dans cette session.</p>
+    return <p className="text-stone-500 text-xs italic">Aucun joueur avec un personnage dans cette session.</p>
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+    <div className="space-y-2">
       {lignes.map((l) => {
         const max = l.live?.max_hp_override ?? l.perso.hp_max
         const hp = l.live?.current_hp ?? l.perso.hp_max
@@ -114,51 +119,54 @@ export default function PanneauTable({ sessionId }: { sessionId: string }) {
         const conds = l.live?.conditions ?? []
         const res = l.live?.class_resources_used ?? {}
         return (
-          <div key={l.perso.id} className={`rounded-xl border p-3 ${ko ? 'border-red-600/60' : 'border-yellow-800/30'}`}
-            style={{ background: ko ? 'rgba(239,68,68,0.08)' : 'rgba(0,0,0,0.3)' }}>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: connecte ? '#22c55e' : '#57534e' }} />
+          <div key={l.perso.id} className={`rounded-lg border p-2 ${ko ? 'border-red-500 ring-1 ring-red-500/50' : 'border-yellow-800/30'}`}
+            style={{ background: ko ? 'rgba(239,68,68,0.12)' : 'rgba(0,0,0,0.3)' }}>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: connecte ? '#22c55e' : '#57534e' }}
+                title={connecte ? 'En ligne' : 'Hors ligne'} />
               {l.perso.image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={l.perso.image_url} alt={l.perso.nom} className="w-8 h-8 rounded-full object-cover" />
+                <img src={l.perso.image_url} alt={l.perso.nom} className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-stone-800 flex items-center justify-center text-yellow-500 text-xs font-bold">
+                <div className="w-6 h-6 rounded-full bg-stone-800 flex items-center justify-center text-yellow-500 text-[9px] font-bold flex-shrink-0">
                   {l.perso.nom.slice(0, 2).toUpperCase()}
                 </div>
               )}
-              <span className="flex-1 min-w-0 text-yellow-100 font-bold truncate">{l.perso.nom}</span>
-              {ko && <span className="text-red-400 text-xs font-bold animate-pulse">⚠ À TERRE</span>}
-              <span className="text-stone-400 text-xs">CA {l.perso.ca ?? '—'}</span>
-              {l.live?.concentration_spell && <span className="text-cyan-300 text-xs">🌀</span>}
+              <span className="flex-1 min-w-0 text-yellow-100 font-bold text-xs truncate">{l.perso.nom}</span>
+              <span className="text-stone-500 text-[10px] flex-shrink-0">CA {l.perso.ca ?? '—'}</span>
+              {l.live?.concentration_spell && (
+                <span className="text-cyan-300 text-[10px] flex-shrink-0" title={`Concentration : ${l.live.concentration_spell}`}>🌀</span>
+              )}
             </div>
 
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-stone-400">PV</span>
-              <span className={`text-sm font-bold ${ko ? 'text-red-400' : 'text-yellow-100'}`}>
+            {ko && <p className="text-red-300 text-[10px] font-bold animate-pulse mb-1">⚠ À TERRE — 0 PV</p>}
+
+            <div className="flex items-center justify-between mb-0.5">
+              <span className="text-[10px] text-stone-500">PV</span>
+              <span className={`text-xs font-bold ${ko ? 'text-red-300' : 'text-yellow-100'}`}>
                 {hp}/{max}{(l.live?.temp_hp ?? 0) > 0 && <span className="text-cyan-300"> +{l.live?.temp_hp}</span>}
               </span>
             </div>
-            <div className="h-2 rounded-full bg-stone-800 overflow-hidden">
+            <div className="h-1.5 rounded-full bg-stone-800 overflow-hidden">
               <div className="h-full" style={{ width: `${pct}%`, background: ko ? '#ef4444' : pct <= 25 ? '#fb923c' : '#4ade80' }} />
             </div>
 
-            <div className="flex items-center gap-1 mt-2">
-              {[-5, -1, 1, 5].map((d) => (
-                <button key={d} type="button" onClick={() => modifierHp(l, d)}
-                  className="flex-1 py-1 rounded bg-stone-800 border border-yellow-800/30 text-yellow-100 text-xs font-bold hover:border-yellow-600">
-                  {d > 0 ? `+${d}` : d}
-                </button>
-              ))}
+            <div className="flex items-center gap-1 mt-1.5">
+              <button type="button" onClick={() => modifierHp(l, -5)}
+                className="flex-1 py-0.5 rounded bg-red-900/40 border border-red-800/40 text-red-200 text-[11px] font-bold">−5</button>
+              <button type="button" onClick={() => modifierHp(l, 5)}
+                className="flex-1 py-0.5 rounded bg-green-900/40 border border-green-800/40 text-green-200 text-[11px] font-bold">+5</button>
               <input value={saisie[l.perso.id] ?? ''} onChange={(e) => setSaisie((s) => ({ ...s, [l.perso.id]: e.target.value }))}
-                inputMode="numeric" placeholder="±" className="w-12 bg-stone-900/60 border border-yellow-800/30 rounded px-1 py-1 text-xs text-center text-gray-200 outline-none" />
-              <button type="button" onClick={() => appliquerSaisie(l, -1)} className="px-1.5 py-1 rounded bg-red-900/40 text-red-200 text-xs">−</button>
-              <button type="button" onClick={() => appliquerSaisie(l, 1)} className="px-1.5 py-1 rounded bg-green-900/40 text-green-200 text-xs">+</button>
+                inputMode="numeric" placeholder="±" aria-label={`Montant pour ${l.perso.nom}`}
+                className="w-9 bg-stone-900/60 border border-yellow-800/30 rounded px-1 py-0.5 text-[11px] text-center text-gray-200 outline-none" />
+              <button type="button" onClick={() => appliquerSaisie(l, -1)} className="px-1 py-0.5 rounded bg-stone-800 text-red-300 text-[11px]">−</button>
+              <button type="button" onClick={() => appliquerSaisie(l, 1)} className="px-1 py-0.5 rounded bg-stone-800 text-green-300 text-[11px]">+</button>
             </div>
 
             {conds.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
+              <div className="flex flex-wrap gap-0.5 mt-1.5">
                 {conds.map((c) => (
-                  <span key={c} className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-900/30 border border-red-800/40 text-red-200">
+                  <span key={c} className="text-[9px] px-1 py-0.5 rounded-full bg-red-900/30 border border-red-800/40 text-red-200">
                     {CONDITIONS_MAP[c as keyof typeof CONDITIONS_MAP]?.nom ?? c}
                   </span>
                 ))}
@@ -166,13 +174,19 @@ export default function PanneauTable({ sessionId }: { sessionId: string }) {
             )}
 
             {Object.keys(res).length > 0 && (
-              <div className="mt-2 space-y-1">
+              <div className="mt-1.5 space-y-1">
                 {Object.entries(res).map(([key, r]) => (
-                  <div key={key} className="flex items-center gap-2 text-xs">
-                    <span className="text-stone-400 flex-1 truncate">{r.label ?? key}</span>
-                    <span className="text-stone-300">{r.max - r.used}/{r.max}</span>
-                    <button type="button" onClick={() => majRessource(l, key, 1)} className="px-1.5 rounded bg-stone-800 text-stone-300">−</button>
-                    <button type="button" onClick={() => majRessource(l, key, -1)} className="px-1.5 rounded bg-stone-800 text-stone-300">+</button>
+                  <div key={key} className="flex items-center gap-1 text-[10px]">
+                    <span className="text-stone-500 flex-1 truncate">{r.label ?? key}</span>
+                    <PastillesUsage
+                      max={r.max}
+                      used={r.used}
+                      couleur="#a78bfa"
+                      taille={8}
+                      label={r.label ?? key}
+                      onConsommer={() => majRessource(l, key, 1)}
+                      onRestituer={() => majRessource(l, key, -1)}
+                    />
                   </div>
                 ))}
               </div>

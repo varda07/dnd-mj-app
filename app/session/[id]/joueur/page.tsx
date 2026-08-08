@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 // Phase 2 : sélection de son personnage, aperçu de fiche, bouton « Je suis
 // prêt », message d'attente. Reconnexion : si la session est déjà `active`, on
 // n'affiche pas la salle d'attente — le joueur est directement « en partie »
-// (l'interface PJ complète — Fiche/Actions/Scène/Dés/Sac — arrive en Phase 3).
+// (le poste de jeu complet — la roue du personnage — s'affiche directement).
 // Mobile-first.
 // ============================================================================
 
@@ -185,7 +185,7 @@ export default function LobbyJoueurPage() {
           onClick={() => router.push('/dashboard')}
           className="mt-4 px-4 py-2 rounded-lg font-bold border border-yellow-700/50 text-yellow-200"
         >
-          Retour à l'accueil
+          Retour à l&apos;accueil
         </button>
       </Shell>
     )
@@ -236,7 +236,7 @@ export default function LobbyJoueurPage() {
           {persos.length === 0 ? (
             <div className="text-center py-2">
               <p className="text-stone-500 text-sm italic mb-2">
-                Tu n'as pas encore de personnage pour ce scénario.
+                Tu n&apos;as pas encore de personnage pour ce scénario.
               </p>
               <button
                 type="button"
@@ -310,8 +310,7 @@ export default function LobbyJoueurPage() {
           >
             <p className="text-green-300 font-bold">🟢 La partie a commencé</p>
             <p className="text-stone-400 text-xs mt-1">
-              Ton interface de jeu complète (Fiche · Actions · Scène · Dés · Sac)
-              arrive en Phase 3.
+              Ton poste de jeu s’ouvre : la roue du personnage arrive.
             </p>
           </div>
         ) : (

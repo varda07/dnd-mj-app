@@ -1,33 +1,44 @@
 'use client'
 
 // ============================================================================
-// SessionJoueur — poste de travail joueur en partie (Phase 3)
+// SessionJoueur — poste de travail joueur en partie (Delta A)
 // ----------------------------------------------------------------------------
-// Mobile-first : en-tête permanent (nom, PV, CA, états, concentration) + dock
-// bas 5 onglets (Fiche · Actions · Scène · Dés · Sac). Desktop : mise en page
-// élargie via les breakpoints (dock devient barre haute). Une seule interface.
+// Le dock d'onglets et l'en-tête PV permanent ont DISPARU : la navigation passe
+// entièrement par la roue du personnage, et les PV ne sont affichés qu'une fois,
+// par l'arc de cette roue.
+//
+// Une seule arborescence de composants sert les deux dispositions, uniquement
+// via les points de rupture Tailwind :
+//   · mobile  — diffusion en haut, menu du pétale actif puis roue en bas ;
+//   · PC (lg) — trois colonnes : menu + roue à gauche (~300 px), diffusion au
+//     centre, ordre des tours / journal / dés à droite (~200 px).
+//
+// Aucun `transform`, `filter`, `backdrop-filter` ni `contain` sur les conteneurs
+// de cette page : toutes les surfaces modales sont portées vers document.body,
+// et un ancêtre porteur de ces propriétés casserait leur ancrage au viewport.
 // ============================================================================
 
 import { useState } from 'react'
 import { CONDITIONS_MAP } from '@/app/data/conditions'
 import { extraireDes } from '@/app/data/sorts_dnd5e'
 import { formatMod, rollD20, rollDice } from '@/app/lib/dnd-calc'
+import { useCombatEngine } from '@/app/lib/combat-engine'
 import { logSessionEvent } from '@/app/lib/session-live'
+import LanceurDesSession, { BoutonDes } from '@/app/components/session/LanceurDesSession'
 import { useSessionJoueur } from './useSessionJoueur'
+import RoueJoueur, { PETALES, type PetaleKey } from './RoueJoueur'
 import OngletFiche from './OngletFiche'
+import OngletSorts from './OngletSorts'
+import OngletNotes from './OngletNotes'
 import OngletActions from './OngletActions'
-import OngletScene from './OngletScene'
-import OngletDes from './OngletDes'
 import OngletSac from './OngletSac'
+import PanneauPointsDeVie from './PanneauPointsDeVie'
+import ZoneDiffusion from './ZoneDiffusion'
+import TimelineInitiative from './TimelineInitiative'
+import JournalTable from './JournalTable'
 
-type OngletKey = 'fiche' | 'actions' | 'scene' | 'des' | 'sac'
-const ONGLETS: { key: OngletKey; label: string; icon: string }[] = [
-  { key: 'fiche', label: 'Fiche', icon: '📋' },
-  { key: 'actions', label: 'Actions', icon: '⚔️' },
-  { key: 'scene', label: 'Scène', icon: '🎬' },
-  { key: 'des', label: 'Dés', icon: '🎲' },
-  { key: 'sac', label: 'Sac', icon: '🎒' }
-]
+/** Menu affiché : un pétale, le panneau PV (centre de la roue), ou rien. */
+type MenuActif = PetaleKey | 'pv' | null
 
 function flatBonus(expr: string): number {
   const sansDes = expr.replace(/\d+d(?:4|6|8|10|12|20|100)/gi, ' ')
@@ -47,12 +58,13 @@ export default function SessionJoueur({
   characterId: string | null
 }) {
   const api = useSessionJoueur(sessionId, characterId)
-  const [onglet, setOnglet] = useState<OngletKey>('fiche')
+  const { combat, personnages, ennemis } = useCombatEngine(scenarioId, { isMj: false })
+  const [menu, setMenu] = useState<MenuActif>(null)
   const [jet, setJet] = useState<{ detail: string; total: number } | null>(null)
 
   const nom = api.sheet?.nom ?? 'Personnage'
 
-  // Jet d20 + bonus (carac/save/compétence/attaque).
+  // Jet d20 + bonus (carac / sauvegarde / compétence / attaque).
   const roll = (label: string, bonus: number) => {
     const { rolls, kept } = rollD20('normal')
     const total = kept + bonus
@@ -61,7 +73,7 @@ export default function SessionJoueur({
       { label, nom, dice: 'd20', rolls, bonus, total, prive: false }, characterId)
   }
 
-  // Jet d'expression de dés (dégâts/sort).
+  // Jet d'expression de dés (dégâts / sort).
   const rollExpr = (label: string, expr: string) => {
     const dice = extraireDes(expr)
     const rolls = dice.flatMap((d) => rollDice(d.faces, d.n))
@@ -80,102 +92,141 @@ export default function SessionJoueur({
     )
   }
 
-  const hp = api.currentHp
-  const hpMax = api.effectiveMaxHp
-  const pct = hpMax > 0 ? Math.max(0, Math.min(100, (hp / hpMax) * 100)) : 0
+  const titreMenu =
+    menu === 'pv' ? 'Points de vie' : PETALES.find((p) => p.key === menu)?.label ?? null
+
+  const contenuMenu = () => {
+    if (!menu) return null
+    if (menu === 'pv') return <PanneauPointsDeVie api={api} roll={roll} />
+    if (menu === 'notes') {
+      return (
+        <OngletNotes
+          sessionId={sessionId}
+          characterId={characterId}
+          userId={api.userId}
+          sessionState={api.sessionState}
+        />
+      )
+    }
+    if (!api.sheet) {
+      return (
+        <p className="text-stone-500 text-sm italic text-center py-8">
+          Aucun personnage sélectionné pour cette session.
+        </p>
+      )
+    }
+    if (menu === 'competences') return <OngletFiche sheet={api.sheet} api={api} roll={roll} />
+    if (menu === 'sorts') return <OngletSorts sheet={api.sheet} spells={api.spells} api={api} rollExpr={rollExpr} />
+    if (menu === 'actions') return <OngletActions sheet={api.sheet} api={api} roll={roll} rollExpr={rollExpr} />
+    return <OngletSac sheet={api.sheet} isOwner={api.sheet.id != null} />
+  }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#0e0b06' }}>
-      {/* En-tête permanent */}
-      <header className="sticky top-0 z-30 px-3 py-2 border-b backdrop-blur"
-        style={{ borderColor: 'rgba(201,168,76,0.25)', background: 'rgba(14,11,6,0.9)' }}>
-        <div className="max-w-3xl mx-auto flex items-center gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-yellow-100 font-bold truncate" style={{ fontFamily: 'Georgia, serif' }}>{nom}</span>
-              <ConnDot conn={api.conn} />
-            </div>
-            <div className="h-2 rounded-full bg-stone-800 overflow-hidden mt-1">
-              <div className="h-full" style={{ width: `${pct}%`, background: pct <= 25 ? '#ef4444' : '#4ade80' }} />
-            </div>
-          </div>
-          <div className="text-center flex-shrink-0">
-            <p className="text-[10px] uppercase text-yellow-600 leading-none">PV</p>
-            <p className="text-yellow-100 font-bold leading-tight">{hp}/{hpMax}{api.tempHp > 0 && <span className="text-cyan-300 text-xs"> +{api.tempHp}</span>}</p>
-          </div>
-          <div className="text-center flex-shrink-0">
-            <p className="text-[10px] uppercase text-yellow-600 leading-none">CA</p>
-            <p className="text-yellow-100 font-bold leading-tight">{api.sheet?.ca ?? '—'}</p>
-          </div>
+    <div className="h-[100dvh] flex flex-col lg:flex-row overflow-hidden" style={{ background: '#0e0b06' }}>
+      {/* --- Colonne gauche (PC) / bas d'écran (mobile) : menu + roue --- */}
+      <aside
+        className="order-2 lg:order-1 flex flex-col min-h-0 lg:w-[300px] lg:flex-shrink-0 lg:border-r"
+        style={{ borderColor: 'rgba(201,168,76,0.18)' }}
+      >
+        {/* Bandeau d'états (les PV, eux, ne vivent que dans l'arc de la roue) */}
+        <div className="flex items-center gap-1.5 px-3 py-1 flex-wrap flex-shrink-0">
+          <ConnDot conn={api.conn} />
+          {api.concentration && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-900/40 border border-cyan-700/50 text-cyan-200">
+              🌀 {api.concentration}
+            </span>
+          )}
+          {api.conditions.map((c) => (
+            <span key={c} className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-900/30 border border-red-800/40 text-red-200">
+              {CONDITIONS_MAP[c as keyof typeof CONDITIONS_MAP]?.nom ?? c}
+            </span>
+          ))}
         </div>
-        {(api.conditions.length > 0 || api.concentration) && (
-          <div className="max-w-3xl mx-auto flex flex-wrap gap-1 mt-1.5">
-            {api.concentration && (
-              <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-cyan-900/40 border border-cyan-700/50 text-cyan-200">🌀 {api.concentration}</span>
-            )}
-            {api.conditions.map((c) => (
-              <span key={c} className="text-[11px] px-1.5 py-0.5 rounded-full bg-red-900/30 border border-red-800/40 text-red-200">
-                {CONDITIONS_MAP[c as keyof typeof CONDITIONS_MAP]?.nom ?? c}
-              </span>
-            ))}
+
+        {/* Menu du pétale actif */}
+        {menu && (
+          <div className="flex flex-col min-h-0 flex-1 max-h-[62vh] lg:max-h-none">
+            <div className="flex items-center gap-2 px-3 py-1.5 flex-shrink-0 border-y"
+              style={{ borderColor: 'rgba(201,168,76,0.18)' }}>
+              <h2 className="flex-1 text-sm font-bold" style={{ color: '#C9A84C', fontFamily: 'Georgia, serif' }}>
+                {titreMenu}
+              </h2>
+              <button type="button" onClick={() => setMenu(null)} className="text-stone-500 hover:text-stone-300 text-lg leading-none" aria-label="Fermer le menu">
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3">{contenuMenu()}</div>
           </div>
         )}
-      </header>
 
-      {/* Barre d'onglets (haut sur desktop) */}
-      <nav className="hidden md:flex max-w-3xl mx-auto w-full gap-1 px-3 pt-3">
-        {ONGLETS.map((o) => (
-          <button key={o.key} type="button" onClick={() => setOnglet(o.key)}
-            className={`flex-1 py-2 rounded-t-lg text-sm font-bold ${
-              onglet === o.key ? 'bg-stone-900/60 text-yellow-100 border-b-2 border-amber-400' : 'text-stone-400 hover:text-yellow-200'
-            }`}>
-            {o.icon} {o.label}
-          </button>
-        ))}
-      </nav>
+        {/* Bouton dés — mobile : à droite, juste au-dessus de la roue */}
+        <div className="lg:hidden flex justify-end px-4 pb-1 flex-shrink-0">
+          <BoutonDes taille={48} />
+        </div>
 
-      {/* Toast dernier jet */}
+        {/* La roue, en bas de colonne */}
+        <div className="flex-shrink-0 px-2 pb-[env(safe-area-inset-bottom)]">
+          <RoueJoueur
+            nom={nom}
+            imageUrl={api.sheet?.image_url ?? null}
+            hp={api.currentHp}
+            hpMax={api.effectiveMaxHp}
+            tempHp={api.tempHp}
+            ca={api.sheet?.ca ?? '—'}
+            actif={menu === 'pv' ? null : menu}
+            onSelect={(k) => setMenu((m) => (m === k ? null : k))}
+            onCentre={() => setMenu((m) => (m === 'pv' ? null : 'pv'))}
+          />
+        </div>
+      </aside>
+
+      {/* --- Centre : ce que le MJ diffuse, en grand --- */}
+      <main className="order-1 lg:order-2 flex-1 min-h-0 overflow-y-auto px-3 py-3">
+        <ZoneDiffusion
+          sessionId={sessionId}
+          characterId={characterId}
+          characterNom={nom}
+          userId={api.userId}
+          sessionState={api.sessionState}
+          combat={combat}
+          personnages={personnages}
+          ennemis={ennemis}
+        />
+      </main>
+
+      {/* --- Colonne droite (PC) : ordre des tours, journal, dés --- */}
+      <aside
+        className="hidden lg:flex order-3 w-[200px] flex-shrink-0 flex-col min-h-0 border-l px-2 py-3 gap-3"
+        style={{ borderColor: 'rgba(201,168,76,0.18)' }}
+      >
+        <div className="flex-shrink-0 max-h-[40%] flex flex-col min-h-0">
+          <TimelineInitiative
+            combat={combat}
+            personnages={personnages}
+            ennemis={ennemis}
+            characterId={characterId}
+          />
+        </div>
+        <div className="flex-1 min-h-0">
+          <JournalTable sessionId={sessionId} userId={api.userId} />
+        </div>
+        <div className="flex-shrink-0 flex justify-center">
+          <BoutonDes />
+        </div>
+      </aside>
+
+      {/* Toast du dernier jet local */}
       {jet && (
         <button type="button" onClick={() => setJet(null)}
-          className="fixed top-16 left-1/2 -translate-x-1/2 z-40 rounded-full px-4 py-1.5 shadow-lg border text-sm"
+          className="fixed top-3 left-1/2 -translate-x-1/2 z-[120] rounded-full px-4 py-1.5 shadow-lg border text-sm"
           style={{ background: '#15110a', borderColor: 'rgba(201,168,76,0.5)' }}>
           <span className="text-stone-300">{jet.detail} = </span>
           <span className="text-yellow-100 font-bold text-base">{jet.total}</span>
         </button>
       )}
 
-      {/* Contenu */}
-      <main className="flex-1 max-w-3xl w-full mx-auto px-3 py-4 pb-24 md:pb-6">
-        {onglet === 'fiche' && api.sheet && <OngletFiche sheet={api.sheet} api={api} roll={roll} />}
-        {onglet === 'actions' && api.sheet && (
-          <OngletActions sheet={api.sheet} spells={api.spells} api={api} roll={roll} rollExpr={rollExpr} />
-        )}
-        {onglet === 'scene' && (
-          <OngletScene sessionId={sessionId} scenarioId={scenarioId} characterId={characterId}
-            characterNom={nom} sessionState={api.sessionState} />
-        )}
-        {onglet === 'des' && (
-          <OngletDes sessionId={sessionId} characterId={characterId} characterNom={nom} userId={api.userId} />
-        )}
-        {onglet === 'sac' && api.sheet && <OngletSac sheet={api.sheet} isOwner={api.sheet.id != null} />}
-        {!api.sheet && onglet !== 'scene' && onglet !== 'des' && (
-          <p className="text-stone-500 text-sm italic text-center py-8">
-            Aucun personnage sélectionné pour cette session.
-          </p>
-        )}
-      </main>
-
-      {/* Dock bas (mobile) */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 flex border-t backdrop-blur"
-        style={{ borderColor: 'rgba(201,168,76,0.25)', background: 'rgba(14,11,6,0.95)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        {ONGLETS.map((o) => (
-          <button key={o.key} type="button" onClick={() => setOnglet(o.key)}
-            className={`flex-1 py-2.5 flex flex-col items-center gap-0.5 ${onglet === o.key ? 'text-yellow-200' : 'text-stone-500'}`}>
-            <span className="text-lg leading-none">{o.icon}</span>
-            <span className="text-[10px]">{o.label}</span>
-          </button>
-        ))}
-      </nav>
+      {/* Le lanceur de dés de l'application, porté dans document.body */}
+      <LanceurDesSession session={{ sessionId, characterId, characterNom: nom }} />
     </div>
   )
 }

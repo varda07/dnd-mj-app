@@ -148,7 +148,7 @@ export default function LobbyMJPage() {
     return (
       <Shell>
         <p className="text-red-300 text-sm">
-          Cette session n'existe pas ou tu n'en es pas le MJ.
+          Cette session n&apos;existe pas ou tu n&apos;en es pas le MJ.
         </p>
         <button
           type="button"
@@ -288,8 +288,7 @@ export default function LobbyMJPage() {
               >
                 <p className="text-green-300 text-sm font-bold">🟢 Partie en cours</p>
                 <p className="text-stone-400 text-xs">
-                  Le cockpit MJ complet (préparation, table, outils live, combat)
-                  arrive en Phase 4.
+                  Le cockpit MJ s’ouvre : préparation, zone de travail et Ma table.
                 </p>
               </div>
               <button

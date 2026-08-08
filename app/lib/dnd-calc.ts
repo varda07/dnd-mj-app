@@ -13,36 +13,37 @@ export const formatMod = (m: number): string => (m >= 0 ? `+${m}` : `${m}`)
 export const bonusMaitrise = (niv: number): number =>
   2 + Math.floor((Math.max(1, niv) - 1) / 4)
 
-export const STATS: { key: StatKey; label: string; abbr: string }[] = [
-  { key: 'force', label: 'Force', abbr: 'FOR' },
-  { key: 'dexterite', label: 'Dextérité', abbr: 'DEX' },
-  { key: 'constitution', label: 'Constitution', abbr: 'CON' },
-  { key: 'intelligence', label: 'Intelligence', abbr: 'INT' },
-  { key: 'sagesse', label: 'Sagesse', abbr: 'SAG' },
-  { key: 'charisme', label: 'Charisme', abbr: 'CHA' }
+export const STATS: { key: StatKey; label: string; abbr: string; desc: string }[] = [
+  { key: 'force', label: 'Force', abbr: 'FOR', desc: 'Puissance physique brute : soulever, pousser, briser, agripper.' },
+  { key: 'dexterite', label: 'Dextérité', abbr: 'DEX', desc: 'Agilité, réflexes, équilibre et précision des gestes.' },
+  { key: 'constitution', label: 'Constitution', abbr: 'CON', desc: 'Endurance, santé et résistance à l’effort ou au poison.' },
+  { key: 'intelligence', label: 'Intelligence', abbr: 'INT', desc: 'Mémoire, raisonnement, savoir et déduction.' },
+  { key: 'sagesse', label: 'Sagesse', abbr: 'SAG', desc: 'Perception du monde, intuition et force de volonté.' },
+  { key: 'charisme', label: 'Charisme', abbr: 'CHA', desc: 'Présence, assurance et capacité à influencer autrui.' }
 ]
 
 // Compétences 5e FR → caractéristique associée (clé = libellé stocké dans
-// personnages.comp_maitrises / comp_expertise).
-export const COMPETENCES: { nom: string; stat: StatKey }[] = [
-  { nom: 'Acrobaties', stat: 'dexterite' },
-  { nom: 'Arcanes', stat: 'intelligence' },
-  { nom: 'Athlétisme', stat: 'force' },
-  { nom: 'Discrétion', stat: 'dexterite' },
-  { nom: 'Dressage', stat: 'sagesse' },
-  { nom: 'Escamotage', stat: 'dexterite' },
-  { nom: 'Histoire', stat: 'intelligence' },
-  { nom: 'Intimidation', stat: 'charisme' },
-  { nom: 'Investigation', stat: 'intelligence' },
-  { nom: 'Médecine', stat: 'sagesse' },
-  { nom: 'Nature', stat: 'intelligence' },
-  { nom: 'Perception', stat: 'sagesse' },
-  { nom: 'Perspicacité', stat: 'sagesse' },
-  { nom: 'Persuasion', stat: 'charisme' },
-  { nom: 'Représentation', stat: 'charisme' },
-  { nom: 'Religion', stat: 'intelligence' },
-  { nom: 'Survie', stat: 'sagesse' },
-  { nom: 'Tromperie', stat: 'charisme' }
+// personnages.comp_maitrises / comp_expertise) + description courte affichée
+// au dépli de la ligne dans le menu Compétences de la roue joueur.
+export const COMPETENCES: { nom: string; stat: StatKey; desc: string }[] = [
+  { nom: 'Acrobaties', stat: 'dexterite', desc: 'Garder l’équilibre, amortir une chute, se contorsionner, faire une figure.' },
+  { nom: 'Arcanes', stat: 'intelligence', desc: 'Reconnaître un sort, un objet magique, un plan d’existence ou une tradition occulte.' },
+  { nom: 'Athlétisme', stat: 'force', desc: 'Escalader, nager, sauter, lutter, forcer un passage.' },
+  { nom: 'Discrétion', stat: 'dexterite', desc: 'Se déplacer sans bruit, se cacher, échapper à la vigilance.' },
+  { nom: 'Dressage', stat: 'sagesse', desc: 'Calmer, mener ou comprendre le comportement d’un animal.' },
+  { nom: 'Escamotage', stat: 'dexterite', desc: 'Tour de main : faire les poches, dissimuler un objet, un tour de passe-passe.' },
+  { nom: 'Histoire', stat: 'intelligence', desc: 'Se souvenir d’événements, de royaumes, de guerres, de lignées.' },
+  { nom: 'Intimidation', stat: 'charisme', desc: 'Obtenir par la menace, la violence contenue ou la présence.' },
+  { nom: 'Investigation', stat: 'intelligence', desc: 'Déduire à partir d’indices, fouiller une scène, trouver un mécanisme.' },
+  { nom: 'Médecine', stat: 'sagesse', desc: 'Stabiliser un mourant, diagnostiquer une maladie ou une cause de mort.' },
+  { nom: 'Nature', stat: 'intelligence', desc: 'Connaître terrains, plantes, météo, cycles et créatures naturelles.' },
+  { nom: 'Perception', stat: 'sagesse', desc: 'Remarquer ce qui vous entoure : bruit, mouvement, détail hors de propos.' },
+  { nom: 'Perspicacité', stat: 'sagesse', desc: 'Lire les intentions réelles derrière les mots et le comportement.' },
+  { nom: 'Persuasion', stat: 'charisme', desc: 'Convaincre avec tact, honnêteté ou diplomatie.' },
+  { nom: 'Représentation', stat: 'charisme', desc: 'Captiver un public : musique, danse, récit, comédie.' },
+  { nom: 'Religion', stat: 'intelligence', desc: 'Connaître divinités, rites, symboles sacrés et hiérarchies cléricales.' },
+  { nom: 'Survie', stat: 'sagesse', desc: 'Pister, s’orienter, chasser, prévoir le temps, éviter les dangers naturels.' },
+  { nom: 'Tromperie', stat: 'charisme', desc: 'Mentir de façon convaincante, déguiser ses intentions, bluffer.' }
 ]
 
 // ----------------------------------------------------------------------------

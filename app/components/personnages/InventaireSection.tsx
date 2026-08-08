@@ -22,6 +22,7 @@ import {
   type ObjetInventaire,
   type TypeObjet
 } from '@/app/lib/inventaire'
+import PastillesUsage from '@/app/components/ui/PastillesUsage'
 
 const TYPES: Array<{ key: TypeObjet; label: string; icon: string }> = [
   { key: 'arme', label: 'Arme', icon: '⚔️' },
@@ -241,21 +242,16 @@ export default function InventaireSection({
                 <span className="text-[10px] uppercase tracking-wider text-stone-500">
                   Charges
                 </span>
-                <div className="flex items-center gap-0.5">
-                  {Array.from({ length: obj.usages_max }).map((_, i) => {
-                    const consomme = i < obj.usages_utilises
-                    return (
-                      <span
-                        key={i}
-                        className={`w-2.5 h-2.5 rounded-full border ${
-                          consomme
-                            ? 'bg-stone-700 border-stone-600'
-                            : 'bg-amber-400 border-amber-300'
-                        }`}
-                      />
-                    )
-                  })}
-                </div>
+                {/* Ronds d'usage — consommation de DROITE à GAUCHE, clic sur un
+                    rond pour consommer / restituer (roadmap delta A.4). */}
+                <PastillesUsage
+                  max={obj.usages_max}
+                  used={obj.usages_utilises}
+                  taille={11}
+                  label={obj.nom}
+                  onConsommer={isOwner ? () => majUsage(obj, 1) : undefined}
+                  onRestituer={isOwner ? () => majUsage(obj, -1) : undefined}
+                />
                 {isOwner && (
                   <div className="flex items-center gap-1 ml-1">
                     <button

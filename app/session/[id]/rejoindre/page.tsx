@@ -208,8 +208,8 @@ export default function RejoindreSessionPage() {
         {phase === 'code' && (
           <div className="space-y-4">
             <p className="text-center text-stone-300 text-sm">
-              Tu n'es pas encore inscrit·e à ce scénario. Saisis le code
-              d'invitation transmis par ton MJ.
+              Tu n&apos;es pas encore inscrit·e à ce scénario. Saisis le code
+              d&apos;invitation transmis par ton MJ.
             </p>
             <input
               type="text"
@@ -258,7 +258,7 @@ export default function RejoindreSessionPage() {
               </p>
               {persos.length === 0 ? (
                 <p className="text-stone-500 text-sm italic">
-                  Tu n'as pas encore de personnage. Tu peux rejoindre maintenant
+                  Tu n&apos;as pas encore de personnage. Tu peux rejoindre maintenant
                   et en créer un ensuite.
                 </p>
               ) : (

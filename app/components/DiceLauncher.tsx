@@ -17,6 +17,7 @@ import {
   type SoundKey
 } from '@/app/lib/dice-sounds'
 import { unlockAchievement, incrementCounter } from '@/app/lib/achievements'
+import { logSessionEvent } from '@/app/lib/session-live'
 
 // @3d-dice/dice-box est strictement client-side (Babylon.js + AmmoJS via
 // web worker). On charge le wrapper dynamiquement, ssr désactivé.
@@ -396,7 +397,24 @@ type JetRow = {
   mode?: RollMode | null
 }
 
-export default function DiceLauncher() {
+// Contexte de séance (facultatif). Quand il est fourni — mode session — chaque
+// jet est AUSSI écrit dans `session_events`, donc visible du MJ et de la table.
+// C'est ce qui permet de réutiliser ce lanceur tel quel en session au lieu d'en
+// maintenir un second (Delta B).
+export type DiceSessionContext = {
+  sessionId: string
+  characterId?: string | null
+  characterNom?: string
+}
+
+export default function DiceLauncher({
+  session,
+  hideFab = false
+}: {
+  session?: DiceSessionContext
+  /** Le mode session fournit ses propres boutons ronds d'ouverture. */
+  hideFab?: boolean
+} = {}) {
   const [open, setOpen] = useState(false)
   const [shake, setShake] = useState(false)
   // Mode diffusion MJ : la roue d'action remplace ce FAB. On masque alors le
@@ -606,6 +624,33 @@ export default function DiceLauncher() {
         setTimeout(() => setCritEffect(null), 2000)
         void unlockAchievement('premier_fumble')
       }
+    }
+
+    // Mode session : le jet part aussi dans le journal de la table.
+    if (session?.sessionId) {
+      const retenu =
+        rollMode === 'avantage'
+          ? Math.max(...jets)
+          : rollMode === 'desavantage'
+            ? Math.min(...jets)
+            : null
+      void logSessionEvent(
+        session.sessionId,
+        'dice_roll',
+        {
+          label: `${jets.length}${selectedDice.label}${
+            rollMode === 'avantage' ? ' (avantage)' : rollMode === 'desavantage' ? ' (désavantage)' : ''
+          }`,
+          nom: session.characterNom ?? 'MJ',
+          dice: selectedDice.label,
+          nombre: jets.length,
+          mode: rollMode,
+          rolls: jets,
+          total: retenu ?? jets.reduce((a, b) => a + b, 0),
+          prive: false
+        },
+        session.characterId ?? null
+      )
     }
 
     // Roadmap Affinement 2.10 — compteur de dés lancés
@@ -932,7 +977,7 @@ export default function DiceLauncher() {
         </div>
       )}
 
-      {!fabHidden && (
+      {!fabHidden && !hideFab && (
       <button
         type="button"
         onClick={() => {

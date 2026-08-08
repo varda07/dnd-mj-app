@@ -1,59 +1,46 @@
 'use client'
 
-// Onglet « Actions » (Phase 3.3) — attaques, sorts + emplacements visuels,
-// concentration, ressources de classe (compteurs), capacités race/background.
+// ============================================================================
+// Menu « Actions » de la roue joueur (Delta A.2 / A.3 / A.4)
+// ----------------------------------------------------------------------------
+// Attaques d'arme, capacités à usage limité, traits de classe / d'espèce.
+// Les sorts ont quitté ce menu (→ OngletSorts, pétale « Sorts »).
+//
+// ⚠️ Règle D&D 5e — Delta A.4 : AUCUN rond d'usage sur les attaques d'arme
+// classiques. On ne met des ronds que sur les capacités déclarées à usage
+// limité (X/repos court, X/repos long, X/jour), et leur rythme de récupération
+// pilote les boutons Repos court / Repos long du MJ.
+// ============================================================================
 
-import { useCallback, useState } from 'react'
-import { createPortal } from 'react-dom'
-import type { CharacterSheet, ClassResource, SortJoue } from '@/app/lib/session-live'
+import { useState } from 'react'
+import type { CharacterSheet, ClassResource, RechargeRessource } from '@/app/lib/session-live'
 import type { SessionJoueurApi } from './useSessionJoueur'
-import { useModalEffects } from '@/app/components/ui/Modal'
+import LigneDepliable from './LigneDepliable'
+import PastillesUsage from '@/app/components/ui/PastillesUsage'
+
+const RECHARGES: Array<{ key: RechargeRessource; label: string; court: string }> = [
+  { key: 'court', label: 'Repos court', court: '/repos court' },
+  { key: 'long', label: 'Repos long', court: '/repos long' },
+  { key: 'jour', label: 'Par jour', court: '/jour' }
+]
 
 export default function OngletActions({
   sheet,
-  spells,
   api,
   roll,
   rollExpr
 }: {
   sheet: CharacterSheet
-  spells: SortJoue[]
   api: SessionJoueurApi
   roll: (label: string, bonus: number) => void
   rollExpr: (label: string, expr: string) => void
 }) {
-  const [detail, setDetail] = useState<SortJoue | null>(null)
+  const [ouvert, setOuvert] = useState<string | null>(null)
   const [nouvRes, setNouvRes] = useState('')
   const [nouvResMax, setNouvResMax] = useState('')
+  const [nouvRecharge, setNouvRecharge] = useState<RechargeRessource>('long')
 
-  // Échap ferme le détail + verrou du défilement de fond.
-  const fermerDetail = useCallback(() => setDetail(null), [])
-  useModalEffects(detail !== null, fermerDetail)
-
-  // Regroupe les sorts par niveau.
-  const parNiveau = new Map<number, SortJoue[]>()
-  for (const s of spells) {
-    const arr = parNiveau.get(s.niveau) ?? []
-    arr.push(s)
-    parNiveau.set(s.niveau, arr)
-  }
-  const niveaux = [...parNiveau.keys()].sort((a, b) => a - b)
-
-  const slotMax = (lvl: number) => sheet.sorts_slots_max?.[String(lvl)] ?? 0
-  const slotUsed = (lvl: number) => api.slotsUsed?.[String(lvl)] ?? 0
-
-  const lancerSort = async (s: SortJoue) => {
-    if (s.niveau > 0) {
-      const ok = await api.consommerSlot(s.niveau)
-      if (!ok) {
-        alert(`Aucun emplacement de niveau ${s.niveau} disponible.`)
-        return
-      }
-    }
-    if (s.concentration) await api.setConcentration(s.nom)
-    const des = extraireExpr(s.description)
-    if (des) rollExpr(`Sort : ${s.nom}`, des)
-  }
+  const bascule = (cle: string) => setOuvert((o) => (o === cle ? null : cle))
 
   const ajouterRes = async () => {
     const nom = nouvRes.trim()
@@ -61,15 +48,16 @@ export default function OngletActions({
     if (!nom || max <= 0) return
     await api.setResources({
       ...api.resources,
-      [nom]: { label: nom, max, used: 0 }
+      [nom]: { label: nom, max, used: 0, recharge: nouvRecharge }
     })
     setNouvRes('')
     setNouvResMax('')
   }
-  const majRes = async (key: string, r: ClassResource, delta: number) => {
-    const used = Math.max(0, Math.min(r.max, r.used + delta))
-    await api.setResources({ ...api.resources, [key]: { ...r, used } })
+
+  const changerRecharge = async (key: string, r: ClassResource, recharge: RechargeRessource) => {
+    await api.setResources({ ...api.resources, [key]: { ...r, recharge } })
   }
+
   const suppRes = async (key: string) => {
     const next = { ...api.resources }
     delete next[key]
@@ -78,184 +66,144 @@ export default function OngletActions({
 
   return (
     <div className="space-y-5">
-      {/* Concentration en cours */}
-      {api.concentration && (
-        <div className="rounded-lg border px-3 py-2 flex items-center justify-between"
-          style={{ borderColor: 'rgba(56,189,248,0.4)', background: 'rgba(56,189,248,0.08)' }}>
-          <span className="text-cyan-200 text-sm">🌀 Concentration : <b>{api.concentration}</b></span>
-          <button type="button" onClick={() => api.setConcentration(null)} className="text-cyan-300 text-xs underline">
-            Arrêter
-          </button>
-        </div>
-      )}
-
-      {/* Attaques */}
+      {/* Attaques — pas de ronds d'usage : une attaque d'arme n'est pas limitée */}
       <section>
-        <p className="text-xs uppercase tracking-widest text-yellow-600 mb-2">Attaques</p>
+        <p className="text-xs uppercase tracking-widest text-yellow-600 mb-1.5">Attaques</p>
         {sheet.armes.length === 0 ? (
           <p className="text-stone-500 text-sm italic">Aucune arme.</p>
         ) : (
-          <div className="space-y-1.5">
-            {sheet.armes.map((a, i) => (
-              <div key={i} className="flex items-center gap-2 rounded-lg border border-yellow-800/25 bg-stone-900/40 px-2.5 py-2">
-                <span className="flex-1 min-w-0 text-yellow-100 font-medium text-sm truncate">⚔️ {a.nom || 'Arme'}</span>
-                <button type="button" onClick={() => roll(`Attaque : ${a.nom}`, parseInt(a.bonus, 10) || 0)}
-                  className="px-2.5 py-1 rounded bg-stone-800 border border-yellow-800/40 text-yellow-200 text-xs font-bold">
-                  Att. {a.bonus || '+0'}
-                </button>
-                <button type="button" onClick={() => rollExpr(`Dégâts : ${a.nom}`, a.degats)}
-                  className="px-2.5 py-1 rounded bg-red-900/40 border border-red-800/50 text-red-200 text-xs font-bold">
-                  Dgts {a.degats || '—'}
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Sorts */}
-      <section>
-        <p className="text-xs uppercase tracking-widest text-yellow-600 mb-2">Sorts</p>
-        {spells.length === 0 ? (
-          <p className="text-stone-500 text-sm italic">Aucun sort connu.</p>
-        ) : (
-          <div className="space-y-3">
-            {niveaux.map((lvl) => {
-              const max = slotMax(lvl)
-              const used = slotUsed(lvl)
+          <ul className="space-y-1">
+            {sheet.armes.map((a, i) => {
+              const cle = `arme:${i}`
+              const bonus = parseInt(a.bonus, 10) || 0
+              const signe = bonus >= 0 ? `+${bonus}` : `${bonus}`
               return (
-                <div key={lvl}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold text-yellow-500">
-                      {lvl === 0 ? 'Sorts mineurs' : `Niveau ${lvl}`}
-                    </span>
-                    {lvl > 0 && max > 0 && (
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: max }).map((_, i) => (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => (i < used ? api.restaurerSlot(lvl) : api.consommerSlot(lvl))}
-                            title={i < used ? 'Emplacement utilisé' : 'Emplacement disponible'}
-                            className="w-3.5 h-3.5 rounded-sm border"
-                            style={{
-                              background: i < used ? '#57534e' : '#C9A84C',
-                              borderColor: i < used ? '#78716c' : '#e0c874'
-                            }}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    {(parNiveau.get(lvl) ?? []).map((s) => (
-                      <div key={s.junction_id} className={`flex items-center gap-2 rounded border px-2.5 py-1.5 ${
-                        s.prepare ? 'border-yellow-800/30 bg-stone-900/40' : 'border-stone-800 bg-stone-900/20 opacity-70'
-                      }`}>
-                        <button type="button" onClick={() => setDetail(s)} className="flex-1 min-w-0 text-left">
-                          <span className="text-sm text-yellow-100 truncate block">
-                            {s.concentration ? '🌀 ' : ''}{s.nom}
-                          </span>
-                        </button>
-                        <button type="button" onClick={() => lancerSort(s)}
-                          className="px-2.5 py-1 rounded bg-stone-800 border border-yellow-800/40 text-yellow-200 text-xs font-bold">
-                          Lancer
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <LigneDepliable
+                  key={cle}
+                  nom={`⚔️ ${a.nom || 'Arme'}`}
+                  valeur={a.bonus || '+0'}
+                  ouvert={ouvert === cle}
+                  onToggle={() => bascule(cle)}
+                  description={`Attaque au toucher ${signe}${a.degats ? ` · dégâts ${a.degats}` : ''}. Nombre d'attaques non limité.`}
+                  formule={`1d20${signe}`}
+                  onLancer={() => roll(`Attaque : ${a.nom}`, bonus)}
+                  contenu={
+                    a.degats ? (
+                      <button
+                        type="button"
+                        onClick={() => rollExpr(`Dégâts : ${a.nom}`, a.degats)}
+                        className="w-full py-2 rounded-lg font-bold text-sm bg-red-900/40 border border-red-800/50 text-red-200"
+                      >
+                        🩸 Lancer {a.degats}
+                      </button>
+                    ) : null
+                  }
+                />
               )
             })}
-          </div>
+          </ul>
         )}
       </section>
 
-      {/* Ressources de classe (compteurs) */}
+      {/* Capacités à usage limité — ronds d'usage légitimes */}
       <section>
-        <p className="text-xs uppercase tracking-widest text-yellow-600 mb-2">Ressources de classe</p>
-        {Object.keys(api.resources).length > 0 && (
-          <div className="space-y-1.5 mb-2">
-            {Object.entries(api.resources).map(([key, r]) => (
-              <div key={key} className="flex items-center gap-2 rounded-lg border border-yellow-800/25 bg-stone-900/40 px-2.5 py-2">
-                <span className="flex-1 min-w-0 text-yellow-100 text-sm truncate">{r.label ?? key}</span>
-                <div className="flex items-center gap-0.5">
-                  {Array.from({ length: r.max }).map((_, i) => (
-                    <span key={i} className="w-2.5 h-2.5 rounded-full border"
-                      style={{ background: i < r.used ? '#57534e' : '#a78bfa', borderColor: '#8b5cf6' }} />
-                  ))}
-                </div>
-                <button type="button" onClick={() => majRes(key, r, 1)} className="px-2 py-0.5 rounded bg-stone-800 text-stone-300 text-xs">Utiliser</button>
-                <button type="button" onClick={() => majRes(key, r, -1)} className="px-2 py-0.5 rounded bg-stone-800 text-stone-300 text-xs">+1</button>
-                <button type="button" onClick={() => suppRes(key)} className="text-stone-600 hover:text-red-300 text-xs">✕</button>
-              </div>
-            ))}
-          </div>
+        <p className="text-xs uppercase tracking-widest text-yellow-600 mb-1.5">Capacités à usage limité</p>
+        {Object.keys(api.resources).length === 0 ? (
+          <p className="text-stone-500 text-sm italic mb-2">
+            Aucune capacité limitée déclarée (Rage, Ki, Inspiration bardique…).
+          </p>
+        ) : (
+          <ul className="space-y-1 mb-2">
+            {Object.entries(api.resources).map(([key, r]) => {
+              const cle = `res:${key}`
+              const rech = RECHARGES.find((x) => x.key === (r.recharge ?? 'long'))
+              return (
+                <LigneDepliable
+                  key={cle}
+                  nom={`${r.label ?? key} ${rech ? `(${r.max}${rech.court})` : ''}`}
+                  ouvert={ouvert === cle}
+                  onToggle={() => bascule(cle)}
+                  accessoire={
+                    <PastillesUsage
+                      max={r.max}
+                      used={r.used}
+                      couleur="#a78bfa"
+                      taille={11}
+                      label={r.label ?? key}
+                      onConsommer={() => void api.majRessource(key, 1)}
+                      onRestituer={() => void api.majRessource(key, -1)}
+                    />
+                  }
+                  valeur={`${r.max - r.used}/${r.max}`}
+                  contenu={
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] text-stone-500">Récupère à :</span>
+                      {RECHARGES.map((x) => (
+                        <button
+                          key={x.key}
+                          type="button"
+                          onClick={() => changerRecharge(key, r, x.key)}
+                          className={`text-[11px] px-2 py-0.5 rounded-full border ${
+                            (r.recharge ?? 'long') === x.key
+                              ? 'border-amber-500 bg-amber-900/30 text-yellow-100'
+                              : 'border-stone-700 text-stone-400'
+                          }`}
+                        >
+                          {x.label}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => suppRes(key)}
+                        className="ml-auto text-[11px] text-stone-600 hover:text-red-300"
+                      >
+                        Supprimer
+                      </button>
+                    </div>
+                  }
+                />
+              )
+            })}
+          </ul>
         )}
-        <div className="flex flex-wrap gap-2">
+
+        <div className="flex flex-wrap gap-1.5">
           <input value={nouvRes} onChange={(e) => setNouvRes(e.target.value)} placeholder="Rage, Ki, Inspiration…"
             className="flex-1 min-w-[7rem] bg-stone-900/60 border border-yellow-800/30 rounded px-2 py-1.5 text-sm text-gray-200 outline-none" />
           <input value={nouvResMax} onChange={(e) => setNouvResMax(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="Max"
-            className="w-16 bg-stone-900/60 border border-yellow-800/30 rounded px-2 py-1.5 text-sm text-gray-200 outline-none" />
-          <button type="button" onClick={ajouterRes} className="px-3 py-1.5 rounded bg-stone-800 border border-yellow-700/40 text-yellow-300 text-xs font-bold">➕</button>
+            className="w-14 bg-stone-900/60 border border-yellow-800/30 rounded px-2 py-1.5 text-sm text-gray-200 outline-none" />
+          <select value={nouvRecharge} onChange={(e) => setNouvRecharge(e.target.value as RechargeRessource)}
+            className="bg-stone-900/60 border border-yellow-800/30 rounded px-1.5 py-1.5 text-xs text-gray-200 outline-none">
+            {RECHARGES.map((x) => (
+              <option key={x.key} value={x.key}>{x.label}</option>
+            ))}
+          </select>
+          <button type="button" onClick={ajouterRes} className="px-3 py-1.5 rounded bg-stone-800 border border-yellow-700/40 text-yellow-300 text-xs font-bold">
+            Ajouter
+          </button>
         </div>
-        {sheet.traits_classe.trim() && (
-          <p className="text-stone-400 text-xs mt-2 whitespace-pre-wrap">{sheet.traits_classe}</p>
-        )}
       </section>
 
-      {/* Capacités de race et de background */}
-      {(sheet.traits_espece.trim() || (sheet.historique ?? '').trim()) && (
+      {/* Traits */}
+      {(sheet.traits_classe.trim() || sheet.traits_espece.trim() || (sheet.historique ?? '').trim()) && (
         <section>
-          <p className="text-xs uppercase tracking-widest text-yellow-600 mb-2">Race & background</p>
-          {sheet.traits_espece.trim() && <p className="text-stone-300 text-sm whitespace-pre-wrap mb-2">{sheet.traits_espece}</p>}
-          {(sheet.historique ?? '').trim() && <p className="text-stone-400 text-xs">Historique : {sheet.historique}</p>}
+          <p className="text-xs uppercase tracking-widest text-yellow-600 mb-1.5">Traits</p>
+          <ul className="space-y-1">
+            {sheet.traits_classe.trim() && (
+              <LigneDepliable nom="Traits de classe" ouvert={ouvert === 'tr:classe'} onToggle={() => bascule('tr:classe')}
+                description={sheet.traits_classe} />
+            )}
+            {sheet.traits_espece.trim() && (
+              <LigneDepliable nom="Traits d'espèce" ouvert={ouvert === 'tr:espece'} onToggle={() => bascule('tr:espece')}
+                description={sheet.traits_espece} />
+            )}
+            {(sheet.historique ?? '').trim() && (
+              <LigneDepliable nom="Historique" ouvert={ouvert === 'tr:histo'} onToggle={() => bascule('tr:histo')}
+                description={sheet.historique ?? ''} />
+            )}
+          </ul>
         </section>
-      )}
-
-      {/* Détail d'un sort — porté dans document.body : feuille inférieure sur
-          mobile, l'ancrage viewport ne doit pas dépendre des ancêtres. */}
-      {detail && createPortal(
-        <div className="fixed inset-0 z-[130] bg-black/70 flex items-end sm:items-center justify-center p-3"
-          role="dialog" aria-modal="true"
-          onClick={(e) => { if (e.target === e.currentTarget) setDetail(null) }}>
-          <div className="w-full max-w-md rounded-2xl border-2 p-4 max-h-[80vh] overflow-y-auto"
-            style={{ background: '#15110a', borderColor: 'rgba(201,168,76,0.5)' }}>
-            <div className="flex items-start justify-between mb-2">
-              <h3 className="font-bold text-lg" style={{ color: '#C9A84C', fontFamily: 'Georgia, serif' }}>{detail.nom}</h3>
-              <button type="button" onClick={() => setDetail(null)} className="text-stone-400 text-xl leading-none">✕</button>
-            </div>
-            <p className="text-xs text-stone-400 mb-2">
-              {detail.niveau === 0 ? 'Sort mineur' : `Niveau ${detail.niveau}`}
-              {detail.ecole ? ` · ${detail.ecole}` : ''}
-              {detail.concentration ? ' · Concentration' : ''}
-              {detail.rituel ? ' · Rituel' : ''}
-            </p>
-            <div className="grid grid-cols-2 gap-1 text-xs text-stone-400 mb-2">
-              <span>⏱ {detail.temps_incantation ?? '—'}</span>
-              <span>🎯 {detail.portee ?? '—'}</span>
-              <span>⏳ {detail.duree ?? '—'}</span>
-              <span>
-                {[detail.composantes_verbal && 'V', detail.composantes_somatique && 'S', detail.composantes_materiel && 'M']
-                  .filter(Boolean).join(', ') || '—'}
-              </span>
-            </div>
-            <p className="text-stone-300 text-sm whitespace-pre-wrap">{detail.description ?? 'Aucune description.'}</p>
-            <button type="button" onClick={() => { lancerSort(detail); setDetail(null) }}
-              className="mt-3 w-full py-2 rounded-lg font-bold text-gray-900 bg-[#C9A84C]">
-              Lancer le sort
-            </button>
-          </div>
-        </div>,
-        document.body
       )}
     </div>
   )
-}
-
-// Extrait la première expression de dés d'une description (ex "2d6" dans le texte).
-function extraireExpr(desc: string | null): string | null {
-  if (!desc) return null
-  const m = desc.match(/\d+d(?:4|6|8|10|12|20)(?:\s*[+-]\s*\d+)?/i)
-  return m ? m[0] : null
 }
