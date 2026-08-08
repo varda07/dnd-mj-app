@@ -4,10 +4,12 @@
 // un combat est actif, bascule en vue combat joueur (timeline, mon tour, états
 // qualitatifs des ennemis, « Fin de mon tour »).
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useCombatEngine, resolveEntiteId } from '@/app/lib/combat-engine'
 import CombatVueJoueurs from '@/app/components/presentation/CombatVueJoueurs'
 import { logSessionEvent, type SessionState } from '@/app/lib/session-live'
+import { useModalEffects } from '@/app/components/ui/Modal'
 
 export default function OngletScene({
   sessionId,
@@ -25,6 +27,10 @@ export default function OngletScene({
   const { combat, personnages, ennemis } = useCombatEngine(scenarioId, { isMj: false })
   const [plein, setPlein] = useState(false)
   const dejaVibre = useRef<string | null>(null)
+
+  // Échap quitte le plein écran + verrou du défilement de fond.
+  const quitterPlein = useCallback(() => setPlein(false), [])
+  useModalEffects(plein, quitterPlein)
 
   // Mon tour ?
   const entree = combat?.ordre_initiative?.[combat.tour_actuel ?? 0]
@@ -101,12 +107,16 @@ export default function OngletScene({
         <p className="text-center text-stone-500 text-xs">🎵 Ambiance en cours{son.en_lecture === false ? ' (en pause)' : ''}</p>
       )}
 
-      {plein && img && (
-        <div className="fixed inset-0 z-[140] bg-black flex items-center justify-center p-2" onClick={() => setPlein(false)}>
+      {/* Visionneuse plein écran — portée dans document.body pour couvrir
+          réellement le viewport quel que soit l'ancêtre. */}
+      {plein && img && createPortal(
+        <div className="fixed inset-0 z-[140] bg-black flex items-center justify-center p-2"
+          role="dialog" aria-modal="true" onClick={() => setPlein(false)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={img} alt="Scène" className="max-w-full max-h-full object-contain" />
-          <button type="button" onClick={() => setPlein(false)} className="absolute top-3 right-3 text-white text-2xl">✕</button>
-        </div>
+          <button type="button" onClick={() => setPlein(false)} className="absolute top-3 right-3 text-white text-2xl" aria-label="Fermer">✕</button>
+        </div>,
+        document.body
       )}
     </div>
   )

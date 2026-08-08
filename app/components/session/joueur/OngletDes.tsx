@@ -5,7 +5,7 @@
 // et des autres joueurs), avec option « jet privé » (MJ uniquement). Historique.
 
 import { useCallback, useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { ouvrirCanal } from '@/app/lib/session-realtime'
 import { DICE_FACES, formatMod, rollD20, rollDice, type RollMode } from '@/app/lib/dnd-calc'
 import { fetchSessionEvents, logSessionEvent, type SessionEvent } from '@/app/lib/session-live'
 
@@ -35,17 +35,13 @@ export default function OngletDes({
 
   useEffect(() => {
     void charger()
-    const channel = supabase
-      .channel(`session-des:${sessionId}`)
-      .on(
+    return ouvrirCanal(`session-des:${sessionId}`, (c) =>
+      c.on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'session_events', filter: `session_id=eq.${sessionId}` },
         () => void charger()
       )
-      .subscribe()
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    )
   }, [sessionId, charger])
 
   const lancer = async () => {

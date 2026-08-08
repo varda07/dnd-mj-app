@@ -13,6 +13,7 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { ouvrirCanal } from '@/app/lib/session-realtime'
 import { fetchSession } from '@/app/lib/session'
 import { fetchSessionState, type SessionState } from '@/app/lib/session-live'
 import { useCombatEngine } from '@/app/lib/combat-engine'
@@ -54,14 +55,10 @@ export default function EcranPartagePage() {
 
   useEffect(() => {
     if (!pret) return
-    const channel = supabase
-      .channel(`ecran:${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'session_state', filter: `session_id=eq.${id}` },
+    return ouvrirCanal(`ecran:${id}`, (c) =>
+      c.on('postgres_changes', { event: '*', schema: 'public', table: 'session_state', filter: `session_id=eq.${id}` },
         () => void fetchSessionState(id).then(setEtat))
-      .subscribe()
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    )
   }, [id, pret])
 
   return <EcranContenu scenarioId={scenarioId} etat={etat} />

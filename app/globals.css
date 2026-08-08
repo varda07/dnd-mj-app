@@ -1796,6 +1796,7 @@ html[data-theme="eclipsed"] ::-webkit-scrollbar-thumb:hover {
   border-radius: 8px;
   transition: border-color 0.2s var(--codex-ease),
               box-shadow 0.2s var(--codex-ease),
+              top 0.2s var(--codex-ease),
               transform 0.2s var(--codex-ease);
 }
 /* Variante interactive (cartes cliquables) */
@@ -1804,7 +1805,14 @@ html[data-theme="eclipsed"] ::-webkit-scrollbar-thumb:hover {
   border-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 30%, transparent);
   border-left-color: var(--theme-accent, #C9A84C);
   box-shadow: 0 0 18px color-mix(in srgb, var(--theme-accent, #C9A84C) 10%, transparent);
-  transform: translateY(-1px);
+  /* Décollement au survol via `top` et NON `transform` : un transform crée un
+     bloc englobant pour les descendants `position: fixed`. Une modale rendue
+     dans une carte (ex. « Lancer la session ») s'ancrait alors sur la CARTE et
+     non sur le viewport — décalée, overlay limité à la carte, fond resté
+     cliquable. Même piège que `.codex-page-transition` (cf. plus bas).
+     `.grim-card` est déjà `position: relative`, donc `top` suffit et
+     n'influence pas la mise en page. */
+  top: -1px;
 }
 /* Bouton grimoire : filet or fin, transparent, hover doré */
 .grim-btn {

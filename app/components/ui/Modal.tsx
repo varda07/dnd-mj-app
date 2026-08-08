@@ -6,6 +6,39 @@ import { createPortal } from 'react-dom'
 type ModalSize = 'sm' | 'md' | 'lg' | 'xl'
 
 /**
+ * Échap ferme + verrou du défilement de fond, pour toute surface modale — y
+ * compris celles qui n'utilisent pas le chrome de `Modal` (visionneuse plein
+ * écran, feuille inférieure…). À combiner avec `createPortal(…, document.body)` :
+ * un overlay `position: fixed` rendu sous un ancêtre portant `transform`,
+ * `filter`, `backdrop-filter`, `contain` ou `will-change: transform` s'ancre sur
+ * cet ancêtre et non sur le viewport.
+ *
+ * `onClose` est lu via une ref : l'effet ne dépend que de `open`. Sans cela, un
+ * `onClose` en lambda inline le relance à chaque rendu et `prev` finit par
+ * capturer 'hidden' — le défilement resterait bloqué après fermeture.
+ */
+export function useModalEffects(open: boolean, onClose: () => void) {
+  const onCloseRef = useRef(onClose)
+  useEffect(() => {
+    onCloseRef.current = onClose
+  })
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCloseRef.current()
+    }
+    document.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prev
+    }
+  }, [open])
+}
+
+/**
  * Modal — composant réutilisable, fond semi-transparent, bordure or, animation
  * fade + scale. Bouton fermeture en haut à droite. Bouton principal en bas à
  * droite via le slot `footer`. Echap ferme la modale.
@@ -31,18 +64,8 @@ export default function Modal({
 }) {
   const ref = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', onKey)
-    // Lock body scroll
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = prev
-    }
-  }, [open, onClose])
+  // Échap + verrou du défilement de fond.
+  useModalEffects(open, onClose)
 
   if (!open) return null
   if (typeof window === 'undefined') return null

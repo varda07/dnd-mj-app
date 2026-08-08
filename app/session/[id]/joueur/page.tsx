@@ -24,6 +24,7 @@ import {
   type SessionParticipant
 } from '@/app/lib/session'
 import SessionJoueur from '@/app/components/session/joueur/SessionJoueur'
+import { ouvrirCanal, useSessionPresence } from '@/app/lib/session-realtime'
 
 type Perso = {
   id: string
@@ -48,10 +49,12 @@ export default function LobbyJoueurPage() {
   const [monPerso, setMonPerso] = useState<string | null>(null)
   const [pret, setPret] = useState(false)
   const [participants, setParticipants] = useState<SessionParticipant[]>([])
-  const [enLigne, setEnLigne] = useState<Set<string>>(new Set())
   const [phase, setPhase] = useState<'loading' | 'ok' | 'refuse'>('loading')
   const [busy, setBusy] = useState(false)
   const initDone = useRef(false)
+
+  // Présence : canal unique et partagé pour toute la session (cf. session-realtime).
+  const enLigne = useSessionPresence(id, phase === 'ok' ? userId : null, 'joueur')
 
   const rafraichirParticipants = useCallback(async () => {
     setParticipants(await fetchParticipants(id))
@@ -130,47 +133,24 @@ export default function LobbyJoueurPage() {
   // Realtime : statut de session (démarrage/pause/fin) + participants.
   useEffect(() => {
     if (phase !== 'ok') return
-    const channel = supabase
-      .channel(`session-joueur:${id}`)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'game_sessions', filter: `id=eq.${id}` },
-        (payload) => {
-          const next = payload.new as GameSession
-          setSession((s) => (s ? { ...s, ...next } : s))
-          if (next.status === 'ended') router.replace('/dashboard')
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'session_participants', filter: `session_id=eq.${id}` },
-        () => void rafraichirParticipants()
-      )
-      .subscribe()
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    return ouvrirCanal(`session-joueur:${id}`, (c) =>
+      c
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'game_sessions', filter: `id=eq.${id}` },
+          (payload) => {
+            const next = payload.new as GameSession
+            setSession((s) => (s ? { ...s, ...next } : s))
+            if (next.status === 'ended') router.replace('/dashboard')
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'session_participants', filter: `session_id=eq.${id}` },
+          () => void rafraichirParticipants()
+        )
+    )
   }, [id, phase, router, rafraichirParticipants])
-
-  // Présence.
-  useEffect(() => {
-    if (phase !== 'ok' || !userId) return
-    const channel = supabase.channel(`session-presence:${id}`, {
-      config: { presence: { key: userId } }
-    })
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        setEnLigne(new Set(Object.keys(channel.presenceState())))
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await channel.track({ role: 'joueur', at: new Date().toISOString() })
-        }
-      })
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [id, phase, userId])
 
   const choisirPerso = async (pid: string) => {
     setBusy(true)

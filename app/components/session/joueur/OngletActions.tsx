@@ -3,9 +3,11 @@
 // Onglet « Actions » (Phase 3.3) — attaques, sorts + emplacements visuels,
 // concentration, ressources de classe (compteurs), capacités race/background.
 
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { CharacterSheet, ClassResource, SortJoue } from '@/app/lib/session-live'
 import type { SessionJoueurApi } from './useSessionJoueur'
+import { useModalEffects } from '@/app/components/ui/Modal'
 
 export default function OngletActions({
   sheet,
@@ -23,6 +25,10 @@ export default function OngletActions({
   const [detail, setDetail] = useState<SortJoue | null>(null)
   const [nouvRes, setNouvRes] = useState('')
   const [nouvResMax, setNouvResMax] = useState('')
+
+  // Échap ferme le détail + verrou du défilement de fond.
+  const fermerDetail = useCallback(() => setDetail(null), [])
+  useModalEffects(detail !== null, fermerDetail)
 
   // Regroupe les sorts par niveau.
   const parNiveau = new Map<number, SortJoue[]>()
@@ -207,11 +213,14 @@ export default function OngletActions({
         </section>
       )}
 
-      {/* Détail d'un sort */}
-      {detail && (
-        <div className="fixed inset-0 z-[130] bg-black/70 flex items-end sm:items-center justify-center p-3" onClick={() => setDetail(null)}>
+      {/* Détail d'un sort — porté dans document.body : feuille inférieure sur
+          mobile, l'ancrage viewport ne doit pas dépendre des ancêtres. */}
+      {detail && createPortal(
+        <div className="fixed inset-0 z-[130] bg-black/70 flex items-end sm:items-center justify-center p-3"
+          role="dialog" aria-modal="true"
+          onClick={(e) => { if (e.target === e.currentTarget) setDetail(null) }}>
           <div className="w-full max-w-md rounded-2xl border-2 p-4 max-h-[80vh] overflow-y-auto"
-            style={{ background: '#15110a', borderColor: 'rgba(201,168,76,0.5)' }} onClick={(e) => e.stopPropagation()}>
+            style={{ background: '#15110a', borderColor: 'rgba(201,168,76,0.5)' }}>
             <div className="flex items-start justify-between mb-2">
               <h3 className="font-bold text-lg" style={{ color: '#C9A84C', fontFamily: 'Georgia, serif' }}>{detail.nom}</h3>
               <button type="button" onClick={() => setDetail(null)} className="text-stone-400 text-xl leading-none">✕</button>
@@ -237,7 +246,8 @@ export default function OngletActions({
               Lancer le sort
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

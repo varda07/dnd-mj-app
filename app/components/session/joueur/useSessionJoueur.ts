@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { ouvrirCanal } from '@/app/lib/session-realtime'
 import {
   fetchCharacterSheet,
   fetchCharacterSpells,
@@ -88,39 +89,39 @@ export function useSessionJoueur(sessionId: string, characterId: string | null) 
 
   // Realtime : état vivant (MJ ↔ PJ) + état diffusé.
   useEffect(() => {
-    const channel = supabase
-      .channel(`session-live:${sessionId}:${characterId ?? 'none'}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'character_live_state',
-          filter: `session_id=eq.${sessionId}`
-        },
-        (payload) => {
-          const row = payload.new as Record<string, unknown>
-          if (row && characterId && row.character_id === characterId) {
-            void fetchLiveState(sessionId, characterId).then((lv) => lv && setLive(lv))
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'session_state',
-          filter: `session_id=eq.${sessionId}`
-        },
-        () => void fetchSessionState(sessionId).then(setSessionState)
-      )
-      .subscribe((status) => {
+    return ouvrirCanal(
+      `session-live:${sessionId}:${characterId ?? 'none'}`,
+      (c) =>
+        c
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'character_live_state',
+              filter: `session_id=eq.${sessionId}`
+            },
+            (payload) => {
+              const row = payload.new as Record<string, unknown>
+              if (row && characterId && row.character_id === characterId) {
+                void fetchLiveState(sessionId, characterId).then((lv) => lv && setLive(lv))
+              }
+            }
+          )
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'session_state',
+              filter: `session_id=eq.${sessionId}`
+            },
+            () => void fetchSessionState(sessionId).then(setSessionState)
+          ),
+      (status) => {
         setConn(status === 'SUBSCRIBED' ? 'connecte' : status === 'CLOSED' ? 'hors-ligne' : 'reconnexion')
-      })
-    return () => {
-      supabase.removeChannel(channel)
-    }
+      }
+    )
   }, [sessionId, characterId])
 
   // Applique un patch optimiste + persiste.

@@ -12,7 +12,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { setSessionStatus, SETUP_LABEL, type GameSession } from '@/app/lib/session'
 import { fetchSessionState, patchSessionState, type SessionState } from '@/app/lib/session-live'
-import { supabase } from '@/lib/supabase'
+import { ouvrirCanal } from '@/app/lib/session-realtime'
 import PanneauPreparation from './PanneauPreparation'
 import PanneauTable from './PanneauTable'
 import PanneauOutils from './PanneauOutils'
@@ -47,22 +47,19 @@ export default function SessionMJ({
 
   useEffect(() => {
     void rechargerEtat()
-    const channel = supabase
-      .channel(`session-mj-state:${sessionId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'session_state', filter: `session_id=eq.${sessionId}` },
-        () => void rechargerEtat()
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'game_sessions', filter: `id=eq.${sessionId}` },
-        (payload) => setStatut((payload.new as GameSession).status)
-      )
-      .subscribe()
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    return ouvrirCanal(`session-mj-state:${sessionId}`, (c) =>
+      c
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'session_state', filter: `session_id=eq.${sessionId}` },
+          () => void rechargerEtat()
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'game_sessions', filter: `id=eq.${sessionId}` },
+          (payload) => setStatut((payload.new as GameSession).status)
+        )
+    )
   }, [sessionId, rechargerEtat])
 
   const patchState = useCallback(

@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { ouvrirCanal } from '@/app/lib/session-realtime'
 
 type SessionARejoindre = {
   session_id: string
@@ -51,17 +52,16 @@ export default function SessionBanner() {
   // Realtime : une session lancée / mise à jour apparaît sans rafraîchir.
   useEffect(() => {
     if (!userId) return
-    const channel = supabase
-      .channel(`session-banner:${userId}`)
-      .on(
+    const fermer = ouvrirCanal(`session-banner:${userId}`, (c) =>
+      c.on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'game_sessions' },
         () => void charger()
       )
-      .subscribe()
+    )
     const interval = setInterval(() => void charger(), 5 * 60 * 1000)
     return () => {
-      supabase.removeChannel(channel)
+      fermer()
       clearInterval(interval)
     }
   }, [userId, charger])

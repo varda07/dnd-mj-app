@@ -5,7 +5,7 @@
 // existant via combat-engine). Contrôles de session : dans l'en-tête (SessionMJ).
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { ouvrirCanal } from '@/app/lib/session-realtime'
 import { useCombatEngine } from '@/app/lib/combat-engine'
 import CombatCockpitMJ from '@/app/components/presentation/CombatCockpitMJ'
 import ActionWheelMJ from '@/app/components/presentation/ActionWheelMJ'
@@ -49,13 +49,9 @@ export default function PanneauOutils({
   }, [sessionId])
   useEffect(() => {
     void chargerJournal()
-    const channel = supabase
-      .channel(`session-journal:${sessionId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'session_events', filter: `session_id=eq.${sessionId}` }, () => void chargerJournal())
-      .subscribe()
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    return ouvrirCanal(`session-journal:${sessionId}`, (c) =>
+      c.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'session_events', filter: `session_id=eq.${sessionId}` }, () => void chargerJournal())
+    )
   }, [sessionId, chargerJournal])
 
   const onWheel = (key: string) => {

@@ -14,6 +14,7 @@ import {
   type CharacterLiveState
 } from '@/app/lib/session-live'
 import { CONDITIONS_MAP } from '@/app/data/conditions'
+import { ouvrirCanal, useSessionPresence } from '@/app/lib/session-realtime'
 
 type Perso = { id: string; nom: string; image_url: string | null; hp_max: number; ca: number | null }
 type Ligne = {
@@ -25,10 +26,14 @@ type Ligne = {
 
 export default function PanneauTable({ sessionId }: { sessionId: string }) {
   const [lignes, setLignes] = useState<Ligne[]>([])
-  const [enLigne, setEnLigne] = useState<Set<string>>(new Set())
   const [mjId, setMjId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saisie, setSaisie] = useState<Record<string, string>>({})
+
+  // Même salon de présence que la page MJ : un seul canal, partagé et compté
+  // par références (cf. session-realtime). Ouvrir un second canal sur ce topic
+  // faisait lever `.on('presence')` et coupait le canal de la page.
+  const enLigne = useSessionPresence(sessionId, mjId, 'mj')
 
   const charger = useCallback(async () => {
     const parts = (await fetchParticipants(sessionId)).filter(
@@ -64,29 +69,12 @@ export default function PanneauTable({ sessionId }: { sessionId: string }) {
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setMjId(data.user?.id ?? null))
     void charger()
-    const channel = supabase
-      .channel(`session-table:${sessionId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'character_live_state', filter: `session_id=eq.${sessionId}` }, () => void charger())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'session_participants', filter: `session_id=eq.${sessionId}` }, () => void charger())
-      .subscribe()
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    return ouvrirCanal(`session-table:${sessionId}`, (c) =>
+      c
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'character_live_state', filter: `session_id=eq.${sessionId}` }, () => void charger())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'session_participants', filter: `session_id=eq.${sessionId}` }, () => void charger())
+    )
   }, [sessionId, charger])
-
-  // Présence.
-  useEffect(() => {
-    if (!mjId) return
-    const channel = supabase.channel(`session-presence:${sessionId}`, { config: { presence: { key: mjId } } })
-    channel
-      .on('presence', { event: 'sync' }, () => setEnLigne(new Set(Object.keys(channel.presenceState()))))
-      .subscribe(async (s) => {
-        if (s === 'SUBSCRIBED') await channel.track({ role: 'mj' })
-      })
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [sessionId, mjId])
 
   const modifierHp = async (l: Ligne, delta: number) => {
     const max = l.live?.max_hp_override ?? l.perso.hp_max
