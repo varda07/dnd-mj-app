@@ -27,6 +27,8 @@ import ModaleMonteeNiveau, {
 } from './ModaleMonteeNiveau'
 import NumberInput from '@/app/components/NumberInput'
 import GuidedTour from '@/app/components/GuidedTour'
+import InventaireSection from '@/app/components/personnages/InventaireSection'
+import { MONNAIES } from '@/app/lib/inventaire'
 
 type StatKey = 'force' | 'dexterite' | 'constitution' | 'intelligence' | 'sagesse' | 'charisme'
 
@@ -76,6 +78,12 @@ type Personnage = {
   sorts_slots_max: Record<string, number>
   sorts_slots_used: Record<string, number>
   classes_multiples: ClasseMultiple[]
+  // Phase 2.5 — monnaie (cuivre/argent/électrum/or/platine).
+  pc: number
+  pa: number
+  pe: number
+  po: number
+  pp: number
 }
 
 type Sort = {
@@ -165,7 +173,12 @@ const FICHE_COLUMNS = [
   'autres_maitrises',
   'sorts_slots_max',
   'sorts_slots_used',
-  'classes_multiples'
+  'classes_multiples',
+  'pc',
+  'pa',
+  'pe',
+  'po',
+  'pp'
 ] as const
 
 const modifier = (v: number) => Math.floor((v - 10) / 2)
@@ -206,7 +219,12 @@ const normalize = (row: Record<string, unknown>): Personnage => ({
     (row.sorts_slots_used as Record<string, number>) ?? {},
   classes_multiples: Array.isArray(row.classes_multiples)
     ? (row.classes_multiples as ClasseMultiple[])
-    : []
+    : [],
+  pc: (row.pc as number) ?? 0,
+  pa: (row.pa as number) ?? 0,
+  pe: (row.pe as number) ?? 0,
+  po: (row.po as number) ?? 0,
+  pp: (row.pp as number) ?? 0
 })
 
 export default function FichePersonnage() {
@@ -2214,12 +2232,36 @@ export default function FichePersonnage() {
               </Panel>
             </div>
 
-            <Panel title="Équipement">
+            {/* Phase 2.5 — Inventaire structuré + monnaie (préalable onglet Sac PJ). */}
+            <Panel title="Inventaire">
+              {/* Monnaie */}
+              <div className="grid grid-cols-5 gap-1.5 mb-3">
+                {MONNAIES.map((m) => (
+                  <div key={m.key} className="text-center">
+                    <p className="text-[10px] uppercase tracking-wider text-yellow-600" title={m.long}>
+                      {m.label}
+                    </p>
+                    <input
+                      value={perso[m.key]}
+                      onChange={(e) =>
+                        update(m.key, Math.max(0, parseInt(e.target.value.replace(/[^0-9]/g, ''), 10) || 0))
+                      }
+                      disabled={!isOwner}
+                      inputMode="numeric"
+                      className="w-full mt-0.5 bg-stone-900/60 border border-yellow-800/30 rounded px-1 py-1 text-sm text-center text-yellow-100 outline-none disabled:opacity-70"
+                    />
+                  </div>
+                ))}
+              </div>
+              <InventaireSection personnageId={perso.id} isOwner={isOwner} />
+            </Panel>
+
+            <Panel title="Équipement (notes)">
               <textarea
                 value={perso.equipement}
                 onChange={(e) => update('equipement', e.target.value)}
-                placeholder="Sac à dos, corde (15m), torches (10), rations (5 jours), bourse avec 50 po..."
-                className="w-full h-32 bg-stone-900/60 border border-yellow-800/30 rounded p-2 text-sm text-gray-200 outline-none resize-y"
+                placeholder="Notes libres : sac à dos, corde (15m), torches, rations..."
+                className="w-full h-24 bg-stone-900/60 border border-yellow-800/30 rounded p-2 text-sm text-gray-200 outline-none resize-y"
               />
             </Panel>
 

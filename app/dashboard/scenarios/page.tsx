@@ -19,6 +19,7 @@ import StarFavori from '@/app/components/StarFavori'
 import ActionMenu from '@/app/components/ui/ActionMenu'
 import TemplatesScenariosGallery from '@/app/components/TemplatesScenariosGallery'
 import AssistantScenario from '@/app/components/scenarios/AssistantScenario'
+import LancerSessionButton from '@/app/components/session/LancerSessionButton'
 import { ChoiceCard, ChoiceGrid, FormActions } from '@/app/components/ui/FormKit'
 import { useFavoris } from '@/app/lib/favoris'
 import { unlockAchievement } from '@/app/lib/achievements'
@@ -561,6 +562,12 @@ export default function Scenarios() {
                   >
                     👥 Inviter
                   </button>
+                  {/* Mode Session — lance une vraie session de jeu (remplace Diffuser). */}
+                  <LancerSessionButton
+                    scenarioId={scenario.id}
+                    scenarioNom={scenario.nom}
+                    compact
+                  />
                   <ActionMenu
                     actions={[
                       {

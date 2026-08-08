@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase'
 import { useFavoris, type FavoriType } from '@/app/lib/favoris'
 import type { DashboardPrefs, WidgetInstance } from '@/app/lib/widgets'
 import CustomDashboard from '@/app/components/CustomDashboard'
+import SessionBanner from '@/app/components/session/SessionBanner'
 
 type ScenarioLite = { id: string; nom: string; actif?: boolean }
 type PersoLite = {
@@ -398,6 +399,8 @@ export default function Dashboard() {
         <p className="grimoire-slogan">— Fortis Fortuna Adiuvat —</p>
         <div className="grimoire-divider-line" />
       </header>
+      {/* Mode Session — bandeau « Rejoindre » si une session t'attend (temps réel). */}
+      <SessionBanner />
       {/* Sous le titre : bascule MJ/Joueur. Centrée sur mobile ET desktop. */}
       <div className="h-12 md:h-auto px-3 md:p-3 flex items-center justify-center gap-2 border-b border-[rgba(201,168,76,0.10)] theme-header-border theme-no-deco">
         <div className="grimoire-pill-group">

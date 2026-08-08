@@ -28,6 +28,7 @@ const TYPE_EMOJI: Record<string, string> = {
   commentaire: '💬',
   like: '❤️',
   combat: '⚔️',
+  session: '🎲',
   // Annonces globales (V1 3.2)
   maintenance: '🔧',
   nouveaute: '🎉',

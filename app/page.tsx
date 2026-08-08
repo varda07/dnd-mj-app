@@ -21,6 +21,12 @@ export default function Home() {
     try {
       const code = localStorage.getItem('pending_invite_code')
       if (code) return `/rejoindre/${code}`
+      // Mode Session : retour direct vers la session/lobby après connexion.
+      const url = localStorage.getItem('pending_return_url')
+      if (url) {
+        localStorage.removeItem('pending_return_url')
+        return url
+      }
     } catch {}
     return '/dashboard'
   }
