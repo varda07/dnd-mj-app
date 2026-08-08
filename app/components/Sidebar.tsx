@@ -16,6 +16,7 @@ import {
   type ThemeKey
 } from '@/app/styles/themes'
 import { useAdminMode } from '@/app/lib/adminMode'
+import { useSessionActive } from '@/app/lib/session-active'
 
 type NavItem = {
   label: string
@@ -76,6 +77,8 @@ export default function Sidebar() {
   const { locale, setLocale } = useLocale()
   // Mode Admin / Mode Public (toggle UX réservé aux comptes is_admin).
   const { isAdmin, modeActif: adminModeActif, setMode: setAdminMode } = useAdminMode()
+  // Session ouverte qui me concerne (MJ ou joueur), suivie en temps réel.
+  const sessionActive = useSessionActive()
 
   const [drawerOuvert, setDrawerOuvert] = useState(false)
   const [replie, setReplie] = useState(false)
@@ -299,7 +302,7 @@ export default function Sidebar() {
   ]
 
   // ⚔️ AVENTURE — Roadmap Finalisation 3.1/3.2 : deux hubs dépliables (Combat,
-  // Cartes & Exploration) + Présentation en accès direct.
+  // Cartes & Exploration) + accès direct à la session en cours.
   const hubCombatItems: NavItem[] = [
     { label: t('adv_combat_prepare'), icon: '🛠', href: '/dashboard/combat-prepare' },
     { label: t('adv_combat_rapide'), icon: '⚡', href: '/dashboard/combat-rapide' },
@@ -322,9 +325,18 @@ export default function Sidebar() {
     { label: 'Carte du monde', icon: '🧭', href: '/dashboard/maps/hexcrawl' },
     { label: t('adv_exploration'), icon: '🏞', href: '/dashboard/exploration' }
   ]
-  const presentationItem: NavItem = {
-    label: t('adv_presentation'), icon: '📺', href: '/dashboard/presentation'
-  }
+  // Phase 5 — l'ancienne entrée « Présentation » est remplacée par un accès
+  // direct à la session en cours. Elle n'apparaît que s'il y en a une, mène au
+  // bon poste selon le rôle (cockpit MJ ou poste joueur), et se met à jour en
+  // temps réel : le joueur voit l'entrée surgir dès que le MJ lance la séance.
+  const sessionItem: NavItem | null = sessionActive
+    ? {
+        label: 'Session en cours',
+        icon: '🎲',
+        href: sessionActive.href,
+        match: (p) => p.startsWith('/session/')
+      }
+    : null
 
   // ⚙️ OUTILS — utilitaires transverses (+ Succès, Historique, Tables d'effets
   // branchés en Roadmap Finalisation 2.1/2.5/2.6).
@@ -710,7 +722,7 @@ export default function Sidebar() {
             </>
           )}
 
-          {/* ===== ⚔️ AVENTURE : hubs Combat & Cartes + Présentation ===== */}
+          {/* ===== ⚔️ AVENTURE : hubs Combat & Cartes + Session en cours ===== */}
           {renderCollapsible(
             'aventure',
             t('section_aventure'),
@@ -718,7 +730,16 @@ export default function Sidebar() {
               {renderHub('hub_combat', '⚔️', 'Combat', hubCombatItems)}
               {renderHub('hub_cartes', '🗺️', 'Cartes', hubCartesItems)}
               {renderHub('hub_exploration', '🌍', 'Univers', hubExplorationItems)}
-              {renderNavItem(presentationItem)}
+              {sessionItem && (
+                <div className="relative" data-tour="nav-session">
+                  {renderNavItem(sessionItem)}
+                  <span
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse pointer-events-none"
+                    aria-hidden="true"
+                    title={sessionActive?.statut === 'paused' ? 'Session en pause' : 'Session ouverte'}
+                  />
+                </div>
+              )}
             </>
           )}
 

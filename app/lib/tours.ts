@@ -41,17 +41,33 @@ export const TOURS: Record<string, Tour> = {
     steps: [
       { title: '🛠 Préparer un combat', text: "Configure tes combats à l'avance : choisis les ennemis, règle l'initiative et sauvegarde-les pour les lancer en un clic pendant la session." },
       { selector: '[data-tour="prepare-creer"]', title: 'Créer un combat préparé', text: "Donne un nom à ton combat et ajoute-le à la liste des combats de ce scénario." },
-      { title: '⚡ Lancer plus tard', text: "Tes combats préparés sont accessibles depuis le cockpit de diffusion et le dashboard — prêts à lancer ou à diffuser instantanément." },
+      { title: '⚡ Lancer plus tard', text: "Tes combats préparés sont accessibles depuis le cockpit MJ de la session et le dashboard — prêts à lancer instantanément." },
     ],
   },
-  diffusion: {
-    id: 'diffusion',
-    titre: 'Le mode diffusion',
+  // ==========================================================================
+  // Phase 5 — le mode diffusion a été remplacé par le mode session. Deux tours
+  // distincts : un par poste, car MJ et joueur ne voient pas le même écran.
+  // ==========================================================================
+  'session-mj': {
+    id: 'session-mj',
+    titre: 'Le cockpit MJ',
     steps: [
-      { title: '📺 Mode diffusion', text: "Diffuse une vue joueurs (TV / second écran) pendant que tu gardes le contrôle MJ. Voici les outils principaux." },
-      { selector: '[data-tour="diffusion-tabs"]', title: 'Les onglets', text: "Bascule entre Narration, Combat, Carte, Sons… chaque onglet pilote ce que voient les joueurs." },
-      { selector: '[data-tour="diffusion-lancer"]', title: 'Lancer la diffusion', text: "Génère un lien public + QR code que tes joueurs ouvrent sans compte pour voir l'écran partagé." },
-      { title: '🎡 Roue d\'action', text: "La roue flottante (déplaçable) pousse rapidement une narration, une image, un son ou gère le combat en direct." },
+      { title: '🎲 Ta session est ouverte', text: "Tout tient sur un écran : ta préparation à gauche, ta zone de travail au centre, ta table à droite. Les joueurs ont chacun leur poste, synchronisé en temps réel." },
+      { selector: '[data-tour="session-preparation"]', title: 'Ma préparation', text: "Chapitres, lieux, PNJ, rencontres, notes — avec compteurs et recherche. Un clic sur une entrée change la zone de travail ; un clic sur une rencontre préparée lance le combat." },
+      { selector: '[data-tour="session-table"]', title: 'Ma table', text: "Une carte par joueur, toujours visible : connexion, PV exacts, CA, ressources, concentration. Les boutons −5 / +5 arrivent instantanément sur l'écran du joueur." },
+      { selector: '[data-tour="session-repos"]', title: 'Repos court & repos long', text: "Applique un repos à toute la table d'un clic : les ressources et les emplacements de sorts se rechargent chez chaque joueur, PV au maximum pour le repos long." },
+      { title: '🎡 La roue d\'action', text: "Le bouton MS flottant (déplaçable) déploie six pétales : image, narration, sons, dés, rencontre et magie sauvage. Les trois premiers apparaissent immédiatement chez tous les joueurs." },
+    ],
+  },
+  'session-joueur': {
+    id: 'session-joueur',
+    titre: 'Ton poste de jeu',
+    steps: [
+      { title: '🎲 Bienvenue à la table', text: "Ton personnage tient dans une roue, en bas de l'écran. Le reste de l'écran est à ce que le MJ te montre." },
+      { selector: '[data-tour="roue-joueur"]', title: 'La roue du personnage', text: "L'arc extérieur est ta jauge de points de vie — c'est le seul endroit où ils s'affichent. Les cinq pétales ouvrent tes menus : Compétences, Sorts, Notes, Actions, Sac. Appuie au centre pour gérer tes PV." },
+      { title: '📖 Déplier une ligne', text: "Dans un menu, appuie sur une ligne : sa description apparaît, avec un bouton « Lancer » quand l'élément se jette. Une seule ligne ouverte à la fois." },
+      { title: '⭕ Les ronds d\'usage', text: "Emplacements de sorts, capacités limitées et objets à charges affichent des ronds : ils se consomment de droite à gauche, et un clic sur un rond gris te le restitue. Tes compétences et tes attaques d'arme n'en ont pas — elles ne sont pas limitées." },
+      { selector: '[data-tour="zone-diffusion"]', title: 'Ce que le MJ diffuse', text: "Image, narration et ambiance sonore arrivent ici en direct. Quand le MJ ne diffuse rien, la zone affiche le journal de table. En combat, elle bascule sur la vue combat." },
     ],
   },
   scenario: {
@@ -189,7 +205,7 @@ export const TOURS: Record<string, Tour> = {
     steps: [
       { title: '🎵 Sound Box', text: "Gère l'ambiance sonore de tes sessions : musiques d'ambiance et effets ponctuels." },
       { title: '🔊 Tes sons', text: "Ajoute tes propres sons et déclenche-les en un clic pendant le jeu." },
-      { title: '📡 En diffusion', text: "Pousse une ambiance directement vers l'écran joueurs depuis le mode diffusion." },
+      { title: '📡 En session', text: "Le pétale « Sons » de la roue d'action MJ pousse une ambiance directement chez tous les joueurs." },
     ],
   },
   'dashboard-perso': {

@@ -417,7 +417,7 @@ export default function DiceLauncher({
 } = {}) {
   const [open, setOpen] = useState(false)
   const [shake, setShake] = useState(false)
-  // Mode diffusion MJ : la roue d'action remplace ce FAB. On masque alors le
+  // Cockpit MJ : la roue d'action remplace ce FAB. On masque alors le
   // FAB classique (event `dice:fab-hidden`) pour ne jamais avoir deux boutons.
   const [fabHidden, setFabHidden] = useState(false)
   useEffect(() => {

@@ -263,7 +263,7 @@ function TutorielsSection() {
           </h2>
           <p className="text-xs text-gray-400 mt-1">
             Affiche un guide pas-à-pas à la première visite des pages importantes
-            (combat, diffusion, scénario…). Tu peux toujours le relancer via le
+            (combat, session, scénario…). Tu peux toujours le relancer via le
             bouton 🎓 en bas à gauche de ces pages.
           </p>
         </div>

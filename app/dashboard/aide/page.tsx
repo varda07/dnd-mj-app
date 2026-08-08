@@ -66,11 +66,11 @@ const ARTICLES: Article[] = [
     contenu: `Dans un combat actif, ouvre le menu **« 💥 Effet de zone »**. Saisis l'expression de dégâts (ex : 8d6), le type de sauvegarde (DEX/CON), le DD. Coche les cibles, l'app applique automatiquement plein/moitié dégâts.`,
   },
   {
-    id: 'presentation',
-    titre: 'Diffuser sur une TV (mode Présentation)',
+    id: 'session',
+    titre: 'Lancer une session de jeu',
     categorie: 'Mode Aventure',
-    icon: '📺',
-    contenu: `Va dans **Présentation** et démarre une session. Tu obtiens un QR code à scanner depuis n'importe quel écran : tablet, TV via navigateur, etc. Tout ce que tu fais côté MJ est diffusé en temps réel.`,
+    icon: '🎲',
+    contenu: `Depuis un scénario, clique **« 🎲 Lancer la session »** : tu choisis le setup (PC+TV, PC+téléphones, MJ seul…) et le lobby s'ouvre. Tes joueurs reçoivent une notification et rejoignent avec leur personnage — chacun a son poste de jeu (la roue du personnage), toi ton cockpit MJ, et l'écran TV s'ouvre sur **/session/…/ecran**. Tout est synchronisé en temps réel : PV, images, narration, ambiance, combat. L'entrée **« Session en cours »** du menu te ramène à la partie à tout moment.`,
   },
   // ---------- Outils ----------
   {

@@ -203,7 +203,7 @@ export function AtelierPanelContent() {
           )}
           {vue === 'joueurs' && (
             <p className="text-[11px] text-emerald-300/80 mt-2">
-              👁 Aperçu « Vue joueurs » : sur la carte diffusée, les annotations, pièges et triggers MJ restent cachés aux joueurs.
+              👁 Aperçu « Vue joueurs » : sur la carte partagée en session, les annotations, pièges et triggers MJ restent cachés aux joueurs.
             </p>
           )}
         </div>

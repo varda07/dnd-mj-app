@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { Persona, Ennemi } from '@/app/dashboard/presentation/page'
+import type { Persona, Ennemi } from '@/app/lib/combat-types'
 
 type Participant = { kind: 'perso' | 'ennemi'; ref_id: string; nom: string; image_url: string | null }
 type CombatPrepare = {

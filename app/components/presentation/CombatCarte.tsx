@@ -1,7 +1,7 @@
 'use client'
 
 // ============================================================================
-// Refonte combat diffusion — PHASE 3 : Carte tactique
+// Carte tactique de combat
 // ----------------------------------------------------------------------------
 // Plateau de jetons partagé MJ ⇄ joueurs. Positions normalisées (0..1) pour
 // rester indépendantes de la résolution. Côté MJ : drag des jetons. Côté

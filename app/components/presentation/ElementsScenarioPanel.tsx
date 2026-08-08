@@ -6,9 +6,9 @@ import { supabase } from '@/lib/supabase'
 // ============================================================================
 // ElementsScenarioPanel — Corrections V1 Vague 2 (1.2)
 // ----------------------------------------------------------------------------
-// Panneau du cockpit de diffusion donnant au MJ un accès RAPIDE aux éléments
+// Panneau du cockpit de session donnant au MJ un accès RAPIDE aux éléments
 // qu'il a liés au scénario actif (ennemis / PNJ / maps / items) SANS quitter la
-// diffusion : consultation des fiches + affichage aux joueurs (image plein
+// session : consultation des fiches + affichage aux joueurs (image plein
 // écran) pour ceux qui ont un visuel.
 //
 // Les liens vivent dans `scenario_liens` (element_type, element_id). La RLS

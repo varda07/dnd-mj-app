@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 // ----------------------------------------------------------------------------
 // Le MJ prépare des combats EN AMONT (nom, scénario, ennemis, PJ, notes, carte
 // optionnelle + placement de jetons, conditions de départ), les sauvegarde
-// (combats_prepares) et les lance le jour J en combat rapide ou en diffusion.
+// (combats_prepares) et les lance le jour J en combat rapide ou en session.
 // La page combat live complète (/dashboard/combat) reste disponible séparément.
 // ============================================================================
 
@@ -24,6 +24,7 @@ import {
   type PrepParticipant
 } from '@/app/lib/combats-prepares'
 import CombatCarte, { type Jeton } from '@/app/components/presentation/CombatCarte'
+import { routeSession } from '@/app/lib/session-active'
 import GuidedTour from '@/app/components/GuidedTour'
 
 type ScenarioLite = { id: string; nom: string }
@@ -372,7 +373,7 @@ function CombatPrepareInner() {
                       onChange={(e) => patchDraft({ conditions_depart: { ...draft.conditions_depart, surprise: e.target.checked } })}
                       className="accent-yellow-500"
                     />
-                    🌫 Round de surprise (ennemis cachés au départ en diffusion)
+                    🌫 Round de surprise (ennemis cachés au départ côté joueurs)
                   </label>
                 </div>
 
@@ -462,7 +463,7 @@ function CombatPrepareInner() {
               return
             }
             if (mode === 'rapide') router.push(`/dashboard/combat-rapide?scenario=${scnId}`)
-            else router.push(`/dashboard/presentation?scenario=${scnId}&diffuser=1`)
+            else router.push(await routeSession(scnId))
           }}
         />
       )}
@@ -477,7 +478,7 @@ function LancerModal({
 }: {
   combat: CombatPrepare
   onClose: () => void
-  onLancer: (mode: 'rapide' | 'diffusion') => void
+  onLancer: (mode: 'rapide' | 'session') => void
 }) {
   return (
     <div className="fixed inset-0 z-[120] bg-black/75 flex items-center justify-center p-3" onClick={onClose} role="dialog" aria-modal="true">
@@ -490,10 +491,10 @@ function LancerModal({
           <p className="text-xs text-gray-400 mb-1">Choisis le mode de lancement :</p>
           <button type="button" onClick={() => onLancer('rapide')} className="w-full px-4 py-3 rounded border border-gray-600 text-left hover:border-yellow-600 hover:bg-yellow-500/5 transition">
             <span className="text-sm font-bold text-gray-100">⚡ Combat rapide</span>
-            <span className="block text-[11px] text-gray-400">MJ seul, un écran, sans diffusion</span>
+            <span className="block text-[11px] text-gray-400">MJ seul, un écran, sans vue joueurs</span>
           </button>
-          <button type="button" onClick={() => onLancer('diffusion')} className="w-full px-4 py-3 rounded border border-[rgba(201,168,76,0.4)] text-left hover:bg-[rgba(201,168,76,0.12)] transition">
-            <span className="text-sm font-bold text-[#ffe6a8]">📡 Mode diffusion</span>
+          <button type="button" onClick={() => onLancer('session')} className="w-full px-4 py-3 rounded border border-[rgba(201,168,76,0.4)] text-left hover:bg-[rgba(201,168,76,0.12)] transition">
+            <span className="text-sm font-bold text-[#ffe6a8]">🎲 En session</span>
             <span className="block text-[11px] text-gray-400">Vue joueurs synchronisée (TV / téléphones)</span>
           </button>
         </div>

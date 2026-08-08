@@ -23,6 +23,7 @@ import NumberInput from '@/app/components/NumberInput'
 import WildMagicRoller from '@/app/components/WildMagicRoller'
 import SituationsRandom from '@/app/components/SituationsRandom'
 import GuidedTour from '@/app/components/GuidedTour'
+import { routeSession } from '@/app/lib/session-active'
 
 type Scenario = { id: string; nom: string; bg_image_url: string | null; mj_id: string }
 
@@ -1571,13 +1572,11 @@ function CombatInner() {
           >
             🧮 Calculateur de rencontre
           </button>
-          {/* Moteur unifié — bascule vers le mode diffusion (état préservé : la
-              ligne combats est partagée par scénario). */}
+          {/* Moteur unifié — bascule vers la session en cours (état préservé :
+              la ligne combats est partagée par scénario). */}
           <button
             type="button"
-            onClick={() =>
-              router.push(`/dashboard/presentation?scenario=${scenarioId}&diffuser=1`)
-            }
+            onClick={async () => router.push(await routeSession(scenarioId))}
             disabled={!scenarioId}
             title={!scenarioId ? 'Sélectionne un scénario d\'abord' : 'Diffuser ce combat avec vue joueurs'}
             className="px-3 py-1.5 text-xs uppercase tracking-[0.16em] font-bold rounded border border-[rgba(201,168,76,0.5)] text-[#ffe6a8] bg-[rgba(201,168,76,0.1)] hover:bg-[rgba(201,168,76,0.2)] transition disabled:opacity-40"

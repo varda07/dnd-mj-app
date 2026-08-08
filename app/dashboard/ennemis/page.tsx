@@ -61,7 +61,7 @@ type Ennemi = {
   // Roadmap 6.4 — combat de masse.
   est_groupe?: boolean
   taille_groupe?: number
-  // Refonte combat diffusion — mitigation des dégâts.
+  // Mitigation des dégâts en combat.
   resistances?: string[]
   immunites?: string[]
   vulnerabilites?: string[]
@@ -205,7 +205,7 @@ export default function Ennemis() {
   const [notes, setNotes] = useState('')
   // Roadmap 6.3 — comportement tactique (texte libre + suggestion selon INT).
   const [comportementTactique, setComportementTactique] = useState('')
-  // Refonte combat diffusion — résistances / immunités / vulnérabilités
+  // Résistances / immunités / vulnérabilités
   // (saisies en texte séparé par des virgules, stockées en array jsonb).
   const [resistances, setResistances] = useState('')
   const [immunites, setImmunites] = useState('')
@@ -638,7 +638,7 @@ export default function Ennemis() {
               />
             </div>
 
-            {/* Refonte combat diffusion — résistances / immunités / vulnérabilités.
+            {/* Résistances / immunités / vulnérabilités.
                 Affichées côté cockpit MJ pendant le combat. Séparer par des virgules. */}
             <div className="rounded border border-gray-700 bg-gray-900/40 p-3 space-y-2">
               <label className="text-sm font-bold text-yellow-300">

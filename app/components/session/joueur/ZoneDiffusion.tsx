@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { resolveEntiteId, type EngineCombat } from '@/app/lib/combat-engine'
-import type { Ennemi, Persona } from '@/app/dashboard/presentation/page'
+import type { Ennemi, Persona } from '@/app/lib/combat-types'
 import CombatVueJoueurs from '@/app/components/presentation/CombatVueJoueurs'
 import { useModalEffects } from '@/app/components/ui/Modal'
 import type { SessionState } from '@/app/lib/session-live'

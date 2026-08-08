@@ -620,7 +620,7 @@ export default function Dashboard() {
                     {[
                       { titre: 'Scénarios', desc: 'Créer et gérer tes aventures', href: '/dashboard/scenarios' },
                       { titre: '🛠 Préparer un combat', desc: 'Configurer des combats à l\'avance', href: '/dashboard/combat-prepare' },
-                      { titre: '⚡ Combat rapide', desc: 'Lancer un combat sans diffusion', href: '/dashboard/combat-rapide' },
+                      { titre: '⚡ Combat rapide', desc: 'Lancer un combat sans vue joueurs', href: '/dashboard/combat-rapide' },
                       { titre: 'Personnages', desc: 'Fiches des joueurs et PJ', href: '/dashboard/personnages' },
                       { titre: 'Ennemis', desc: 'Bestiaire et adversaires', href: '/dashboard/ennemis' },
                       { titre: 'PNJ', desc: 'Personnages non-joueurs', href: '/dashboard/pnj' },
@@ -691,7 +691,7 @@ export default function Dashboard() {
                           {
                             icon: '⚡',
                             titre: 'Combat rapide',
-                            desc: 'Version légère MJ seul, sans diffusion',
+                            desc: 'Version légère MJ seul, sans vue joueurs',
                             href: `/dashboard/combat-rapide?scenario=${scenarioAventureEffectif}`
                           },
                           {
@@ -707,10 +707,10 @@ export default function Dashboard() {
                             href: `/dashboard/exploration?scenario=${scenarioAventureEffectif}`
                           },
                           {
-                            icon: '📺',
-                            titre: 'Présentation',
-                            desc: 'Combat diffusé avec vue joueurs',
-                            href: `/dashboard/presentation?scenario=${scenarioAventureEffectif}`
+                            icon: '🎲',
+                            titre: 'Session',
+                            desc: 'Lancer la session de jeu (MJ + joueurs)',
+                            href: '/dashboard/scenarios'
                           },
                           {
                             icon: '📝',

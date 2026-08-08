@@ -1,7 +1,7 @@
 'use client'
 
 // ============================================================================
-// Refonte combat diffusion — PHASE 2 : Vue Joueurs (épurée & COMPACTE)
+// Vue Joueurs du combat (épurée & COMPACTE)
 // ----------------------------------------------------------------------------
 // Affichée sur la TV / les téléphones quand un combat est actif. Format dense
 // et élégant : barre de tour compacte, mini-timeline d'initiative, deux
@@ -11,7 +11,7 @@
 
 import { CONDITIONS_MAP, isConditionKey } from '@/app/data/conditions'
 import CombatCarte, { type Jeton } from '@/app/components/presentation/CombatCarte'
-import type { CombatLite, Persona, Ennemi, InitiativeEntry } from '@/app/dashboard/presentation/page'
+import type { CombatLite, Persona, Ennemi, InitiativeEntry } from '@/app/lib/combat-types'
 
 function entiteId(e: InitiativeEntry | null | undefined): string | null {
   if (!e) return null

@@ -23,10 +23,10 @@ export default function AventurePage() {
       href: '/dashboard/exploration'
     },
     {
-      icon: '📺',
-      titre: 'Présentation',
-      desc: 'Écran joueurs / mode TV',
-      href: '/dashboard/presentation'
+      icon: '🎲',
+      titre: 'Session',
+      desc: 'Lancer la session : poste MJ, postes joueurs, écran TV',
+      href: '/dashboard/scenarios'
     },
     {
       icon: '📝',

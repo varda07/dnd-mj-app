@@ -986,7 +986,7 @@ export default function ScenarioEditPage() {
             </div>
 
             {/* Roadmap 1.3 — Notes secrètes MJ : jamais affichées aux joueurs
-                ni en mode présentation. */}
+                ni côté joueurs en session. */}
             <div className="rounded-lg border border-yellow-800/40 bg-[#171717]">
               <button
                 type="button"
@@ -1006,7 +1006,7 @@ export default function ScenarioEditPage() {
                   <textarea
                     value={notesSecretes}
                     onChange={(e) => setNotesSecretes(e.target.value)}
-                    placeholder="Twists, identités cachées, pièges… visible uniquement par toi, jamais en présentation."
+                    placeholder="Twists, identités cachées, pièges… visible uniquement par toi, jamais côté joueurs."
                     className="w-full min-h-[140px] bg-[#0f0f0f] text-[13px] text-gray-200 leading-relaxed rounded border border-yellow-900/30 outline-none focus:border-yellow-700/60 p-2 resize-y placeholder-gray-600"
                   />
                   <p className="text-[10px] text-gray-600 italic mt-1">

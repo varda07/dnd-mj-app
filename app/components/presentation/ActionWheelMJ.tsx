@@ -1,7 +1,7 @@
 'use client'
 
 // ============================================================================
-// Roue d'action MJ — mode diffusion UNIQUEMENT
+// Roue d'action MJ — cockpit de session UNIQUEMENT
 // ----------------------------------------------------------------------------
 // Bouton central (monogramme Master Screen) DÉPLAÇABLE (drag & drop), position
 // mémorisée en localStorage. Au clic, 6 pétales se déploient sur un arc calculé

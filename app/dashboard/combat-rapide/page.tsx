@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 // ----------------------------------------------------------------------------
 // Interface allégée mono-écran : le MJ gère initiative + PV + conditions via le
 // MOTEUR unifié (useCombatEngine) et le composant CombatCockpitMJ (réutilisé du
-// mode diffusion). Pas de vue joueurs ici — mais bascule « 📡 Diffuser » d'un
+// mode session). Pas de vue joueurs ici — mais bascule « 📡 Diffuser ce combat »
 // clic (l'état du combat est préservé car partagé par scénario, Phase 3.3).
 // Récap de stats en fin de combat (Phase 4.2). Enemis ajoutables via les
 // situations aléatoires (Phase 2.4).
@@ -19,6 +19,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useCombatEngine, computeCombatStats, type CombatStats } from '@/app/lib/combat-engine'
 import CombatCockpitMJ from '@/app/components/presentation/CombatCockpitMJ'
+import { routeSession } from '@/app/lib/session-active'
 import CombatsPreparesPanel from '@/app/components/combat/CombatsPreparesPanel'
 import SituationsRandom from '@/app/components/SituationsRandom'
 
@@ -92,8 +93,11 @@ function CombatRapideInner() {
     }
   }, [combat?.actif, combat])
 
-  const diffuser = useCallback(() => {
-    if (scenarioId) router.push(`/dashboard/presentation?scenario=${scenarioId}&diffuser=1`)
+  // « Diffuser ce combat » : on rejoint la session ouverte du scénario (la
+  // vue joueurs y est déjà synchronisée). Sans session ouverte, on renvoie vers
+  // les scénarios, d'où l'on lance une session.
+  const diffuser = useCallback(async () => {
+    router.push(await routeSession(scenarioId))
   }, [router, scenarioId])
 
   if (resolvingScenario || engine.loading) {
@@ -146,9 +150,9 @@ function CombatRapideInner() {
             </button>
             <button
               type="button"
-              onClick={diffuser}
+              onClick={() => void diffuser()}
               className="text-[11px] px-2.5 py-1.5 rounded border border-[rgba(201,168,76,0.4)] text-[#ffe6a8] bg-[rgba(201,168,76,0.1)] hover:bg-[rgba(201,168,76,0.2)] transition"
-              title="Passer ce combat en mode diffusé (vue joueurs synchronisée)"
+              title="Reprendre ce combat dans la session en cours (vue joueurs synchronisée)"
             >
               📡 Diffuser ce combat
             </button>

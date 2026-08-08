@@ -26,6 +26,7 @@ import { useRelaisFinDeTour } from '@/app/lib/session-tour'
 import { appliquerRepos, type TypeRepos } from '@/app/lib/session-repos'
 import { lancerCombatPrepare, type CombatPrepare } from '@/app/lib/combats-prepares'
 import ActionWheelMJ, { type ActionWheelKey } from '@/app/components/presentation/ActionWheelMJ'
+import GuidedTour from '@/app/components/GuidedTour'
 import WildMagicRoller from '@/app/components/WildMagicRoller'
 import LanceurDesSession, { ouvrirLanceurDes } from '@/app/components/session/LanceurDesSession'
 import JournalTable from '@/app/components/session/joueur/JournalTable'
@@ -121,7 +122,7 @@ export default function SessionMJ({
   const lancerRencontre = useCallback(
     async (cp: CombatPrepare) => {
       setMsg('')
-      const ok = await lancerCombatPrepare(cp, 'rapide')
+      const ok = await lancerCombatPrepare(cp, 'session')
       if (!ok) {
         setMsg('Impossible de lancer cette rencontre.')
         return
@@ -187,7 +188,7 @@ export default function SessionMJ({
         </div>
 
         {/* Repos court / long (Delta C.2) */}
-        <button type="button" disabled={busy} onClick={() => repos('court')}
+        <button data-tour="session-repos" type="button" disabled={busy} onClick={() => repos('court')}
           className="px-2.5 py-1.5 rounded-lg border border-yellow-800/40 text-yellow-200 text-xs font-bold disabled:opacity-50">
           🌤 Repos court
         </button>
@@ -231,7 +232,7 @@ export default function SessionMJ({
         {/* Gauche — Ma préparation */}
         <aside className="order-2 lg:order-1 lg:w-[200px] lg:flex-shrink-0 border-t lg:border-t-0 lg:border-r px-2 py-2 min-h-0 max-h-[35vh] lg:max-h-none overflow-hidden flex flex-col"
           style={{ borderColor: 'rgba(201,168,76,0.18)' }}>
-          <h2 className="text-[10px] uppercase tracking-widest text-yellow-600 mb-1.5 flex-shrink-0">Ma préparation</h2>
+          <h2 className="text-[10px] uppercase tracking-widest text-yellow-600 mb-1.5 flex-shrink-0" data-tour="session-preparation">Ma préparation</h2>
           <PanneauPreparation
             scenarioId={scenarioId}
             etat={etat}
@@ -277,19 +278,34 @@ export default function SessionMJ({
         {/* Droite — Ma table, toujours visible */}
         <aside className="order-3 lg:w-[200px] lg:flex-shrink-0 border-t lg:border-t-0 lg:border-l px-2 py-2 min-h-0 max-h-[35vh] lg:max-h-none overflow-hidden flex flex-col"
           style={{ borderColor: 'rgba(201,168,76,0.18)' }}>
-          <h2 className="text-[10px] uppercase tracking-widest text-yellow-600 mb-1.5 flex-shrink-0">Ma table</h2>
+          <h2 className="text-[10px] uppercase tracking-widest text-yellow-600 mb-1.5 flex-shrink-0" data-tour="session-table">Ma table</h2>
           <div className="flex-1 min-h-0 overflow-y-auto pr-0.5">
             <PanneauTable sessionId={sessionId} />
           </div>
         </aside>
       </div>
 
+      {/* Tutoriel guidé du cockpit (bouton 🎓, auto à la première session) */}
+      <GuidedTour tourId="session-mj" />
+
       {/* Roue d'action MJ — bouton MS inchangé, pétales désormais câblés */}
       <ActionWheelMJ onSelect={surPetale} />
 
       {/* Surfaces modales — toutes portées vers document.body */}
       <ModaleDiffusion cible={diffusion} etat={etat} onFermer={() => setDiffusion(null)} onPatchState={patchState} />
-      <WildMagicRoller scenarioId={scenarioId} flottant={false} ouvert={magieOuverte} onClose={() => setMagieOuverte(false)} />
+      <WildMagicRoller
+        scenarioId={scenarioId}
+        flottant={false}
+        ouvert={magieOuverte}
+        onClose={() => setMagieOuverte(false)}
+        // Diffusion de l'effet : il part dans la narration de session, donc
+        // sur l'écran de chaque joueur et sur l'écran partagé.
+        onDiffuser={(effet) =>
+          patchState({
+            broadcast_text: effet ? `✨ Magie sauvage — ${effet.titre}\n${effet.description}` : null
+          })
+        }
+      />
       <LanceurDesSession session={{ sessionId, characterNom: 'MJ' }} />
     </div>
   )

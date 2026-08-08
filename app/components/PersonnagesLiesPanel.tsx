@@ -5,7 +5,7 @@
 // ----------------------------------------------------------------------------
 // Depuis l'édition d'un scénario : lier / délier les personnages DU COMPTE
 // (joueur_id = utilisateur courant) à ce scénario. Un PJ lié apparaît ensuite
-// dans le combat / la diffusion (chargés par scenario_id). Seuls les PJ du
+// dans le combat / la session (chargés par scenario_id). Seuls les PJ du
 // compte sont listés. Un PJ ne peut être lié qu'à un scénario à la fois ;
 // le lier ici le déplace s'il était ailleurs.
 // ============================================================================

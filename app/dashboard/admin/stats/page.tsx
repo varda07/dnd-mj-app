@@ -24,7 +24,10 @@ type Stats = {
   items: number
   sorts: number
   combats: number
-  sessions_diffusion: number
+  // Phase 5 — `sessions_jeu` remplace `sessions_diffusion` ; on lit les deux le
+  // temps que la migration de suppression du mode présentation soit poussée.
+  sessions_jeu?: number
+  sessions_diffusion?: number
   tables_effets: number
   serie_utilisateurs: { mois: string; nb: number }[]
 }
@@ -88,7 +91,7 @@ export default function AdminStatsPage() {
             <h2 className="text-sm uppercase tracking-wider text-[#6a6a72] mb-2">Activité</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               <Carte label="Combats lancés" valeur={stats.combats} icon="⚔️" />
-              <Carte label="Sessions diffusion" valeur={stats.sessions_diffusion} icon="📡" />
+              <Carte label="Sessions de jeu" valeur={stats.sessions_jeu ?? stats.sessions_diffusion ?? 0} icon="🎲" />
             </div>
           </section>
 

@@ -4,15 +4,14 @@
 // Moteur de combat unifié — Phase 1.1
 // ----------------------------------------------------------------------------
 // Logique métier centralisée et réutilisable par TOUS les points d'entrée du
-// combat (rapide MJ-seul, diffusé, préparé, impromptu). N'importe QUE des types
-// de la page diffusion (imports type-only → aucun cycle runtime). Toute la
+// combat (rapide MJ-seul, en session, préparé, impromptu). N'importe QUE des
+// types de `combat-types` (imports type-only → aucun cycle runtime). Toute la
 // logique d'état + persistance Supabase + stats vit ici.
 //
 //   - helpers purs : rollInitiative, etatQualitatif, nextTurn/prevTurn…
 //   - hook useCombatEngine(scenarioId) : état + actions + realtime + persistance
 //
-// Le mode "diffusé" (presentation/page.tsx) conserve sa propre orchestration de
-// snapshot joueurs ; il peut adopter ces helpers progressivement.
+// Le mode session (app/components/session/) consomme ces helpers directement.
 // ============================================================================
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -23,7 +22,7 @@ import type {
   InitiativeEntry,
   Persona,
   Ennemi
-} from '@/app/dashboard/presentation/page'
+} from '@/app/lib/combat-types'
 
 // Combat tel que renvoyé par le moteur : CombatLite + id + horodatage.
 export type EngineCombat = CombatLite & { id?: string; demarre_a?: string | null }

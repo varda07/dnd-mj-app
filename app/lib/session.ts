@@ -2,7 +2,7 @@
 // Mode Session — helpers client
 // ----------------------------------------------------------------------------
 // Petite couche au-dessus de Supabase pour le nouveau « Mode Session » (refonte
-// du mode diffusion). Types partagés + wrappers des RPC (start_session,
+// du mode session). Types partagés + wrappers des RPC (start_session,
 // join_session, set_session_status) et lecture du contexte de session.
 // Voir supabase/migrations/20260807120000_mode_session_phase1.sql et _phase2.sql.
 // ============================================================================

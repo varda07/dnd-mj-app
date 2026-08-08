@@ -9,7 +9,7 @@
 // ============================================================================
 
 import { etatQualitatif, resolveEntiteId, type EngineCombat } from '@/app/lib/combat-engine'
-import type { Ennemi, Persona } from '@/app/dashboard/presentation/page'
+import type { Ennemi, Persona } from '@/app/lib/combat-types'
 
 export default function TimelineInitiative({
   combat,

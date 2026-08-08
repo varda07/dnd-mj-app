@@ -25,6 +25,7 @@ import { formatMod, rollD20, rollDice } from '@/app/lib/dnd-calc'
 import { useCombatEngine } from '@/app/lib/combat-engine'
 import { logSessionEvent } from '@/app/lib/session-live'
 import LanceurDesSession, { BoutonDes } from '@/app/components/session/LanceurDesSession'
+import GuidedTour from '@/app/components/GuidedTour'
 import { useSessionJoueur } from './useSessionJoueur'
 import RoueJoueur, { PETALES, type PetaleKey } from './RoueJoueur'
 import OngletFiche from './OngletFiche'
@@ -165,7 +166,7 @@ export default function SessionJoueur({
         </div>
 
         {/* La roue, en bas de colonne */}
-        <div className="flex-shrink-0 px-2 pb-[env(safe-area-inset-bottom)]">
+        <div className="flex-shrink-0 px-2 pb-[env(safe-area-inset-bottom)]" data-tour="roue-joueur">
           <RoueJoueur
             nom={nom}
             imageUrl={api.sheet?.image_url ?? null}
@@ -181,7 +182,7 @@ export default function SessionJoueur({
       </aside>
 
       {/* --- Centre : ce que le MJ diffuse, en grand --- */}
-      <main className="order-1 lg:order-2 flex-1 min-h-0 overflow-y-auto px-3 py-3">
+      <main className="order-1 lg:order-2 flex-1 min-h-0 overflow-y-auto px-3 py-3" data-tour="zone-diffusion">
         <ZoneDiffusion
           sessionId={sessionId}
           characterId={characterId}
@@ -224,6 +225,9 @@ export default function SessionJoueur({
           <span className="text-yellow-100 font-bold text-base">{jet.total}</span>
         </button>
       )}
+
+      {/* Tutoriel guidé du poste joueur (bouton 🎓, auto à la première partie) */}
+      <GuidedTour tourId="session-joueur" />
 
       {/* Le lanceur de dés de l'application, porté dans document.body */}
       <LanceurDesSession session={{ sessionId, characterId, characterNom: nom }} />

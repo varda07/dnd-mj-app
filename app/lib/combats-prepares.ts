@@ -6,12 +6,12 @@
 // CRUD sur combats_prepares + lancement d'un combat préparé : on applique la
 // config (ennemis liés au scénario, conditions de départ, positions, carte) à
 // la ligne `combats` du scénario, puis la page navigue vers combat rapide ou
-// diffusion. Le moteur (combat-engine) reste la source des helpers d'init.
+// session. Le moteur (combat-engine) reste la source des helpers d'init.
 // ============================================================================
 
 import { supabase } from '@/lib/supabase'
 import { rollInitiative } from '@/app/lib/combat-engine'
-import type { InitiativeEntry, Persona, Ennemi } from '@/app/dashboard/presentation/page'
+import type { InitiativeEntry, Persona, Ennemi } from '@/app/lib/combat-types'
 
 export type PrepParticipant = {
   kind: 'ennemi' | 'perso'
@@ -133,7 +133,7 @@ export async function duplicateCombatPrepare(cp: CombatPrepare): Promise<string 
 // vers le mode choisi.
 export async function lancerCombatPrepare(
   cp: CombatPrepare,
-  mode: 'rapide' | 'diffusion'
+  mode: 'rapide' | 'session'
 ): Promise<string | null> {
   if (!cp.scenario_id) {
     console.warn('[combats_prepares] lancer : aucun scénario lié')
@@ -147,7 +147,7 @@ export async function lancerCombatPrepare(
   }
 
   // 2. Construire l'ordre d'initiative (preset sinon roll via le MOTEUR partagé
-  //    rollInitiative → pas de divergence avec combat rapide / diffusion).
+  //    rollInitiative → pas de divergence avec combat rapide / session).
   let ordre: InitiativeEntry[] | null = cp.initiative_preset
   if (!ordre || ordre.length === 0) {
     const [pjRes, enRes] = await Promise.all([
@@ -199,15 +199,11 @@ export async function lancerCombatPrepare(
     return null
   }
 
-  // 5. Surprise → masque les ennemis côté joueurs (diffusion uniquement).
-  if (mode === 'diffusion' && cp.conditions_depart?.surprise) {
-    await supabase
-      .from('presentation_etats')
-      .upsert(
-        { scenario_id: cp.scenario_id, ennemis_visibles: false, updated_at: new Date().toISOString() },
-        { onConflict: 'scenario_id' }
-      )
-  }
+  // 5. Surprise : rien à écrire. En mode session, la vue joueurs n'expose JAMAIS
+  //    l'identité ni les PV des adversaires tant que le MJ ne les révèle pas
+  //    (CombatVueJoueurs, `ennemisReveles` à false par défaut) — le masquage est
+  //    donc le comportement normal, l'ancien drapeau presentation_etats n'a plus
+  //    d'objet.
 
   return cp.scenario_id
 }

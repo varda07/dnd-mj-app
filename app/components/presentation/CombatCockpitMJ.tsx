@@ -1,9 +1,9 @@
 'use client'
 
 // ============================================================================
-// Refonte combat diffusion — PHASE 1 : Cockpit de combat MJ
+// Cockpit de combat MJ
 // ----------------------------------------------------------------------------
-// Vue MJ complète intégrée dans l'onglet ⚔️ Combat du mode diffusion :
+// Vue MJ complète, utilisée par la vue Combat du cockpit de session :
 //   1.1 timeline d'initiative horizontale
 //   1.2 panneau Alliés (PJ) — PV exacts, CA, conditions, édition rapide
 //   1.3 panneau Ennemis — PV, CA, attaques, résistances/immunités/vulnérabilités,
@@ -27,7 +27,7 @@ import AttackRoller, { type AttaqueData, type CibleData } from '@/app/components
 import CombatCarte, { type Jeton, type FogState, fogVide, FOG_COLS, FOG_ROWS } from '@/app/components/presentation/CombatCarte'
 import JetGroupeModal from '@/app/components/combat/JetGroupeModal'
 import HistoriqueCombat from '@/app/components/combat/HistoriqueCombat'
-import type { CombatLite, Persona, Ennemi, InitiativeEntry } from '@/app/dashboard/presentation/page'
+import type { CombatLite, Persona, Ennemi, InitiativeEntry } from '@/app/lib/combat-types'
 
 function entiteId(e: InitiativeEntry | null | undefined): string | null {
   if (!e) return null

@@ -6,14 +6,15 @@
 // Composant autonome (modal + bouton flottant) qui permet au MJ de :
 //   - Roll un effet de Wild Magic (manuel via bouton, ou auto sur d20=1)
 //   - Choisir s'il affiche ou non l'effet aux joueurs (mode présentation)
-// L'effet en cours est stocké en localStorage + diffusé via Supabase
-// (presentation_etats) pour la sync avec l'écran joueurs.
+// L'effet en cours est mémorisé en localStorage. Sa diffusion aux joueurs est
+// déléguée au parent via `onDiffuser` : en mode session, le cockpit MJ le pousse
+// dans `session_state` (Phase 5 — l'ancienne table presentation_etats a disparu
+// avec le mode diffusion).
 // ============================================================================
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { rollWildMagicAvecValeur, type WildMagicEffet } from '@/app/data/wild_magic_table'
-import { supabase } from '@/lib/supabase'
 
 const STORAGE_KEY = 'wild_magic_last'
 
@@ -24,9 +25,14 @@ type Props = {
   flottant?: boolean
   ouvert?: boolean
   onClose?: () => void
+  /**
+   * Diffusion de l'effet aux joueurs. Absent → le bouton « Visible » n'est pas
+   * proposé (rien à diffuser hors session).
+   */
+  onDiffuser?: (effet: WildMagicEffet | null) => void
 }
 
-export default function WildMagicRoller({ scenarioId, flottant = true, ouvert: ouvertProp, onClose }: Props) {
+export default function WildMagicRoller({ flottant = true, ouvert: ouvertProp, onClose, onDiffuser }: Props) {
   const [ouvertInterne, setOuvertInterne] = useState(false)
   const [effet, setEffet] = useState<WildMagicEffet | null>(null)
   const [valeur, setValeur] = useState<number | null>(null)
@@ -51,16 +57,10 @@ export default function WildMagicRoller({ scenarioId, flottant = true, ouvert: o
     try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(e)) } catch {}
   }
 
-  const toggleVisible = async () => {
+  const toggleVisible = () => {
     const next = !visiblePourJoueurs
     setVisiblePourJoueurs(next)
-    if (!scenarioId || !effet) return
-    // Sync écran joueurs via presentation_etats.wild_magic
-    const wildMagicPayload = next ? { titre: effet.titre, description: effet.description } : null
-    await supabase
-      .from('presentation_etats')
-      .upsert({ scenario_id: scenarioId, wild_magic: wildMagicPayload, updated_at: new Date().toISOString() })
-      .select()
+    onDiffuser?.(next ? effet : null)
   }
 
   return (
@@ -156,22 +156,25 @@ export default function WildMagicRoller({ scenarioId, flottant = true, ouvert: o
                   >
                     🎲 Re-roll
                   </button>
-                  <button
-                    type="button"
-                    onClick={toggleVisible}
-                    className={`flex-1 px-4 py-2 rounded font-bold text-xs uppercase tracking-wider transition-all ${
-                      visiblePourJoueurs
-                        ? 'bg-green-700 text-white border border-green-500'
-                        : 'bg-[#1a1d24] border border-[rgba(201,168,76,0.30)] hover:border-[#C9A84C] text-[#C9A84C]'
-                    }`}
-                  >
-                    {visiblePourJoueurs ? '👁 Visible' : '🙈 MJ seul'}
-                  </button>
+                  {onDiffuser && (
+                    <button
+                      type="button"
+                      onClick={toggleVisible}
+                      title="Pousser l'effet à la table (narration diffusée)"
+                      className={`flex-1 px-4 py-2 rounded font-bold text-xs uppercase tracking-wider transition-all ${
+                        visiblePourJoueurs
+                          ? 'bg-green-700 text-white border border-green-500'
+                          : 'bg-[#1a1d24] border border-[rgba(201,168,76,0.30)] hover:border-[#C9A84C] text-[#C9A84C]'
+                      }`}
+                    >
+                      {visiblePourJoueurs ? '👁 Visible' : '🙈 MJ seul'}
+                    </button>
+                  )}
                 </div>
-                {scenarioId && (
+                {onDiffuser && (
                   <p className="text-[10px] text-[#6a6a72] text-center italic">
                     {visiblePourJoueurs
-                      ? 'L\'effet est diffusé sur l\'écran joueurs.'
+                      ? 'L\'effet est poussé à la table.'
                       : 'Effet caché aux joueurs.'}
                   </p>
                 )}
