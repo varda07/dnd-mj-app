@@ -121,7 +121,7 @@ export default function WildMagicRoller({ flottant = true, ouvert: ouvertProp, o
             {!effet ? (
               <div className="text-center py-6">
                 <p className="text-[#a8a8b0] mb-4 text-sm">
-                  Roll un d100 sur la table officielle Wild Magic D&D 5e.
+                  Roll un d100 sur la table Wild Magic (SRD 5.1).
                 </p>
                 <button
                   type="button"

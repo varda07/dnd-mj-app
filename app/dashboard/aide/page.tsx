@@ -161,7 +161,7 @@ const FAQ = [
     r: 'Partiellement. Une fois chargées, les pages déjà visitées restent consultables, mais la synchro nécessite une connexion.',
   },
   {
-    q: 'Comment importer du contenu D&D 5e officiel ?',
+    q: 'Comment importer du contenu SRD 5.1 ?',
     r: 'Va dans **Bibliothèque** : tu peux importer en masse bestiaire, sorts, items, PNJ pré-faits.',
   },
   {

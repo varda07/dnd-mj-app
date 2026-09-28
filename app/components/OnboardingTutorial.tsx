@@ -255,7 +255,7 @@ function StepWelcome({
       <StepHeader
         icone="🎲"
         title="Bienvenue dans la Forge !"
-        sub="Un compagnon pour tes campagnes de D&D : scénarios, combats, PNJ, dés, et plus."
+        sub="Un compagnon pour tes campagnes de jeu de rôle : scénarios, combats, PNJ, dés, et plus."
       />
       <p className="text-gray-300 mb-4 text-sm leading-relaxed">
         Avant de commencer, dis-nous comment tu utilises l&apos;appli — on
@@ -330,11 +330,11 @@ function StepForge({ role }: { role: Role | null }) {
           session et carte mentale.
         </ForgeItem>
         <ForgeItem icone="🎭" titre="Personnages">
-          Fiche complète D&D 5e : stats, classes multiples, sorts, équipement,
+          Fiche complète SRD 5.1 : stats, classes multiples, sorts, équipement,
           jets de sauvegarde de mort, etc.
         </ForgeItem>
         <ForgeItem icone="👹" titre="Ennemis & 🧑 PNJ">
-          Bestiaire D&D et templates de PNJ prêts à importer. Lie-les aux
+          Bestiaire SRD 5.1 et templates de PNJ prêts à importer. Lie-les aux
           chapitres de tes scénarios.
         </ForgeItem>
         <ForgeItem icone="🎒" titre="Items & 🗺️ Cartes">
@@ -527,10 +527,10 @@ function StepLibrary() {
         sub="Tu n&apos;es jamais seul : importe et partage du contenu."
       />
       <ul className="space-y-3 text-sm">
-        <ForgeItem icone="🐉" titre="Bestiaire D&D">
-          Plus de 100 monstres officiels prêts à utiliser — clic et import.
+        <ForgeItem icone="🐉" titre="Bestiaire SRD 5.1">
+          Plus de 100 monstres SRD 5.1 prêts à utiliser — clic et import.
         </ForgeItem>
-        <ForgeItem icone="✨" titre="Sorts D&D 5e">
+        <ForgeItem icone="✨" titre="Sorts SRD 5.1">
           Les sorts du SRD avec descriptions, niveaux, écoles, composantes.
         </ForgeItem>
         <ForgeItem icone="🧑" titre="Templates de PNJ">

@@ -775,7 +775,7 @@ export default function Personnages() {
           <button
             type="button"
             onClick={() => setAideOuverte(true)}
-            title="Aide : créer un personnage D&D 5e"
+            title="Aide : créer un personnage SRD 5.1"
             className="ml-auto w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-yellow-500 border border-gray-700 font-bold text-sm flex items-center justify-center transition"
           >
             ?
@@ -785,27 +785,27 @@ export default function Personnages() {
         {/* Phase 2 — point de départ : Guidé / Rapide / Surprends-moi. */}
         {!editingId && (
           <div className="mb-6">
-            <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-2">Nouveau personnage — comment le créer ?</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-2">{t('start_title')}</p>
             <ChoiceGrid cols={3}>
               <ChoiceCard
                 icon="🪄"
-                title="Guidé"
-                subtitle="Étape par étape, avec les règles expliquées"
+                title={t('start_guided')}
+                subtitle={t('start_guided_sub')}
                 recommended
                 onClick={() => setAssistantMode('guided')}
               />
               <ChoiceCard
                 icon="⚡"
-                title="Rapide"
-                subtitle="Le formulaire complet, ci-dessous"
+                title={t('start_quick')}
+                subtitle={t('start_quick_sub')}
                 onClick={() => {
                   document.getElementById('form-perso-rapide')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
                 }}
               />
               <ChoiceCard
                 icon="🎲"
-                title="Surprends-moi"
-                subtitle="Un personnage complet, généré au hasard"
+                title={t('start_surprise')}
+                subtitle={t('start_surprise_sub')}
                 onClick={() => setAssistantMode('surprise')}
               />
             </ChoiceGrid>
@@ -831,7 +831,7 @@ export default function Personnages() {
           <div className="space-y-3">
             {/* Sélecteur discret de la méthode de génération des stats */}
             <div className="flex items-center gap-2 text-[11px] flex-wrap">
-              <span className="uppercase tracking-[0.18em] text-gray-500">Méthode stats :</span>
+              <span className="uppercase tracking-[0.18em] text-gray-500">{t('method_label')}</span>
               <div className="inline-flex bg-gray-900/60 rounded border border-gray-700 p-0.5">
                 <button
                   type="button"
@@ -842,7 +842,7 @@ export default function Personnages() {
                       : 'text-gray-500 hover:text-gray-300'
                   }`}
                 >
-                  27 points
+                  {t('method_27pts')}
                 </button>
                 <button
                   type="button"
@@ -853,7 +853,7 @@ export default function Personnages() {
                       : 'text-gray-500 hover:text-gray-300'
                   }`}
                 >
-                  4d6 drop lowest
+                  {t('method_4d6')}
                 </button>
               </div>
               <Help text="27 points : stats commencent à 8, tu dépenses 27 points pour les monter. 4d6 : tu lances 4d6 six fois en retirant le plus petit dé, puis assignes les résultats aux caractéristiques." />
@@ -861,9 +861,9 @@ export default function Personnages() {
 
             <div>
               <label className="text-gray-400 text-sm flex items-center">
-                Nom du personnage *
+                {t('name_label')}
               </label>
-              <input type="text" placeholder="Ex : Alwin" value={nom} onChange={(e) => setNom(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
+              <input type="text" placeholder={t('name_ph')} value={nom} onChange={(e) => setNom(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none" />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -885,7 +885,7 @@ export default function Personnages() {
 
               <div>
                 <label className="text-gray-400 text-sm flex items-center">
-                  Classe
+                  {t('class')}
                   <span className="text-yellow-500 font-bold ml-2">🎲 {deVie}</span>
                   <Help text={`Classe ${classeObj?.nom ?? ''} : HP niveau 1 = ${classeObj?.hpNiveau1Base ?? '?'} + mod Con. Les jets de sauvegarde maîtrisés sont pré-cochés ci-dessous.`} />
                 </label>
@@ -902,7 +902,7 @@ export default function Personnages() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="text-gray-400 text-sm flex items-center">
-                  Historique
+                  {t('history')}
                   <Help text="L'historique accorde 2 maîtrises de compétences (pré-cochées ci-dessous)." />
                 </label>
                 <select value={historique} onChange={(e) => changerHistorique(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none">
@@ -915,7 +915,7 @@ export default function Personnages() {
               </div>
 
               <div>
-                <label className="text-gray-400 text-sm">Alignement</label>
+                <label className="text-gray-400 text-sm">{t('alignment')}</label>
                 <select value={alignement} onChange={(e) => setAlignement(e.target.value)} className="w-full p-3 rounded bg-gray-700 text-white border border-gray-600 outline-none">
                   {ALIGNEMENTS.map((a) => <option key={a} value={a}>{a}</option>)}
                 </select>

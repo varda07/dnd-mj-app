@@ -515,7 +515,7 @@ export default function Ennemis() {
                   type="button"
                   onClick={() => setBestiaireOuvert(true)}
                   className="min-h-[40px] px-3 rounded-lg text-sm border border-gray-600 text-gray-300 hover:text-white transition"
-                  title="Importer depuis le bestiaire D&D 5e"
+                  title="Importer depuis le bestiaire SRD 5.1"
                 >
                   📖 Du bestiaire
                 </button>

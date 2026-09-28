@@ -524,7 +524,7 @@ export default function Dashboard() {
                     <div className="grimoire-altar">
                       <span className="grimoire-altar-diamond left" aria-hidden="true">◆</span>
                       <span className="grimoire-altar-diamond right" aria-hidden="true">◆</span>
-                      <p className="grimoire-altar-tag">Scénario actif</p>
+                      <p className="grimoire-altar-tag">{t('altar_active_scenario')}</p>
                       <h3 className="grimoire-altar-name">{scenarioActif.nom}</h3>
                       {scenarioActif.description && (
                         <p className="grimoire-altar-desc">« {scenarioActif.description} »</p>
@@ -550,13 +550,13 @@ export default function Dashboard() {
                         type="button"
                         onClick={() => router.push('/dashboard/combat')}
                       >
-                        ⚔ Combat
+                        {t('altar_combat')}
                       </button>
                       <button
                         type="button"
                         onClick={() => router.push('/dashboard/exploration')}
                       >
-                        🧭 Exploration
+                        {t('altar_exploration')}
                       </button>
                       <button
                         type="button"
@@ -564,7 +564,7 @@ export default function Dashboard() {
                           router.push(`/dashboard/scenarios/${scenarioActif.id}/notes`)
                         }
                       >
-                        📝 Journal
+                        {t('altar_journal')}
                       </button>
                       <button
                         type="button"
@@ -572,7 +572,7 @@ export default function Dashboard() {
                           router.push(`/dashboard/scenarios/${scenarioActif.id}/quetes`)
                         }
                       >
-                        🎯 Quêtes
+                        {t('altar_quests')}
                       </button>
                       <button
                         type="button"
@@ -580,36 +580,36 @@ export default function Dashboard() {
                         title={t('unset_active_tooltip')}
                         aria-label={t('unset_active_tooltip')}
                       >
-                        ✕ Désactiver
+                        {t('altar_unset')}
                       </button>
                     </div>
                   </>
                 ) : (
                   <div className="grimoire-altar-empty">
-                    Aucun scénario actif — choisis-en un dans la liste des scénarios.
+                    {t('altar_empty')}
                   </div>
                 )}
 
                 <div className="grimoire-stats">
                   <div className="grimoire-stat">
-                    <p className="grimoire-stat-tag">Personnages</p>
+                    <p className="grimoire-stat-tag">{t('stat_characters')}</p>
                     <p className="grimoire-stat-value">{stats.personnages}</p>
-                    <p className="grimoire-stat-label">actifs</p>
+                    <p className="grimoire-stat-label">{t('stat_characters_label')}</p>
                   </div>
                   <div className="grimoire-stat">
-                    <p className="grimoire-stat-tag">Ennemis</p>
+                    <p className="grimoire-stat-tag">{t('stat_enemies')}</p>
                     <p className="grimoire-stat-value">{stats.ennemis}</p>
-                    <p className="grimoire-stat-label">créés</p>
+                    <p className="grimoire-stat-label">{t('stat_enemies_label')}</p>
                   </div>
                   <div className="grimoire-stat">
-                    <p className="grimoire-stat-tag">Scénarios</p>
+                    <p className="grimoire-stat-tag">{t('stat_scenarios')}</p>
                     <p className="grimoire-stat-value">{stats.scenarios}</p>
-                    <p className="grimoire-stat-label">en cours</p>
+                    <p className="grimoire-stat-label">{t('stat_scenarios_label')}</p>
                   </div>
                   <div className="grimoire-stat">
-                    <p className="grimoire-stat-tag">Quêtes</p>
+                    <p className="grimoire-stat-tag">{t('stat_quests')}</p>
                     <p className="grimoire-stat-value">{stats.quetesActives}</p>
-                    <p className="grimoire-stat-label">actives</p>
+                    <p className="grimoire-stat-label">{t('stat_quests_label')}</p>
                   </div>
                 </div>
 

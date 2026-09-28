@@ -84,7 +84,7 @@ export const TOURS: Record<string, Tour> = {
     id: 'personnage',
     titre: 'La fiche personnage',
     steps: [
-      { title: '🎭 La fiche personnage', text: "Une fiche D&D 5e complète : caractéristiques, sorts, points de vie et repos. Survol des sections clés." },
+      { title: '🎭 La fiche personnage', text: "Une fiche SRD 5.1 complète : caractéristiques, sorts, points de vie et repos. Survol des sections clés." },
       { selector: '[data-tour="perso-stats"]', title: 'Caractéristiques', text: "Force, Dextérité… modificateurs et jets de sauvegarde sont calculés automatiquement." },
       { selector: '[data-tour="perso-hp"]', title: 'Points de vie & repos', text: "Gère les PV, PV temporaires et les repos courts/longs qui restaurent ressources et dés de vie." },
       { title: '✨ Sorts & équipement', text: "Ajoute des sorts depuis la bibliothèque, gère l'équipement et les emplacements de sorts par niveau." },
@@ -108,7 +108,7 @@ export const TOURS: Record<string, Tour> = {
     titre: 'Les ennemis',
     steps: [
       { title: '👹 Tes ennemis', text: "Crée et gère les créatures de tes combats : PV, CA, attaques, résistances et comportement tactique." },
-      { title: '📚 Importer du bestiaire', text: "Pars d'une créature du bestiaire D&D 5e prête à l'emploi, puis ajuste-la à ta sauce." },
+      { title: '📚 Importer du bestiaire', text: "Pars d'une créature du bestiaire SRD 5.1 prête à l'emploi, puis ajuste-la à ta sauce." },
       { title: '🧬 Variantes', text: "Duplique un ennemi pour créer des variantes (élite, champion, blessé…) sans tout recommencer." },
     ],
   },
@@ -127,14 +127,14 @@ export const TOURS: Record<string, Tour> = {
     steps: [
       { title: '🎒 Tes items', text: "Crée armes, armures, objets et trésors avec leurs effets et leur rareté." },
       { title: '✨ Objets magiques', text: "Définis des objets magiques avec bonus, charges et propriétés spéciales." },
-      { title: '📚 Bibliothèque', text: "Importe des items officiels depuis la bibliothèque D&D 5e pour gagner du temps." },
+      { title: '📚 Bibliothèque', text: "Importe des items depuis la bibliothèque SRD 5.1 pour gagner du temps." },
     ],
   },
   sorts: {
     id: 'sorts',
     titre: 'Les sorts',
     steps: [
-      { title: '✨ Le grimoire', text: "Parcours tous les sorts D&D 5e : niveau, école, classes, composantes et description." },
+      { title: '✨ Le grimoire', text: "Parcours tous les sorts SRD 5.1 : niveau, école, classes, composantes et description." },
       { title: '🔎 Filtrer', text: "Filtre par niveau, classe ou école pour trouver le sort qu'il te faut en un instant." },
       { title: '➕ Créer un sort', text: "Crée tes propres sorts maison et réutilise-les sur les fiches de personnage." },
     ],
@@ -152,8 +152,8 @@ export const TOURS: Record<string, Tour> = {
     id: 'bibliotheque',
     titre: 'La bibliothèque',
     steps: [
-      { title: '📚 La bibliothèque', text: "Tout le contenu D&D 5e à portée de main : monstres, sorts, items, règles." },
-      { title: '📥 Importer', text: "Importe un élément officiel dans tes propres contenus en un clic, puis personnalise-le." },
+      { title: '📚 La bibliothèque', text: "Tout le contenu SRD 5.1 à portée de main : monstres, sorts, items, règles." },
+      { title: '📥 Importer', text: "Importe un élément de la bibliothèque dans tes propres contenus en un clic, puis personnalise-le." },
     ],
   },
   communaute: {
@@ -177,7 +177,7 @@ export const TOURS: Record<string, Tour> = {
     id: 'wild-magic',
     titre: 'La magie sauvage',
     steps: [
-      { title: '🌀 Magie sauvage', text: "La table de magie sauvage officielle : un effet aléatoire à chaque déclenchement." },
+      { title: '🌀 Magie sauvage', text: "La table de magie sauvage (SRD 5.1) : un effet aléatoire à chaque déclenchement." },
       { title: '🎲 Lancer', text: "Lance le d100 et applique l'effet — pour pimenter les sorts de tes ensorceleurs." },
       { title: '✨ Tables custom', text: "Crée tes propres tables d'effets dans « Tables d'effets » pour aller plus loin." },
     ],

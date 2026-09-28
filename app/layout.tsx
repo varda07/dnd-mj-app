@@ -36,7 +36,7 @@ const atkinson = Atkinson_Hyperlegible({
 
 export const metadata: Metadata = {
   title: "Master Screen",
-  description: "Master Screen — La Forge Éclipsée. Gestionnaire de campagnes D&D : scénarios, personnages, combats.",
+  description: "Master Screen — La Forge Éclipsée. Gestionnaire de campagnes de jeu de rôle : scénarios, personnages, combats.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,

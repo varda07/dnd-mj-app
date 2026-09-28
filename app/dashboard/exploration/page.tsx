@@ -705,14 +705,17 @@ export default function ExplorationPage() {
     try {
       const ext = file.name.split('.').pop() || 'png'
       const path = `${userId}/${scenarioId}-${Date.now()}.${ext}`
+      // ⚠ 'MAP' en majuscules : les identifiants de bucket Supabase sont
+      // sensibles à la casse. Cette ligne visait 'maps', un bucket qui n'existe
+      // pas — l'upload échouait et l'URL publique produite était morte.
       const { error } = await supabase.storage
-        .from('maps')
+        .from('MAP')
         .upload(path, file, { upsert: true, contentType: file.type })
       if (error) {
         alert(error.message)
         return
       }
-      const { data } = supabase.storage.from('maps').getPublicUrl(path)
+      const { data } = supabase.storage.from('MAP').getPublicUrl(path)
       await setMap(data.publicUrl)
     } finally {
       setLoading(false)

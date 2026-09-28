@@ -1,6 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { useTranslations } from 'next-intl'
 
 // ============================================================================
 // FormKit — composants de formulaire cohérents (Roadmap Créations, Phase 4.3)
@@ -168,6 +169,7 @@ export function ChoiceCard({
   onClick: () => void
   disabled?: boolean
 }) {
+  const tc = useTranslations('common')
   return (
     <button
       type="button"
@@ -195,7 +197,7 @@ export function ChoiceCard({
           className="absolute -top-2 right-3 text-[9px] uppercase tracking-widest font-bold px-2 py-0.5 rounded-full"
           style={{ background: OR, color: '#1a1410' }}
         >
-          Recommandé
+          {tc('recommended')}
         </span>
       )}
       <div className="flex items-start gap-3">

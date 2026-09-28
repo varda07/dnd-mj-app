@@ -28,7 +28,8 @@
     "export_item_title": "Export as JSON",
     "import_ok": "✓ Import successful",
     "import_error": "Import error: {message}",
-    "export_failed": "Export failed."
+    "export_failed": "Export failed.",
+    "recommended": "Recommended"
   },
   "login": {
     "app_title": "MASTER SCREEN",
@@ -114,7 +115,22 @@
     "combat_in_progress": "Round {round} · Turn {tour}",
     "shortcut_combat": "Combat",
     "shortcut_explore": "Explore",
-    "shortcut_notes": "Notes"
+    "shortcut_notes": "Notes",
+    "altar_active_scenario": "Active scenario",
+    "altar_empty": "No active scenario — pick one from the scenario list.",
+    "altar_combat": "⚔ Combat",
+    "altar_exploration": "🧭 Exploration",
+    "altar_journal": "📝 Journal",
+    "altar_quests": "🎯 Quests",
+    "altar_unset": "✕ Unset",
+    "stat_characters": "Characters",
+    "stat_characters_label": "active",
+    "stat_enemies": "Enemies",
+    "stat_enemies_label": "created",
+    "stat_scenarios": "Scenarios",
+    "stat_scenarios_label": "ongoing",
+    "stat_quests": "Quests",
+    "stat_quests_label": "active"
   },
   "sidebar": {
     "main_nav": "Main navigation",
@@ -150,7 +166,22 @@
     "tools_community": "Community",
     "tools_soundbox": "Sound Box",
     "tools_customize": "Customize home",
-    "tools_accessibility": "Accessibility"
+    "tools_accessibility": "Accessibility",
+    "adv_mode_aventure": "Adventure Mode",
+    "adv_encounter_calc": "Encounter calculator",
+    "maps_editor": "Map editor",
+    "maps_world": "World map",
+    "tools_achievements": "Achievements",
+    "tools_history": "History",
+    "tools_sound_library": "Sound library",
+    "tools_effect_tables": "Effect tables",
+    "tools_feedback": "Feedback & suggestions",
+    "tools_help": "Help",
+    "tools_credits": "Credits and licence",
+    "params_custom_themes": "Custom themes",
+    "hub_combat": "Combat",
+    "hub_cartes": "Maps",
+    "hub_univers": "World"
   },
   "compte": {
     "title": "My account",
@@ -262,7 +293,14 @@
     "name_required": "The name is required!",
     "share_player": "Share",
     "share_code_label": "Code to give to the DM:",
-    "active_conditions": "Active conditions"
+    "active_conditions": "Active conditions",
+    "start_title": "New character — how to create it?",
+    "start_guided": "Guided",
+    "start_guided_sub": "Step by step, with the rules explained",
+    "start_quick": "Quick",
+    "start_quick_sub": "The full form, below",
+    "start_surprise": "Surprise me",
+    "start_surprise_sub": "A complete character, randomly generated"
   },
   "pnj": {
     "title": "🧑 NPCs",
@@ -404,7 +442,7 @@
     "concentration": "Concentration",
     "ritual": "Ritual",
     "classes_compatible": "Compatible classes",
-    "import_library": "📚 Import from D&D library",
+    "import_library": "📚 Import from the SRD 5.1 library",
     "imported_count": "✓ {n} spell(s) imported",
     "search_ph": "Search…",
     "all_levels": "All levels",

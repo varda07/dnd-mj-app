@@ -28,7 +28,8 @@
     "export_item_title": "Exportar a JSON",
     "import_ok": "✓ Importación exitosa",
     "import_error": "Error al importar: {message}",
-    "export_failed": "Error al exportar."
+    "export_failed": "Error al exportar.",
+    "recommended": "Recomendado"
   },
   "login": {
     "app_title": "MASTER SCREEN",
@@ -114,7 +115,22 @@
     "combat_in_progress": "Asalto {round} · Turno {tour}",
     "shortcut_combat": "Combate",
     "shortcut_explore": "Explorar",
-    "shortcut_notes": "Notas"
+    "shortcut_notes": "Notas",
+    "altar_active_scenario": "Escenario activo",
+    "altar_empty": "Ningún escenario activo — elige uno en la lista de escenarios.",
+    "altar_combat": "⚔ Combate",
+    "altar_exploration": "🧭 Exploración",
+    "altar_journal": "📝 Diario",
+    "altar_quests": "🎯 Misiones",
+    "altar_unset": "✕ Desactivar",
+    "stat_characters": "Personajes",
+    "stat_characters_label": "activos",
+    "stat_enemies": "Enemigos",
+    "stat_enemies_label": "creados",
+    "stat_scenarios": "Escenarios",
+    "stat_scenarios_label": "en curso",
+    "stat_quests": "Misiones",
+    "stat_quests_label": "activas"
   },
   "sidebar": {
     "main_nav": "Navegación principal",
@@ -150,7 +166,22 @@
     "tools_community": "Comunidad",
     "tools_soundbox": "Sound Box",
     "tools_customize": "Personalizar el inicio",
-    "tools_accessibility": "Accesibilidad"
+    "tools_accessibility": "Accesibilidad",
+    "adv_mode_aventure": "Modo Aventura",
+    "adv_encounter_calc": "Calculadora de encuentros",
+    "maps_editor": "Editor de mapas",
+    "maps_world": "Mapa del mundo",
+    "tools_achievements": "Logros",
+    "tools_history": "Historial",
+    "tools_sound_library": "Biblioteca de sonidos",
+    "tools_effect_tables": "Tablas de efectos",
+    "tools_feedback": "Comentarios y sugerencias",
+    "tools_help": "Ayuda",
+    "tools_credits": "Créditos y licencia",
+    "params_custom_themes": "Temas personalizados",
+    "hub_combat": "Combate",
+    "hub_cartes": "Mapas",
+    "hub_univers": "Mundo"
   },
   "compte": {
     "title": "Mi cuenta",
@@ -245,7 +276,7 @@
     "hp_current": "PV actuales",
     "method_label": "Método de estadísticas:",
     "method_27pts": "27 puntos",
-    "method_4d6": "4d6 descartando el menor",
+    "method_4d6": "4d6, descartar el más bajo",
     "stats": "Características",
     "rolls_available": "Tiradas disponibles ({avail}/6)",
     "reset_assigns": "↺ Reiniciar",
@@ -262,7 +293,14 @@
     "name_required": "¡El nombre es obligatorio!",
     "share_player": "Compartir",
     "share_code_label": "Código para dar al DJ:",
-    "active_conditions": "Condiciones activas"
+    "active_conditions": "Condiciones activas",
+    "start_title": "Nuevo personaje — ¿cómo crearlo?",
+    "start_guided": "Guiado",
+    "start_guided_sub": "Paso a paso, con las reglas explicadas",
+    "start_quick": "Rápido",
+    "start_quick_sub": "El formulario completo, abajo",
+    "start_surprise": "Sorpréndeme",
+    "start_surprise_sub": "Un personaje completo, generado al azar"
   },
   "pnj": {
     "title": "🧑 PNJ",
@@ -404,7 +442,7 @@
     "concentration": "Concentración",
     "ritual": "Ritual",
     "classes_compatible": "Clases compatibles",
-    "import_library": "📚 Importar desde la biblioteca de D&D",
+    "import_library": "📚 Importar desde la biblioteca SRD 5.1",
     "imported_count": "✓ {n} hechizo(s) importado(s)",
     "search_ph": "Buscar…",
     "all_levels": "Todos los niveles",

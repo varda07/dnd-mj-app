@@ -307,7 +307,7 @@ export default function Sidebar() {
     { label: t('adv_combat_prepare'), icon: '🛠', href: '/dashboard/combat-prepare' },
     { label: t('adv_combat_rapide'), icon: '⚡', href: '/dashboard/combat-rapide' },
     { label: t('adv_combat'), icon: '⚔', href: '/dashboard/combat', match: (p) => p === '/dashboard/combat' },
-    { label: 'Calculateur de rencontre', icon: '🧮', href: '/dashboard/combat/encounter-builder' }
+    { label: t('adv_encounter_calc'), icon: '🧮', href: '/dashboard/combat/encounter-builder' }
   ]
   // Chantier fusion (P4) : Éditeur + Atelier + Générateur sont désormais UN seul
   // éditeur unifié à onglets (/dashboard/maps/editor). La nav ne montre donc que
@@ -315,23 +315,34 @@ export default function Sidebar() {
   // Templates reste accessible via le sélecteur « Créer une carte » de la liste.
   const hubCartesItems: NavItem[] = [
     { label: t('forge_maps'), icon: '🗺', href: '/dashboard/maps', match: (p) => p === '/dashboard/maps' },
-    { label: 'Éditeur de cartes', icon: '🎨', href: '/dashboard/maps/editor' }
+    { label: t('maps_editor'), icon: '🎨', href: '/dashboard/maps/editor' }
   ]
   // Univers : Carte du monde (ex-Hexcrawl, grille hexa) + Exploration narrative
   // — concepts distincts des cartes de combat, sortis de « Cartes ». Nom de hub
   // « Univers » choisi pour éviter la redondance avec « Carte du monde » /
   // « Exploration ».
   const hubExplorationItems: NavItem[] = [
-    { label: 'Carte du monde', icon: '🧭', href: '/dashboard/maps/hexcrawl' },
+    { label: t('maps_world'), icon: '🧭', href: '/dashboard/maps/hexcrawl' },
     { label: t('adv_exploration'), icon: '🏞', href: '/dashboard/exploration' }
   ]
   // Phase 5 — l'ancienne entrée « Présentation » est remplacée par un accès
   // direct à la session en cours. Elle n'apparaît que s'il y en a une, mène au
   // bon poste selon le rôle (cockpit MJ ou poste joueur), et se met à jour en
   // temps réel : le joueur voit l'entrée surgir dès que le MJ lance la séance.
+  // Le hub « Mode Aventure » (/dashboard/aventure) existait mais n'était relié à
+  // rien : aucun lien, aucune entrée de menu (cf. docs/audit-cablage.md §1). Il
+  // ouvre en grand les quatre entrées d'une partie — Combat, Exploration,
+  // Session, Journal — là où la section ci-dessous les éclate en sous-hubs.
+  const modeAventureItem: NavItem = {
+    label: t('adv_mode_aventure'),
+    icon: '🗡',
+    href: '/dashboard/aventure',
+    match: (p) => p === '/dashboard/aventure'
+  }
+
   const sessionItem: NavItem | null = sessionActive
     ? {
-        label: 'Session en cours',
+        label: t('adv_presentation'),
         icon: '🎲',
         href: sessionActive.href,
         match: (p) => p.startsWith('/session/')
@@ -349,17 +360,24 @@ export default function Sidebar() {
         window.dispatchEvent(new CustomEvent('soundbox:open'))
       }
     },
-    { label: 'Succès', icon: '🏆', href: '/dashboard/achievements' },
+    // La Sound Box (ci-dessus) joue l'ambiance ; cette page gère la
+    // bibliothèque de pistes. Elle était finie mais reliée à rien
+    // (cf. docs/audit-cablage.md §1) — on la place juste après son widget.
+    { label: t('tools_sound_library'), icon: '🎼', href: '/dashboard/sons' },
+    { label: t('tools_achievements'), icon: '🏆', href: '/dashboard/achievements' },
     // (Accessibilité retirée d'Outils → cf. accessibiliteItem dans Paramètres)
-    { label: 'Historique', icon: '📜', href: '/dashboard/historique' },
+    { label: t('tools_history'), icon: '📜', href: '/dashboard/historique' },
     { label: t('tools_customize'), icon: '🎨', href: '/dashboard/personnalisation' },
     // V1 4.1 — l'Accessibilité (un réglage) est déplacée dans la section
     // Paramètres ci-dessous (renderNavItem accessibiliteItem).
-    { label: "Tables d'effets", icon: '🎲', href: '/dashboard/tables-effets' },
+    { label: t('tools_effect_tables'), icon: '🎲', href: '/dashboard/tables-effets' },
     // Roadmap Finalisation 5.1 — soumettre un problème ou une suggestion.
-    { label: 'Retours & suggestions', icon: '💬', href: '/dashboard/feedback' },
+    { label: t('tools_feedback'), icon: '💬', href: '/dashboard/feedback' },
     // Roadmap Affinement 4.4 — accès rapide au centre d'aide.
-    { label: 'Aide', icon: '❓', href: '/dashboard/aide' }
+    { label: t('tools_help'), icon: '❓', href: '/dashboard/aide' },
+    // La licence CC-BY du SRD 5.1 impose d'afficher une mention d'attribution :
+    // elle doit donc être atteignable depuis l'interface, pas seulement exister.
+    { label: t('tools_credits'), icon: '⚖️', href: '/dashboard/credits' }
   ]
 
   const aller = (href: string) => {
@@ -727,9 +745,10 @@ export default function Sidebar() {
             'aventure',
             t('section_aventure'),
             <>
-              {renderHub('hub_combat', '⚔️', 'Combat', hubCombatItems)}
-              {renderHub('hub_cartes', '🗺️', 'Cartes', hubCartesItems)}
-              {renderHub('hub_exploration', '🌍', 'Univers', hubExplorationItems)}
+              {renderNavItem(modeAventureItem)}
+              {renderHub('hub_combat', '⚔️', t('hub_combat'), hubCombatItems)}
+              {renderHub('hub_cartes', '🗺️', t('hub_cartes'), hubCartesItems)}
+              {renderHub('hub_exploration', '🌍', t('hub_univers'), hubExplorationItems)}
               {sessionItem && (
                 <div className="relative" data-tour="nav-session">
                   {renderNavItem(sessionItem)}
@@ -871,8 +890,8 @@ export default function Sidebar() {
             <button
               type="button"
               onClick={() => aller('/dashboard/themes/custom')}
-              title={compact ? 'Thèmes custom' : undefined}
-              aria-label={compact ? 'Thèmes custom' : undefined}
+              title={compact ? t('params_custom_themes') : undefined}
+              aria-label={compact ? t('params_custom_themes') : undefined}
               className={`w-full flex items-center ${
                 compact ? 'justify-center px-0' : 'gap-2.5 px-3'
               } py-2 text-left text-[13px] tracking-wide border-l-2 border-l-transparent text-[#a8a8b0] hover:text-white hover:bg-[rgba(201,168,76,0.05)] hover:border-l-[rgba(201,168,76,0.4)] transition-all duration-150`}
@@ -880,7 +899,7 @@ export default function Sidebar() {
               <span className="text-base leading-none w-5 text-center flex-shrink-0" aria-hidden="true">
                 ✨
               </span>
-              {!compact && <span className="truncate">Thèmes custom</span>}
+              {!compact && <span className="truncate">{t('params_custom_themes')}</span>}
             </button>
 
             {/* Accessibilité (V1 4.1 — déplacée d'Outils vers Paramètres) */}
