@@ -18,6 +18,7 @@ import { fetchSession } from '@/app/lib/session'
 import { fetchSessionState, type SessionState } from '@/app/lib/session-live'
 import { useCombatEngine } from '@/app/lib/combat-engine'
 import CombatVueJoueurs from '@/app/components/presentation/CombatVueJoueurs'
+import { DiceFabIcon } from '@/app/components/DiceFabIcon'
 
 export default function EcranPartagePage() {
   const params = useParams()
@@ -69,22 +70,22 @@ function EcranContenu({ scenarioId, etat }: { scenarioId: string | null; etat: S
 
   if (combat && combat.actif) {
     return (
-      <main className="min-h-screen p-4" style={{ background: '#0a0805' }}>
+      <main className="min-h-screen p-4 bg-gray-900">
         <CombatVueJoueurs combat={combat} personnages={personnages} ennemis={ennemis} />
       </main>
     )
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center" style={{ background: '#0a0805' }}>
+    <main className="min-h-screen flex flex-col items-center justify-center bg-gray-900">
       {etat?.broadcast_image_url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={etat.broadcast_image_url} alt="" className="max-w-full max-h-[80vh] object-contain" />
       ) : (
-        <div className="text-6xl opacity-30">🎲</div>
+        <div className="opacity-30"><DiceFabIcon taille={96} /></div>
       )}
       {etat?.broadcast_text && (
-        <p className="mt-6 max-w-3xl text-center text-2xl text-stone-100 px-6" style={{ fontFamily: 'Georgia, serif' }}>
+        <p className="mt-6 max-w-3xl text-center text-2xl text-gray-200 px-6" style={{ fontFamily: 'Georgia, serif' }}>
           {etat.broadcast_text}
         </p>
       )}

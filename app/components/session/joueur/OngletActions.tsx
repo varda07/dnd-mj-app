@@ -12,6 +12,7 @@
 // pilote les boutons Repos court / Repos long du MJ.
 // ============================================================================
 
+import EmptyState from '@/app/components/ui/EmptyState'
 import { useState } from 'react'
 import type { CharacterSheet, ClassResource, RechargeRessource } from '@/app/lib/session-live'
 import type { SessionJoueurApi } from './useSessionJoueur'
@@ -68,9 +69,9 @@ export default function OngletActions({
     <div className="space-y-5">
       {/* Attaques — pas de ronds d'usage : une attaque d'arme n'est pas limitée */}
       <section>
-        <p className="text-xs uppercase tracking-widest text-yellow-600 mb-1.5">Attaques</p>
+        <p className="text-xs uppercase tracking-widest text-yellow-500 mb-1.5">Attaques</p>
         {sheet.armes.length === 0 ? (
-          <p className="text-stone-500 text-sm italic">Aucune arme.</p>
+          <EmptyState icon="⚔️" title="Aucune arme" message="Ajoute une arme à ta fiche depuis le Codex." />
         ) : (
           <ul className="space-y-1">
             {sheet.armes.map((a, i) => {
@@ -107,9 +108,9 @@ export default function OngletActions({
 
       {/* Capacités à usage limité — ronds d'usage légitimes */}
       <section>
-        <p className="text-xs uppercase tracking-widest text-yellow-600 mb-1.5">Capacités à usage limité</p>
+        <p className="text-xs uppercase tracking-widest text-yellow-500 mb-1.5">Capacités à usage limité</p>
         {Object.keys(api.resources).length === 0 ? (
-          <p className="text-stone-500 text-sm italic mb-2">
+          <p className="text-gray-500 text-sm italic mb-2">
             Aucune capacité limitée déclarée (Rage, Ki, Inspiration bardique…).
           </p>
         ) : (
@@ -137,16 +138,14 @@ export default function OngletActions({
                   valeur={`${r.max - r.used}/${r.max}`}
                   contenu={
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-[11px] text-stone-500">Récupère à :</span>
+                      <span className="text-[11px] text-gray-500">Récupère à :</span>
                       {RECHARGES.map((x) => (
                         <button
                           key={x.key}
                           type="button"
                           onClick={() => changerRecharge(key, r, x.key)}
-                          className={`text-[11px] px-2 py-0.5 rounded-full border ${
-                            (r.recharge ?? 'long') === x.key
-                              ? 'border-amber-500 bg-amber-900/30 text-yellow-100'
-                              : 'border-stone-700 text-stone-400'
+                          className={`combatmj-cond-opt ${
+                            (r.recharge ?? 'long') === x.key ? 'is-on' : ''
                           }`}
                         >
                           {x.label}
@@ -155,7 +154,7 @@ export default function OngletActions({
                       <button
                         type="button"
                         onClick={() => suppRes(key)}
-                        className="ml-auto text-[11px] text-stone-600 hover:text-red-300"
+                        className="ml-auto text-[11px] text-gray-500 hover:text-red-300"
                       >
                         Supprimer
                       </button>
@@ -169,16 +168,16 @@ export default function OngletActions({
 
         <div className="flex flex-wrap gap-1.5">
           <input value={nouvRes} onChange={(e) => setNouvRes(e.target.value)} placeholder="Rage, Ki, Inspiration…"
-            className="flex-1 min-w-[7rem] bg-stone-900/60 border border-yellow-800/30 rounded px-2 py-1.5 text-sm text-gray-200 outline-none" />
+            className="flex-1 min-w-[7rem] bg-gray-700 border border-gray-700 rounded px-2 py-1.5 text-sm text-gray-200 outline-none" />
           <input value={nouvResMax} onChange={(e) => setNouvResMax(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="Max"
-            className="w-14 bg-stone-900/60 border border-yellow-800/30 rounded px-2 py-1.5 text-sm text-gray-200 outline-none" />
+            className="w-14 bg-gray-700 border border-gray-700 rounded px-2 py-1.5 text-sm text-gray-200 outline-none" />
           <select value={nouvRecharge} onChange={(e) => setNouvRecharge(e.target.value as RechargeRessource)}
-            className="bg-stone-900/60 border border-yellow-800/30 rounded px-1.5 py-1.5 text-xs text-gray-200 outline-none">
+            className="bg-gray-700 border border-gray-700 rounded px-1.5 py-1.5 text-xs text-gray-200 outline-none">
             {RECHARGES.map((x) => (
               <option key={x.key} value={x.key}>{x.label}</option>
             ))}
           </select>
-          <button type="button" onClick={ajouterRes} className="px-3 py-1.5 rounded bg-stone-800 border border-yellow-700/40 text-yellow-300 text-xs font-bold">
+          <button type="button" onClick={ajouterRes} className="px-3 py-1.5 rounded bg-gray-700 border border-gray-600 text-yellow-300 text-xs font-bold">
             Ajouter
           </button>
         </div>
@@ -187,7 +186,7 @@ export default function OngletActions({
       {/* Traits */}
       {(sheet.traits_classe.trim() || sheet.traits_espece.trim() || (sheet.historique ?? '').trim()) && (
         <section>
-          <p className="text-xs uppercase tracking-widest text-yellow-600 mb-1.5">Traits</p>
+          <p className="text-xs uppercase tracking-widest text-yellow-500 mb-1.5">Traits</p>
           <ul className="space-y-1">
             {sheet.traits_classe.trim() && (
               <LigneDepliable nom="Traits de classe" ouvert={ouvert === 'tr:classe'} onToggle={() => bascule('tr:classe')}

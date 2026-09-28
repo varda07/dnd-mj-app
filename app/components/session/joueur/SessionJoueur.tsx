@@ -26,6 +26,8 @@ import { useCombatEngine } from '@/app/lib/combat-engine'
 import { logSessionEvent } from '@/app/lib/session-live'
 import LanceurDesSession, { BoutonDes } from '@/app/components/session/LanceurDesSession'
 import GuidedTour from '@/app/components/GuidedTour'
+import Spinner from '@/app/components/Spinner'
+import EmptyState from '@/app/components/ui/EmptyState'
 import { useSessionJoueur } from './useSessionJoueur'
 import RoueJoueur, { PETALES, type PetaleKey } from './RoueJoueur'
 import OngletFiche from './OngletFiche'
@@ -87,8 +89,8 @@ export default function SessionJoueur({
 
   if (api.loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0e0b06' }}>
-        <p className="text-stone-400 text-sm italic">Chargement de ta fiche…</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <Spinner size="lg" label="Chargement de ta fiche…" />
       </div>
     )
   }
@@ -111,9 +113,11 @@ export default function SessionJoueur({
     }
     if (!api.sheet) {
       return (
-        <p className="text-stone-500 text-sm italic text-center py-8">
-          Aucun personnage sélectionné pour cette session.
-        </p>
+        <EmptyState
+          icon="🎭"
+          title="Aucun personnage"
+          message="Aucun personnage n'est sélectionné pour cette session."
+        />
       )
     }
     if (menu === 'competences') return <OngletFiche sheet={api.sheet} api={api} roll={roll} />
@@ -123,11 +127,10 @@ export default function SessionJoueur({
   }
 
   return (
-    <div className="h-[100dvh] flex flex-col lg:flex-row overflow-hidden" style={{ background: '#0e0b06' }}>
+    <div className="h-[100dvh] flex flex-col lg:flex-row overflow-hidden bg-gray-900">
       {/* --- Colonne gauche (PC) / bas d'écran (mobile) : menu + roue --- */}
       <aside
-        className="order-2 lg:order-1 flex flex-col min-h-0 lg:w-[300px] lg:flex-shrink-0 lg:border-r"
-        style={{ borderColor: 'rgba(201,168,76,0.18)' }}
+        className="order-2 lg:order-1 flex flex-col min-h-0 lg:w-[300px] lg:flex-shrink-0 lg:border-r border-gray-700"
       >
         {/* Bandeau d'états (les PV, eux, ne vivent que dans l'arc de la roue) */}
         <div className="flex items-center gap-1.5 px-3 py-1 flex-wrap flex-shrink-0">
@@ -137,8 +140,10 @@ export default function SessionJoueur({
               🌀 {api.concentration}
             </span>
           )}
+          {/* Pastilles d'état : même classe que le cockpit MJ (.combatmj-cond-pill),
+              pour que MJ et joueur nomment le même état de la même façon. */}
           {api.conditions.map((c) => (
-            <span key={c} className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-900/30 border border-red-800/40 text-red-200">
+            <span key={c} className="combatmj-cond-pill">
               {CONDITIONS_MAP[c as keyof typeof CONDITIONS_MAP]?.nom ?? c}
             </span>
           ))}
@@ -147,12 +152,11 @@ export default function SessionJoueur({
         {/* Menu du pétale actif */}
         {menu && (
           <div className="flex flex-col min-h-0 flex-1 max-h-[62vh] lg:max-h-none">
-            <div className="flex items-center gap-2 px-3 py-1.5 flex-shrink-0 border-y"
-              style={{ borderColor: 'rgba(201,168,76,0.18)' }}>
-              <h2 className="flex-1 text-sm font-bold" style={{ color: '#C9A84C', fontFamily: 'Georgia, serif' }}>
+            <div className="flex items-center gap-2 px-3 py-1.5 flex-shrink-0 border-y border-gray-700">
+              <h2 className="grim-h2 flex-1 text-sm">
                 {titreMenu}
               </h2>
-              <button type="button" onClick={() => setMenu(null)} className="text-stone-500 hover:text-stone-300 text-lg leading-none" aria-label="Fermer le menu">
+              <button type="button" onClick={() => setMenu(null)} className="text-gray-500 hover:text-gray-300 text-lg leading-none" aria-label="Fermer le menu">
                 ✕
               </button>
             </div>
@@ -197,8 +201,7 @@ export default function SessionJoueur({
 
       {/* --- Colonne droite (PC) : ordre des tours, journal, dés --- */}
       <aside
-        className="hidden lg:flex order-3 w-[200px] flex-shrink-0 flex-col min-h-0 border-l px-2 py-3 gap-3"
-        style={{ borderColor: 'rgba(201,168,76,0.18)' }}
+        className="hidden lg:flex order-3 w-[200px] flex-shrink-0 flex-col min-h-0 border-l px-2 py-3 gap-3 border-gray-700"
       >
         <div className="flex-shrink-0 max-h-[40%] flex flex-col min-h-0">
           <TimelineInitiative
@@ -216,14 +219,22 @@ export default function SessionJoueur({
         </div>
       </aside>
 
-      {/* Toast du dernier jet local */}
+      {/* Dernier jet local — habillé avec les classes .codex-toast de l'app.
+          Le comportement est volontairement conservé : il reste affiché jusqu'au
+          clic (on ne veut pas qu'un résultat de dé disparaisse tout seul en
+          pleine partie), là où `toast.*` se referme après quelques secondes. */}
       {jet && (
-        <button type="button" onClick={() => setJet(null)}
-          className="fixed top-3 left-1/2 -translate-x-1/2 z-[120] rounded-full px-4 py-1.5 shadow-lg border text-sm"
-          style={{ background: '#15110a', borderColor: 'rgba(201,168,76,0.5)' }}>
-          <span className="text-stone-300">{jet.detail} = </span>
-          <span className="text-yellow-100 font-bold text-base">{jet.total}</span>
-        </button>
+        <div className="codex-toast-stack" role="status" aria-live="polite">
+          <div className="codex-toast codex-toast-info">
+            <span className="codex-toast-icon" aria-hidden>🎲</span>
+            <span className="codex-toast-body">
+              {jet.detail} = <b className="text-yellow-100 text-base">{jet.total}</b>
+            </span>
+            <button type="button" className="codex-toast-close" onClick={() => setJet(null)} aria-label="Fermer">
+              ✕
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Tutoriel guidé du poste joueur (bouton 🎓, auto à la première partie) */}

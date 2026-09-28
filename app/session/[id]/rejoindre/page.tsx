@@ -13,6 +13,8 @@ export const dynamic = 'force-dynamic'
 // ============================================================================
 
 import { useCallback, useEffect, useState } from 'react'
+import Spinner from '@/app/components/Spinner'
+import { DiceFabIcon } from '@/app/components/DiceFabIcon'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { fetchSession, joinSession, type GameSession } from '@/app/lib/session'
@@ -140,45 +142,31 @@ export default function RejoindreSessionPage() {
   }
 
   return (
-    <main
-      className="min-h-screen flex items-center justify-center p-4"
-      style={{ background: '#0e0b06' }}
-    >
-      <div
-        className="w-full max-w-md rounded-2xl border p-6 shadow-2xl"
-        style={{
-          background:
-            'linear-gradient(160deg, rgba(30,22,8,0.95) 0%, rgba(14,11,6,0.98) 100%)',
-          borderColor: 'rgba(201,168,76,0.35)'
-        }}
-      >
+    <main className="min-h-screen flex items-center justify-center p-4 bg-gray-900">
+      <div className="w-full max-w-md rounded-2xl border border-gray-700 bg-gray-800 p-6 shadow-2xl">
         <div className="text-center mb-4">
-          <div className="text-4xl mb-2">🎲</div>
-          <h1
-            className="text-2xl font-bold"
-            style={{ color: '#C9A84C', fontFamily: 'Georgia, serif' }}
-          >
+          <div className="mb-2 flex justify-center"><DiceFabIcon taille={44} /></div>
+          <h1 className="grim-title text-2xl">
             Rejoindre la session
           </h1>
         </div>
 
         {phase === 'loading' && (
-          <p className="text-center text-stone-400 text-sm italic py-8">
-            Chargement…
+          <p className="text-center py-8">
+            <Spinner label="Chargement…" />
           </p>
         )}
 
         {phase === 'auth' && (
           <div className="space-y-4 text-center">
-            <p className="text-stone-300 text-sm">
+            <p className="text-gray-300 text-sm">
               Connecte-toi ou crée un compte pour rejoindre la partie — tu
               reviendras directement ici.
             </p>
             <button
               type="button"
               onClick={() => router.push('/')}
-              className="w-full py-3 rounded-lg font-bold text-gray-900"
-              style={{ background: '#C9A84C' }}
+              className="w-full py-3 rounded-lg font-bold text-gray-900 bg-yellow-500"
             >
               Se connecter / Créer un compte
             </button>
@@ -191,7 +179,7 @@ export default function RejoindreSessionPage() {
             <button
               type="button"
               onClick={() => router.push('/dashboard')}
-              className="w-full py-2.5 rounded-lg font-bold border border-yellow-700/50 text-yellow-200"
+              className="w-full py-2.5 rounded-lg font-bold border border-gray-600 text-yellow-200"
             >
               Retour au tableau de bord
             </button>
@@ -207,7 +195,7 @@ export default function RejoindreSessionPage() {
 
         {phase === 'code' && (
           <div className="space-y-4">
-            <p className="text-center text-stone-300 text-sm">
+            <p className="text-center text-gray-300 text-sm">
               Tu n&apos;es pas encore inscrit·e à ce scénario. Saisis le code
               d&apos;invitation transmis par ton MJ.
             </p>
@@ -216,22 +204,21 @@ export default function RejoindreSessionPage() {
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="CODE"
-              className="w-full text-center tracking-[0.3em] font-mono font-bold text-lg rounded-lg bg-black/40 border border-stone-700 focus:border-amber-500 px-3 py-3 text-yellow-200 outline-none"
+              className="w-full text-center tracking-[0.3em] font-mono font-bold text-lg rounded-lg bg-black/40 border border-gray-700 px-3 py-3 text-yellow-200 outline-none"
             />
             {erreur && <p className="text-red-300 text-sm text-center">{erreur}</p>}
             <button
               type="button"
               onClick={validerCode}
               disabled={enCours || code.trim().length === 0}
-              className="w-full py-3 rounded-lg font-bold text-gray-900 disabled:opacity-60"
-              style={{ background: '#C9A84C' }}
+              className="w-full py-3 rounded-lg font-bold text-gray-900 bg-yellow-500 disabled:opacity-60"
             >
               {enCours ? 'Vérification…' : "Valider le code"}
             </button>
             <button
               type="button"
               onClick={() => router.push('/dashboard/personnages')}
-              className="w-full text-xs text-yellow-400/80 hover:text-yellow-300 underline"
+              className="w-full text-xs text-yellow-500 hover:text-yellow-300 underline"
             >
               ➕ Créer un personnage
             </button>
@@ -240,24 +227,24 @@ export default function RejoindreSessionPage() {
 
         {phase === 'ready' && (
           <div className="space-y-4">
-            <p className="text-center text-stone-300 text-sm">
+            <p className="text-center text-gray-300 text-sm">
               Rejoindre{' '}
               <span className="text-yellow-200 font-bold">
                 {scenarioNom ? `« ${scenarioNom} »` : 'la partie'}
               </span>
               {session?.title ? (
-                <span className="block text-stone-500 text-xs mt-0.5">
+                <span className="block text-gray-500 text-xs mt-0.5">
                   {session.title}
                 </span>
               ) : null}
             </p>
 
             <div>
-              <p className="text-stone-400 text-xs uppercase tracking-widest mb-2">
+              <p className="text-gray-400 text-xs uppercase tracking-widest mb-2">
                 Ton personnage
               </p>
               {persos.length === 0 ? (
-                <p className="text-stone-500 text-sm italic">
+                <p className="text-gray-500 text-sm italic">
                   Tu n&apos;as pas encore de personnage. Tu peux rejoindre maintenant
                   et en créer un ensuite.
                 </p>
@@ -270,10 +257,8 @@ export default function RejoindreSessionPage() {
                         key={p.id}
                         type="button"
                         onClick={() => setChoixPjId(selected ? null : p.id)}
-                        className={`w-full flex items-center gap-3 rounded-lg border px-3 py-2 text-left transition-all ${
-                          selected
-                            ? 'border-amber-400 bg-amber-900/30'
-                            : 'border-stone-700 hover:border-amber-700/60 bg-stone-900/40'
+                        className={`grim-card grim-card-hover w-full flex items-center gap-3 px-3 py-2 text-left ${
+                          selected ? 'is-active' : ''
                         }`}
                       >
                         {p.image_url ? (
@@ -281,10 +266,10 @@ export default function RejoindreSessionPage() {
                           <img
                             src={p.image_url}
                             alt={p.nom}
-                            className="w-10 h-10 rounded-full object-cover ring-1 ring-yellow-700/50"
+                            className="w-10 h-10 rounded-full object-cover ring-1 ring-yellow-500"
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-full bg-stone-800 flex items-center justify-center text-yellow-500 font-bold">
+                          <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-yellow-500 font-bold">
                             {p.nom.slice(0, 2).toUpperCase()}
                           </div>
                         )}
@@ -292,13 +277,13 @@ export default function RejoindreSessionPage() {
                           <p className="text-yellow-100 font-bold text-sm truncate">
                             {p.nom}
                           </p>
-                          <p className="text-stone-400 text-xs">
+                          <p className="text-gray-400 text-xs">
                             {[p.classe, p.niveau ? `Niv. ${p.niveau}` : null]
                               .filter(Boolean)
                               .join(' · ') || '—'}
                           </p>
                         </div>
-                        {selected && <span className="text-amber-400 text-lg">✓</span>}
+                        {selected && <span className="text-yellow-500 text-lg">✓</span>}
                       </button>
                     )
                   })}
@@ -307,7 +292,7 @@ export default function RejoindreSessionPage() {
               <button
                 type="button"
                 onClick={() => router.push('/dashboard/personnages')}
-                className="mt-2 text-xs text-yellow-400/80 hover:text-yellow-300 underline"
+                className="mt-2 text-xs text-yellow-500 hover:text-yellow-300 underline"
               >
                 ➕ Créer un nouveau personnage
               </button>
@@ -319,8 +304,7 @@ export default function RejoindreSessionPage() {
               type="button"
               onClick={rejoindre}
               disabled={enCours}
-              className="w-full py-3 rounded-lg font-bold text-gray-900 disabled:opacity-60"
-              style={{ background: '#C9A84C' }}
+              className="w-full py-3 rounded-lg font-bold text-gray-900 bg-yellow-500 disabled:opacity-60"
             >
               {enCours
                 ? 'Connexion à la partie…'

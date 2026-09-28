@@ -175,30 +175,30 @@ export default function OngletNotes({
     <div className="space-y-4">
       {/* Objectif en cours */}
       <section>
-        <p className="text-xs uppercase tracking-widest text-yellow-600 mb-1.5">Objectif en cours</p>
+        <p className="text-xs uppercase tracking-widest text-yellow-500 mb-1.5">Objectif en cours</p>
         {objectif ? (
-          <div className="rounded-xl border p-3" style={{ borderColor: 'rgba(201,168,76,0.3)', background: 'rgba(0,0,0,0.3)' }}>
+          <div className="grim-card p-3">
             <p className="text-yellow-100 font-bold text-sm" style={{ fontFamily: 'Georgia, serif' }}>{objectif.titre}</p>
             {objectif.contenu && (
-              <p className="text-stone-400 text-xs mt-1 whitespace-pre-wrap line-clamp-6">{objectif.contenu}</p>
+              <p className="text-gray-400 text-xs mt-1 whitespace-pre-wrap line-clamp-6">{objectif.contenu}</p>
             )}
           </div>
         ) : (
-          <p className="text-stone-500 text-sm italic">Le MJ n’a pas encore fixé de cap.</p>
+          <p className="text-gray-500 text-sm italic">Le MJ n’a pas encore fixé de cap.</p>
         )}
       </section>
 
       {/* Notes personnelles */}
       <section>
-        <p className="text-xs uppercase tracking-widest text-yellow-600 mb-1.5">Mes notes</p>
+        <p className="text-xs uppercase tracking-widest text-yellow-500 mb-1.5">Mes notes</p>
         <textarea
           value={notes}
           onChange={(e) => majNotes(e.target.value)}
           disabled={statut === 'indisponible' || statut === 'chargement'}
           placeholder="Noms croisés, indices, promesses faites…"
-          className="w-full h-40 bg-stone-900/60 border border-yellow-800/30 rounded-lg p-2.5 text-sm text-gray-200 outline-none resize-y leading-relaxed disabled:opacity-60"
+          className="w-full h-40 bg-gray-700 border border-gray-700 rounded-lg p-2.5 text-sm text-gray-200 outline-none resize-y leading-relaxed disabled:opacity-60"
         />
-        <p className="text-stone-600 text-[11px] mt-1">{legende[statut]}</p>
+        <p className="text-gray-500 text-[11px] mt-1">{legende[statut]}</p>
       </section>
 
       {/* Journal de séance en direct */}

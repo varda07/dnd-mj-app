@@ -13,6 +13,7 @@ export const dynamic = 'force-dynamic'
 // ============================================================================
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import Spinner from '@/app/components/Spinner'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import {
@@ -170,20 +171,20 @@ export default function LobbyJoueurPage() {
   if (phase === 'loading') {
     return (
       <Shell>
-        <p className="text-stone-400 text-sm italic">Connexion à la session…</p>
+        <Spinner size="lg" label="Connexion à la session…" />
       </Shell>
     )
   }
   if (phase === 'refuse') {
     return (
       <Shell>
-        <p className="text-stone-300 text-sm text-center">
+        <p className="text-gray-300 text-sm text-center">
           Cette session est terminée.
         </p>
         <button
           type="button"
           onClick={() => router.push('/dashboard')}
-          className="mt-4 px-4 py-2 rounded-lg font-bold border border-yellow-700/50 text-yellow-200"
+          className="mt-4 px-4 py-2 rounded-lg font-bold border border-gray-600 text-yellow-200"
         >
           Retour à l&apos;accueil
         </button>
@@ -211,37 +212,33 @@ export default function LobbyJoueurPage() {
     <Shell>
       <div className="w-full max-w-md">
         <header className="text-center mb-5">
-          <p className="text-stone-500 text-xs uppercase tracking-[0.25em]">
+          <p className="text-gray-500 text-xs uppercase tracking-[0.25em]">
             {enPartie ? 'En partie' : "Salle d'attente"}
           </p>
-          <h1
-            className="text-xl font-bold mt-1"
-            style={{ color: '#C9A84C', fontFamily: 'Georgia, serif' }}
-          >
+          <h1 className="grim-title text-xl mt-1">
             {session?.title || scenarioNom || 'Session'}
           </h1>
           {scenarioNom && session?.title ? (
-            <p className="text-stone-400 text-sm">{scenarioNom}</p>
+            <p className="text-gray-400 text-sm">{scenarioNom}</p>
           ) : null}
         </header>
 
         {/* Sélection du personnage */}
         <div
-          className="rounded-2xl border p-4 mb-4"
-          style={{ background: '#15110a', borderColor: 'rgba(201,168,76,0.35)' }}
+          className="rounded-2xl border border-gray-700 bg-gray-800 p-4 mb-4"
         >
-          <p className="text-stone-400 text-xs uppercase tracking-widest mb-2">
+          <p className="text-gray-400 text-xs uppercase tracking-widest mb-2">
             Ton personnage
           </p>
           {persos.length === 0 ? (
             <div className="text-center py-2">
-              <p className="text-stone-500 text-sm italic mb-2">
+              <p className="text-gray-500 text-sm italic mb-2">
                 Tu n&apos;as pas encore de personnage pour ce scénario.
               </p>
               <button
                 type="button"
                 onClick={() => router.push('/dashboard/personnages')}
-                className="text-xs text-yellow-400/80 hover:text-yellow-300 underline"
+                className="text-xs text-yellow-500 hover:text-yellow-300 underline"
               >
                 ➕ Créer un personnage
               </button>
@@ -256,10 +253,8 @@ export default function LobbyJoueurPage() {
                     type="button"
                     disabled={busy || enPartie}
                     onClick={() => choisirPerso(p.id)}
-                    className={`w-full flex items-center gap-3 rounded-lg border px-3 py-2 text-left transition-all disabled:opacity-70 ${
-                      sel
-                        ? 'border-amber-400 bg-amber-900/30'
-                        : 'border-stone-700 hover:border-amber-700/60 bg-stone-900/40'
+                    className={`grim-card grim-card-hover w-full flex items-center gap-3 px-3 py-2 text-left disabled:opacity-70 ${
+                      sel ? 'is-active' : ''
                     }`}
                   >
                     {p.image_url ? (
@@ -267,22 +262,22 @@ export default function LobbyJoueurPage() {
                       <img
                         src={p.image_url}
                         alt={p.nom}
-                        className="w-11 h-11 rounded-full object-cover ring-1 ring-yellow-700/50"
+                        className="w-11 h-11 rounded-full object-cover ring-1 ring-yellow-500"
                       />
                     ) : (
-                      <div className="w-11 h-11 rounded-full bg-stone-800 flex items-center justify-center text-yellow-500 font-bold">
+                      <div className="w-11 h-11 rounded-full bg-gray-700 flex items-center justify-center text-yellow-500 font-bold">
                         {p.nom.slice(0, 2).toUpperCase()}
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-yellow-100 font-bold text-sm truncate">{p.nom}</p>
-                      <p className="text-stone-400 text-xs">
+                      <p className="text-gray-400 text-xs">
                         {[p.classe, p.niveau ? `Niv. ${p.niveau}` : null]
                           .filter(Boolean)
                           .join(' · ') || '—'}
                       </p>
                     </div>
-                    {sel && <span className="text-amber-400 text-lg">✓</span>}
+                    {sel && <span className="text-yellow-500 text-lg">✓</span>}
                   </button>
                 )
               })}
@@ -294,7 +289,7 @@ export default function LobbyJoueurPage() {
         {persoActif && (
           <div
             className="rounded-2xl border p-4 mb-4 grid grid-cols-3 gap-2 text-center"
-            style={{ background: 'rgba(0,0,0,0.3)', borderColor: 'rgba(201,168,76,0.2)' }}
+            style={{ background: 'rgba(0,0,0,0.3)', borderColor: 'color-mix(in srgb, var(--theme-accent, #C9A84C) 20%, transparent)' }}
           >
             <Stat label="PV" value={`${persoActif.hp_actuel ?? '—'} / ${persoActif.hp_max ?? '—'}`} />
             <Stat label="CA" value={persoActif.ca ?? '—'} />
@@ -309,7 +304,7 @@ export default function LobbyJoueurPage() {
             style={{ borderColor: 'rgba(34,197,94,0.4)', background: 'rgba(34,197,94,0.08)' }}
           >
             <p className="text-green-300 font-bold">🟢 La partie a commencé</p>
-            <p className="text-stone-400 text-xs mt-1">
+            <p className="text-gray-400 text-xs mt-1">
               Ton poste de jeu s’ouvre : la roue du personnage arrive.
             </p>
           </div>
@@ -321,7 +316,7 @@ export default function LobbyJoueurPage() {
             className={`w-full py-3 rounded-lg font-bold transition disabled:opacity-60 ${
               pret
                 ? 'bg-green-600 text-white hover:brightness-110'
-                : 'bg-[#C9A84C] text-gray-900 hover:brightness-110'
+                : 'bg-yellow-500 text-gray-900 hover:brightness-110'
             }`}
           >
             {pret ? '✓ Je suis prêt·e' : 'Je suis prêt·e'}
@@ -329,7 +324,7 @@ export default function LobbyJoueurPage() {
         )}
 
         {!enPartie && (
-          <p className="text-center text-stone-500 text-xs mt-3 italic">
+          <p className="text-center text-gray-500 text-xs mt-3 italic">
             En attente du MJ pour démarrer la partie…
           </p>
         )}
@@ -337,7 +332,7 @@ export default function LobbyJoueurPage() {
         {/* Autres joueurs connectés */}
         {autres.length > 0 && (
           <div className="mt-4">
-            <p className="text-stone-500 text-[11px] uppercase tracking-widest mb-1 text-center">
+            <p className="text-gray-500 text-[11px] uppercase tracking-widest mb-1 text-center">
               À la table
             </p>
             <div className="flex flex-wrap justify-center gap-1.5">
@@ -345,7 +340,7 @@ export default function LobbyJoueurPage() {
                 <span
                   key={p.user_id}
                   className="inline-flex items-center gap-1 text-xs rounded-full px-2 py-0.5 border"
-                  style={{ borderColor: 'rgba(201,168,76,0.2)', background: 'rgba(0,0,0,0.25)' }}
+                  style={{ borderColor: 'color-mix(in srgb, var(--theme-accent, #C9A84C) 20%, transparent)', background: 'rgba(0,0,0,0.25)' }}
                 >
                   <span
                     className="w-1.5 h-1.5 rounded-full"
@@ -365,7 +360,7 @@ export default function LobbyJoueurPage() {
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div>
-      <p className="text-stone-500 text-[10px] uppercase tracking-widest">{label}</p>
+      <p className="text-gray-500 text-[10px] uppercase tracking-widest">{label}</p>
       <p className="text-yellow-100 font-bold text-sm mt-0.5">{value}</p>
     </div>
   )
@@ -373,10 +368,7 @@ function Stat({ label, value }: { label: string; value: string | number }) {
 
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <main
-      className="min-h-screen flex flex-col items-center justify-center p-4"
-      style={{ background: '#0e0b06' }}
-    >
+    <main className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-900">
       {children}
     </main>
   )

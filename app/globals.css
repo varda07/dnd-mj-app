@@ -1814,6 +1814,19 @@ html[data-theme="eclipsed"] ::-webkit-scrollbar-thumb:hover {
      n'influence pas la mise en page. */
   top: -1px;
 }
+/* Variante sélectionnée — reprend la grammaire « is-active » déjà utilisée par
+   .grimoire-pill et .grimoire-tab (fond accent ~10 %, bordure accent ~35 %),
+   avec en plus le filet gauche porté à l'or plein, signature de .grim-card.
+   Aucune couleur nouvelle : tout dérive de var(--theme-accent). */
+.grim-card.is-active {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--theme-accent, #C9A84C) 10%, transparent) 0%,
+    color-mix(in srgb, var(--theme-accent, #C9A84C) 4%, transparent) 100%
+  );
+  border-color: color-mix(in srgb, var(--theme-accent, #C9A84C) 35%, transparent);
+  border-left-color: var(--theme-accent, #C9A84C);
+}
 /* Bouton grimoire : filet or fin, transparent, hover doré */
 .grim-btn {
   background: transparent;

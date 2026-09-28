@@ -12,6 +12,7 @@
 //   · Notes      — notes de séance et notes secrètes du scénario.
 // ============================================================================
 
+import EmptyState from '@/app/components/ui/EmptyState'
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import ElementsScenarioPanel from '@/app/components/presentation/ElementsScenarioPanel'
@@ -120,7 +121,7 @@ export default function ZoneTravailMJ({
   if (vue === 'lieux' || vue === 'pnj') {
     return (
       <div className="space-y-2">
-        <h2 className="text-xs uppercase tracking-widest text-yellow-600">
+        <h2 className="codex-section-title codex-section-title-left">
           Contenu lié — clic sur une image pour la diffuser
         </h2>
         <ElementsScenarioPanel
@@ -135,17 +136,17 @@ export default function ZoneTravailMJ({
   if (vue === 'rencontres') {
     return (
       <div className="space-y-2 max-w-2xl">
-        <h2 className="text-xs uppercase tracking-widest text-yellow-600">Rencontres préparées</h2>
+        <h2 className="codex-section-title codex-section-title-left">Rencontres préparées</h2>
         {rencontres.length === 0 ? (
-          <p className="text-stone-500 text-sm italic">Aucune rencontre préparée pour ce scénario.</p>
+          <EmptyState icon="⚔️" title="Aucune rencontre préparée" message="Prépare une rencontre depuis le Codex pour la lancer d'un clic ici." />
         ) : (
           <ul className="space-y-1.5">
             {rencontres.map((cp) => (
-              <li key={cp.id} className="flex items-center gap-2 rounded-lg border border-yellow-800/25 bg-stone-900/40 px-3 py-2">
+              <li key={cp.id} className="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-700 px-3 py-2">
                 <span className="flex-1 min-w-0 text-yellow-100 text-sm truncate">⚔️ {cp.nom}</span>
-                <span className="text-stone-500 text-xs">{cp.participants?.length ?? 0} participants</span>
+                <span className="text-gray-500 text-xs">{cp.participants?.length ?? 0} participants</span>
                 <button type="button" onClick={() => onLancerRencontre(cp)}
-                  className="px-2.5 py-1 rounded bg-[#C9A84C] text-gray-900 text-xs font-bold">▶ Lancer</button>
+                  className="px-2.5 py-1 rounded bg-yellow-500 text-gray-900 text-xs font-bold">▶ Lancer</button>
               </li>
             ))}
           </ul>
@@ -157,20 +158,20 @@ export default function ZoneTravailMJ({
   if (vue === 'notes') {
     return (
       <div className="space-y-3 max-w-2xl">
-        <h2 className="text-xs uppercase tracking-widest text-yellow-600">Notes</h2>
+        <h2 className="codex-section-title codex-section-title-left">Notes</h2>
         {notesSecretes.trim() && (
-          <p className="text-stone-300 text-sm whitespace-pre-wrap rounded-lg border border-yellow-800/20 bg-stone-900/30 p-2.5">
+          <p className="text-gray-300 text-sm whitespace-pre-wrap rounded-lg border border-gray-700 bg-gray-700 p-2.5">
             {notesSecretes}
           </p>
         )}
         {notes.length === 0 && !notesSecretes.trim() ? (
-          <p className="text-stone-500 text-sm italic">Aucune note pour ce scénario.</p>
+          <EmptyState icon="📜" title="Aucune note" message="Ce scénario n'a pas encore de note." />
         ) : (
           <ul className="space-y-1">
             {notes.map((n, i) => (
-              <li key={n.id ?? i} className="rounded border border-yellow-800/15 bg-stone-900/30 px-2.5 py-1.5">
+              <li key={n.id ?? i} className="rounded border border-gray-700 bg-gray-700 px-2.5 py-1.5">
                 <p className="text-yellow-100 text-sm font-medium">{n.titre || 'Note'}</p>
-                {n.contenu && <p className="text-stone-400 text-xs whitespace-pre-wrap">{n.contenu}</p>}
+                {n.contenu && <p className="text-gray-400 text-xs whitespace-pre-wrap">{n.contenu}</p>}
               </li>
             ))}
           </ul>
@@ -183,49 +184,49 @@ export default function ZoneTravailMJ({
   return (
     <div className="space-y-4 max-w-3xl">
       <section>
-        <h2 className="text-xs uppercase tracking-widest text-yellow-600 mb-1.5">Ce que voient les joueurs</h2>
-        <div className="rounded-xl border p-3 space-y-2" style={{ borderColor: 'rgba(201,168,76,0.25)', background: 'rgba(0,0,0,0.3)' }}>
+        <h2 className="codex-section-title codex-section-title-left">Ce que voient les joueurs</h2>
+        <div className="grim-card p-3 space-y-2">
           {etat?.broadcast_image_url ? (
             <div className="flex items-start gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={etat.broadcast_image_url} alt="" className="max-h-40 rounded border border-yellow-800/30" />
+              <img src={etat.broadcast_image_url} alt="" className="max-h-40 rounded border border-gray-700" />
               <button type="button" onClick={() => onPatchState({ broadcast_image_url: null })}
                 className="text-red-300 text-xs underline flex-shrink-0">Retirer</button>
             </div>
           ) : (
-            <p className="text-stone-600 text-xs italic">Aucune image diffusée.</p>
+            <p className="text-gray-500 text-xs italic">Aucune image diffusée.</p>
           )}
           {etat?.broadcast_text ? (
             <div className="flex items-start gap-2">
-              <p className="flex-1 text-stone-200 text-sm whitespace-pre-wrap" style={{ fontFamily: 'Georgia, serif' }}>
+              <p className="flex-1 text-gray-200 text-sm whitespace-pre-wrap" style={{ fontFamily: 'Georgia, serif' }}>
                 {etat.broadcast_text}
               </p>
               <button type="button" onClick={() => onPatchState({ broadcast_text: null })}
                 className="text-red-300 text-xs underline flex-shrink-0">Effacer</button>
             </div>
           ) : (
-            <p className="text-stone-600 text-xs italic">Aucune narration diffusée.</p>
+            <p className="text-gray-500 text-xs italic">Aucune narration diffusée.</p>
           )}
           {etat?.ambient_sound?.piste ? (
             <div className="flex items-center gap-2">
-              <p className="flex-1 text-stone-400 text-xs truncate">🎵 {etat.ambient_sound.piste}</p>
+              <p className="flex-1 text-gray-400 text-xs truncate">🎵 {etat.ambient_sound.piste}</p>
               <button type="button" onClick={() => onPatchState({ ambient_sound: null })}
                 className="text-red-300 text-xs underline flex-shrink-0">Stop</button>
             </div>
           ) : (
-            <p className="text-stone-600 text-xs italic">Aucune ambiance sonore.</p>
+            <p className="text-gray-500 text-xs italic">Aucune ambiance sonore.</p>
           )}
         </div>
       </section>
 
       <section>
-        <h2 className="text-xs uppercase tracking-widest text-yellow-600 mb-1.5">
+        <h2 className="codex-section-title codex-section-title-left">
           {chapitre ? chapitre.titre : 'Chapitre'}
         </h2>
         {chapitre?.contenu ? (
-          <p className="text-stone-300 text-sm whitespace-pre-wrap leading-relaxed">{chapitre.contenu}</p>
+          <p className="text-gray-300 text-sm whitespace-pre-wrap leading-relaxed">{chapitre.contenu}</p>
         ) : (
-          <p className="text-stone-500 text-sm italic">
+          <p className="text-gray-500 text-sm italic">
             Sélectionne un chapitre à gauche, ou marque-le comme chapitre courant avec l’étoile.
           </p>
         )}

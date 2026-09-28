@@ -51,6 +51,20 @@ export function etatQualitatif(hp: number, hpMax: number): EtatQualitatif {
   return { label: 'Mourant', couleur: '#f87171' }
 }
 
+/**
+ * Couleur d'une jauge de PV — SOURCE UNIQUE pour toute l'application.
+ *
+ * Dérivée de `etatQualitatif` : mêmes seuils (75 / 50 / 25 %), mêmes teintes.
+ * Avant la refonte visuelle du mode session, trois barèmes cohabitaient — la
+ * roue du joueur (seuils 2/3 et 1/3, ambre #f59e0b et rouge #ef4444), le
+ * panneau « Ma table » du MJ (seuil 25 %), et `etatQualitatif` lui-même. Un
+ * même personnage pouvait donc s'afficher « vert » côté joueur et « orange »
+ * côté MJ. Tout passe désormais ici.
+ */
+export function couleurPv(hp: number, hpMax: number): string {
+  return etatQualitatif(hp, hpMax).couleur
+}
+
 // Tire une initiative (d20) pour tous les participants et trie décroissant.
 export function rollInitiative(
   personnages: Persona[],

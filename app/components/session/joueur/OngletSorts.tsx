@@ -10,6 +10,7 @@
 // Les ronds se consomment de DROITE à GAUCHE (cf. PastillesUsage).
 // ============================================================================
 
+import EmptyState from '@/app/components/ui/EmptyState'
 import { useState } from 'react'
 import type { CharacterSheet, SortJoue } from '@/app/lib/session-live'
 import type { SessionJoueurApi } from './useSessionJoueur'
@@ -65,15 +66,15 @@ export default function OngletSorts({
     <div className="space-y-4">
       {/* Emplacements de sorts — une rangée de ronds par niveau, en tête */}
       {niveauxSlots.length > 0 && (
-        <section className="rounded-xl border p-2.5" style={{ borderColor: 'rgba(201,168,76,0.25)', background: 'rgba(0,0,0,0.3)' }}>
-          <p className="text-xs uppercase tracking-widest text-yellow-600 mb-2">Emplacements de sorts</p>
+        <section className="grim-card p-2.5">
+          <p className="text-xs uppercase tracking-widest text-yellow-500 mb-2">Emplacements de sorts</p>
           <div className="space-y-1.5">
             {niveauxSlots.map((lvl) => {
               const max = slotMax(lvl)
               const used = slotUsed(lvl)
               return (
                 <div key={lvl} className="flex items-center gap-2">
-                  <span className="text-xs text-stone-300 w-16 flex-shrink-0">Niveau {lvl}</span>
+                  <span className="text-xs text-gray-300 w-16 flex-shrink-0">Niveau {lvl}</span>
                   <PastillesUsage
                     max={max}
                     used={used}
@@ -81,7 +82,7 @@ export default function OngletSorts({
                     onConsommer={() => void api.consommerSlot(lvl)}
                     onRestituer={() => void api.restaurerSlot(lvl)}
                   />
-                  <span className="ml-auto text-[11px] text-stone-500">{max - used}/{max}</span>
+                  <span className="ml-auto text-[11px] text-gray-500">{max - used}/{max}</span>
                 </div>
               )
             })}
@@ -101,7 +102,7 @@ export default function OngletSorts({
 
       {/* Liste des sorts par niveau */}
       {spells.length === 0 ? (
-        <p className="text-stone-500 text-sm italic">Aucun sort connu.</p>
+        <EmptyState icon="✨" title="Aucun sort connu" message="Ta fiche ne comporte encore aucun sort." />
       ) : (
         niveaux.map((lvl) => (
           <section key={lvl}>
@@ -122,7 +123,7 @@ export default function OngletSorts({
                     onToggle={() => setOuvert((o) => (o === cle ? null : cle))}
                     description={s.description ?? 'Aucune description.'}
                     contenu={
-                      <div className="grid grid-cols-2 gap-1 text-[11px] text-stone-500">
+                      <div className="grid grid-cols-2 gap-1 text-[11px] text-gray-500">
                         <span>⏱ {s.temps_incantation ?? '—'}</span>
                         <span>🎯 {s.portee ?? '—'}</span>
                         <span>⏳ {s.duree ?? '—'}</span>

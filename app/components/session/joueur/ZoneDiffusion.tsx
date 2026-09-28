@@ -88,15 +88,15 @@ export default function ZoneDiffusion({
           <img
             src={img}
             alt="Scène diffusée par le MJ"
-            className="w-full rounded-xl border border-yellow-800/30 object-contain bg-black/40 max-h-[38vh] lg:max-h-[52vh]"
+            className="w-full rounded-xl border border-gray-700 object-contain bg-black/40 max-h-[38vh] lg:max-h-[52vh]"
           />
         </button>
       )}
 
       {/* Narration diffusée */}
       {texte && (
-        <div className="rounded-xl border p-3" style={{ borderColor: 'rgba(201,168,76,0.3)', background: 'rgba(0,0,0,0.3)' }}>
-          <p className="text-stone-200 text-sm whitespace-pre-wrap leading-relaxed" style={{ fontFamily: 'Georgia, serif' }}>
+        <div className="grim-card p-3">
+          <p className="text-gray-200 text-sm whitespace-pre-wrap leading-relaxed" style={{ fontFamily: 'Georgia, serif' }}>
             {texte}
           </p>
         </div>
@@ -107,7 +107,7 @@ export default function ZoneDiffusion({
 
       {/* Jamais vide : à défaut de diffusion, le journal de table en direct */}
       {rienDeDiffuse && (
-        <div className="flex-1 min-h-0 rounded-xl border p-2.5" style={{ borderColor: 'rgba(201,168,76,0.2)', background: 'rgba(0,0,0,0.25)' }}>
+        <div className="flex-1 min-h-0 grim-card p-2.5">
           <JournalTable sessionId={sessionId} userId={userId} titre="Journal de table" />
         </div>
       )}
@@ -122,7 +122,7 @@ export default function ZoneDiffusion({
           <button
             type="button"
             onClick={() => void demanderFinDeTour(sessionId, characterId, characterNom)}
-            className="w-full py-3 rounded-lg font-bold text-gray-900 bg-[#C9A84C] hover:brightness-110"
+            className="w-full py-3 rounded-lg font-bold text-gray-900 bg-yellow-500 hover:brightness-110"
           >
             ✔ Fin de mon tour
           </button>

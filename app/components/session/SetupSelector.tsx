@@ -60,18 +60,16 @@ export default function SetupSelector({
             key={s.key}
             type="button"
             onClick={() => onChange(s.key)}
-            className={`text-left rounded-lg border px-3 py-2.5 transition-all ${
-              selected
-                ? 'border-amber-400 bg-amber-900/25'
-                : 'border-stone-700 hover:border-amber-700/60 bg-stone-900/40'
+            className={`grim-card grim-card-hover text-left px-3 py-2.5 ${
+              selected ? 'is-active' : ''
             }`}
           >
             <div className="flex items-center gap-2">
               <span className="text-lg">{s.icon}</span>
               <span className="font-bold text-yellow-100 text-sm">{s.titre}</span>
-              {selected && <span className="ml-auto text-amber-400">✓</span>}
+              {selected && <span className="ml-auto text-yellow-500">✓</span>}
             </div>
-            <p className="text-stone-400 text-xs mt-1 leading-snug">{s.desc}</p>
+            <p className="text-gray-400 text-xs mt-1 leading-snug">{s.desc}</p>
           </button>
         )
       })}

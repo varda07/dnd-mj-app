@@ -67,17 +67,17 @@ export default function LecteurAmbiance({ son }: { son: AmbientSound }) {
 
   return (
     <div className="flex items-center gap-2 rounded-lg border px-2.5 py-1.5"
-      style={{ borderColor: 'rgba(201,168,76,0.25)', background: 'rgba(0,0,0,0.3)' }}>
+      style={{ borderColor: 'color-mix(in srgb, var(--theme-accent, #C9A84C) 25%, transparent)', background: 'rgba(0,0,0,0.3)' }}>
       <audio ref={ref} src={piste} loop preload="auto" />
       <span className="text-sm" aria-hidden>🎵</span>
-      <span className="text-[11px] text-stone-400 flex-1 min-w-0 truncate">
+      <span className="text-[11px] text-gray-400 flex-1 min-w-0 truncate">
         {bloque ? 'Ambiance prête' : enLecture ? 'Ambiance en cours' : 'Ambiance en pause'}
       </span>
       {bloque ? (
         <button
           type="button"
           onClick={() => void tenterLecture()}
-          className="px-2 py-1 rounded bg-[#C9A84C] text-gray-900 text-[11px] font-bold flex-shrink-0"
+          className="px-2 py-1 rounded bg-yellow-500 text-gray-900 text-[11px] font-bold flex-shrink-0"
         >
           🔊 Activer l’ambiance
         </button>

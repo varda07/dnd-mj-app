@@ -49,13 +49,13 @@ export default function OngletFiche({
         <MiniStat label="Vitesse" value={`${sheet.vitesse}`} />
         <MiniStat label="Maîtrise" value={formatMod(bm)} />
       </div>
-      <p className="text-center text-xs text-stone-500">
+      <p className="text-center text-xs text-gray-500">
         Dés de vie : {sheet.de_vie ?? '—'} ({Math.max(0, sheet.niveau - sheet.de_vie_utilises)}/{sheet.niveau} dispo)
       </p>
 
       {/* Caractéristiques */}
       <section>
-        <p className="text-xs uppercase tracking-widest text-yellow-600 mb-1.5">Caractéristiques</p>
+        <p className="text-xs uppercase tracking-widest text-yellow-500 mb-1.5">Caractéristiques</p>
         <ul className="space-y-1">
           {STATS.map((s) => {
             const val = sheet[s.key as StatKey] as number
@@ -79,7 +79,7 @@ export default function OngletFiche({
 
       {/* Jets de sauvegarde */}
       <section>
-        <p className="text-xs uppercase tracking-widest text-yellow-600 mb-1.5">Jets de sauvegarde</p>
+        <p className="text-xs uppercase tracking-widest text-yellow-500 mb-1.5">Jets de sauvegarde</p>
         <ul className="space-y-1">
           {STATS.map((s) => {
             const mod = modifier(sheet[s.key as StatKey] as number)
@@ -104,7 +104,7 @@ export default function OngletFiche({
 
       {/* Compétences */}
       <section>
-        <p className="text-xs uppercase tracking-widest text-yellow-600 mb-1.5">Compétences</p>
+        <p className="text-xs uppercase tracking-widest text-yellow-500 mb-1.5">Compétences</p>
         <ul className="space-y-1">
           {COMPETENCES.map((c) => {
             const mod = modifier(sheet[c.stat] as number)
@@ -138,15 +138,15 @@ export default function OngletFiche({
 function MiniStat({ label, value, onClick }: { label: string; value: string | number; onClick?: () => void }) {
   const inner = (
     <>
-      <span className="block text-[10px] uppercase text-yellow-600">{label}</span>
+      <span className="block text-[10px] uppercase text-yellow-500">{label}</span>
       <span className="block text-yellow-100 font-bold">{value}</span>
     </>
   )
   return onClick ? (
-    <button type="button" onClick={onClick} className="rounded-lg border border-yellow-800/30 bg-stone-900/40 py-1.5 hover:border-yellow-600 transition">
+    <button type="button" onClick={onClick} className="rounded-lg border border-gray-700 bg-gray-700 py-1.5 hover:border-gray-600 transition">
       {inner}
     </button>
   ) : (
-    <div className="rounded-lg border border-yellow-800/20 bg-stone-900/40 py-1.5">{inner}</div>
+    <div className="rounded-lg border border-gray-700 bg-gray-700 py-1.5">{inner}</div>
   )
 }

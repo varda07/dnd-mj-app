@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic'
 // ============================================================================
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import Spinner from '@/app/components/Spinner'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import {
@@ -140,7 +141,7 @@ export default function LobbyMJPage() {
   if (phase === 'loading') {
     return (
       <Shell>
-        <p className="text-stone-400 text-sm italic">Chargement du lobby…</p>
+        <Spinner size="lg" label="Chargement du lobby…" />
       </Shell>
     )
   }
@@ -153,7 +154,7 @@ export default function LobbyMJPage() {
         <button
           type="button"
           onClick={() => router.push('/dashboard/scenarios')}
-          className="mt-4 px-4 py-2 rounded-lg font-bold border border-yellow-700/50 text-yellow-200"
+          className="mt-4 px-4 py-2 rounded-lg font-bold border border-gray-600 text-yellow-200"
         >
           Retour aux scénarios
         </button>
@@ -195,33 +196,27 @@ export default function LobbyMJPage() {
     <Shell>
       <div className="w-full max-w-2xl">
         <header className="text-center mb-5">
-          <p className="text-stone-500 text-xs uppercase tracking-[0.25em]">
+          <p className="text-gray-500 text-xs uppercase tracking-[0.25em]">
             {statutLabel(session?.status)}
           </p>
-          <h1
-            className="text-2xl font-bold mt-1"
-            style={{ color: '#C9A84C', fontFamily: 'Georgia, serif' }}
-          >
+          <h1 className="grim-title text-2xl mt-1">
             {session?.title || `Session — ${scenarioNom}`}
           </h1>
-          <p className="text-stone-400 text-sm mt-1">
+          <p className="text-gray-400 text-sm mt-1">
             {scenarioNom}
             {session?.setup_mode ? ` · ${SETUP_LABEL[session.setup_mode]}` : ''}
           </p>
         </header>
 
-        <div
-          className="rounded-2xl border p-4"
-          style={{ background: '#15110a', borderColor: 'rgba(201,168,76,0.35)' }}
-        >
+        <div className="rounded-2xl border border-gray-700 bg-gray-800 p-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-[#C9A84C]">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-yellow-500">
               Joueurs ({nbConnectes}/{attendus.length} en ligne)
             </h2>
           </div>
 
           {attendus.length === 0 ? (
-            <p className="text-stone-500 text-sm italic py-4 text-center">
+            <p className="text-gray-500 text-sm italic py-4 text-center">
               Aucun joueur inscrit à ce scénario. Invite des joueurs depuis la
               fiche du scénario — ils recevront une notification.
             </p>
@@ -232,7 +227,7 @@ export default function LobbyMJPage() {
                   key={r.joueur_id}
                   className="flex items-center gap-3 rounded-lg border px-3 py-2"
                   style={{
-                    borderColor: 'rgba(201,168,76,0.15)',
+                    borderColor: 'color-mix(in srgb, var(--theme-accent, #C9A84C) 15%, transparent)',
                     background: 'rgba(0,0,0,0.25)'
                   }}
                 >
@@ -245,7 +240,7 @@ export default function LobbyMJPage() {
                     <p className="text-yellow-100 font-bold text-sm truncate">
                       {r.username}
                     </p>
-                    <p className="text-stone-400 text-xs truncate">
+                    <p className="text-gray-400 text-xs truncate">
                       {r.persoNom
                         ? `🎭 ${r.persoNom}`
                         : r.aRejoint
@@ -258,7 +253,7 @@ export default function LobbyMJPage() {
                       ✓ Prêt
                     </span>
                   ) : r.aRejoint ? (
-                    <span className="text-stone-500 text-xs flex-shrink-0">
+                    <span className="text-gray-500 text-xs flex-shrink-0">
                       En attente
                     </span>
                   ) : null}
@@ -275,7 +270,7 @@ export default function LobbyMJPage() {
               type="button"
               onClick={demarrer}
               disabled={busy}
-              className="px-6 py-3 rounded-lg font-bold text-gray-900 bg-[#C9A84C] hover:brightness-110 disabled:opacity-60"
+              className="px-6 py-3 rounded-lg font-bold text-gray-900 bg-yellow-500 hover:brightness-110 disabled:opacity-60"
             >
               ▶ Démarrer la partie
             </button>
@@ -287,7 +282,7 @@ export default function LobbyMJPage() {
                 style={{ borderColor: 'rgba(34,197,94,0.4)', background: 'rgba(34,197,94,0.08)' }}
               >
                 <p className="text-green-300 text-sm font-bold">🟢 Partie en cours</p>
-                <p className="text-stone-400 text-xs">
+                <p className="text-gray-400 text-xs">
                   Le cockpit MJ s’ouvre : préparation, zone de travail et Ma table.
                 </p>
               </div>
@@ -295,7 +290,7 @@ export default function LobbyMJPage() {
                 type="button"
                 onClick={() => changerStatut('paused')}
                 disabled={busy}
-                className="px-4 py-2.5 rounded-lg font-bold border border-yellow-700/50 text-yellow-200 disabled:opacity-60"
+                className="px-4 py-2.5 rounded-lg font-bold border border-gray-600 text-yellow-200 disabled:opacity-60"
               >
                 ⏸ Pause
               </button>
@@ -306,7 +301,7 @@ export default function LobbyMJPage() {
               type="button"
               onClick={() => changerStatut('active')}
               disabled={busy}
-              className="px-4 py-2.5 rounded-lg font-bold text-gray-900 bg-[#C9A84C] hover:brightness-110 disabled:opacity-60"
+              className="px-4 py-2.5 rounded-lg font-bold text-gray-900 bg-yellow-500 hover:brightness-110 disabled:opacity-60"
             >
               ▶ Reprendre
             </button>
@@ -332,7 +327,7 @@ export default function LobbyMJPage() {
                 if (confirm('Annuler la session ?')) void changerStatut('ended')
               }}
               disabled={busy}
-              className="px-4 py-2.5 rounded-lg font-bold border border-stone-700 text-stone-400 hover:text-stone-200 disabled:opacity-60"
+              className="px-4 py-2.5 rounded-lg font-bold border border-gray-700 text-gray-400 hover:text-gray-200 disabled:opacity-60"
             >
               Annuler
             </button>
@@ -345,10 +340,7 @@ export default function LobbyMJPage() {
 
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <main
-      className="min-h-screen flex flex-col items-center justify-center p-4"
-      style={{ background: '#0e0b06' }}
-    >
+    <main className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-900">
       {children}
     </main>
   )

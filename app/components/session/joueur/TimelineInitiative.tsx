@@ -27,8 +27,8 @@ export default function TimelineInitiative({
   if (!combat?.actif || !combat.ordre_initiative?.length) {
     return (
       <div>
-        {titre && <p className="text-[10px] uppercase tracking-widest text-yellow-600 mb-1.5">{titre}</p>}
-        <p className="text-stone-500 text-xs italic">Aucun combat en cours.</p>
+        {titre && <p className="text-[10px] uppercase tracking-widest text-yellow-500 mb-1.5">{titre}</p>}
+        <p className="text-gray-500 text-xs italic">Aucun combat en cours.</p>
       </div>
     )
   }
@@ -40,11 +40,13 @@ export default function TimelineInitiative({
   return (
     <div className="min-h-0 flex flex-col">
       {titre && (
-        <p className="text-[10px] uppercase tracking-widest text-yellow-600 mb-1.5 flex-shrink-0">
+        <p className="text-[10px] uppercase tracking-widest text-yellow-500 mb-1.5 flex-shrink-0">
           {titre} · round {combat.round}
         </p>
       )}
-      <ul className="space-y-1 overflow-y-auto min-h-0">
+      {/* Mêmes classes que la vue combat joueurs (.combatj-row) : rail or en
+          inset sur le tour courant, filet de séparation or à 8 %. */}
+      <ul className="overflow-y-auto min-h-0">
         {ordre.map((e, i) => {
           const id = resolveEntiteId(e)
           const estMoi = !!characterId && id === characterId
@@ -55,23 +57,21 @@ export default function TimelineInitiative({
           return (
             <li
               key={e.piece_id ?? `${e.nom}-${i}`}
-              className={`flex items-center gap-1.5 rounded border px-2 py-1 text-xs ${
-                actuel
-                  ? 'border-amber-400 bg-amber-900/25 text-yellow-100'
-                  : 'border-yellow-800/15 bg-stone-900/30 text-stone-300'
-              } ${i < combat.tour_actuel ? 'opacity-55' : ''}`}
+              className={`combatj-row text-xs ${actuel ? 'is-turn' : ''} ${
+                i < combat.tour_actuel ? 'opacity-55' : ''
+              }`}
             >
-              <span className="w-6 text-right font-bold text-yellow-600 flex-shrink-0">{e.init ?? '—'}</span>
-              <span className="flex-1 min-w-0 truncate">
+              <span className="w-6 text-right font-bold text-yellow-500 flex-shrink-0">{e.init ?? '—'}</span>
+              <span className="combatj-row-nom flex-1 min-w-0 truncate">
                 {e.kind === 'ennemi' ? e.nom : e.nom}
-                {estMoi && <span className="text-amber-300"> (toi)</span>}
+                {estMoi && <span className="text-yellow-300"> (toi)</span>}
               </span>
               {etat ? (
                 <span className="text-[10px] flex-shrink-0" style={{ color: etat.couleur }} title={etat.label}>
                   ● {etat.label}
                 </span>
               ) : perso ? (
-                <span className="text-[10px] text-stone-500 flex-shrink-0">
+                <span className="text-[10px] text-gray-500 flex-shrink-0">
                   {perso.hp_actuel}/{perso.hp_max}
                 </span>
               ) : null}

@@ -84,7 +84,7 @@ export default function PanneauPreparation({
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="🔎 Rechercher…"
-        className="flex-shrink-0 w-full bg-stone-900/60 border border-yellow-800/30 rounded px-2 py-1 text-xs text-gray-200 outline-none mb-2"
+        className="flex-shrink-0 w-full bg-gray-700 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 outline-none mb-2"
       />
 
       <div className="flex-1 min-h-0 overflow-y-auto space-y-1 pr-0.5">
@@ -107,7 +107,7 @@ export default function PanneauPreparation({
                     type="button"
                     onClick={() => onSelectChapitre(c.id)}
                     className={`flex-1 min-w-0 text-left text-[11px] px-1.5 py-1 rounded truncate ${
-                      chapitreSel === c.id ? 'bg-stone-800 text-yellow-100' : 'text-stone-400 hover:text-yellow-200'
+                      chapitreSel === c.id ? 'bg-gray-700 text-yellow-100' : 'text-gray-400 hover:text-yellow-200'
                     }`}
                   >
                     {courant ? '★ ' : ''}
@@ -118,7 +118,7 @@ export default function PanneauPreparation({
                     onClick={() => onMarquerChapitre(courant ? null : c.id)}
                     title={courant ? 'Chapitre courant — cliquer pour retirer' : 'Marquer comme chapitre courant'}
                     className={`flex-shrink-0 text-[10px] px-1 py-0.5 rounded ${
-                      courant ? 'bg-amber-500 text-gray-900' : 'border border-yellow-800/40 text-yellow-500'
+                      courant ? 'bg-yellow-500 text-gray-900' : 'border border-gray-700 text-yellow-500'
                     }`}
                   >
                     ★
@@ -149,11 +149,11 @@ export default function PanneauPreparation({
                   type="button"
                   onClick={() => onLancerRencontre(cp)}
                   title="Lancer cette rencontre en combat"
-                  className="w-full flex items-center gap-1 text-left text-[11px] px-1.5 py-1 rounded text-stone-400 hover:text-yellow-200 hover:bg-stone-800"
+                  className="w-full flex items-center gap-1 text-left text-[11px] px-1.5 py-1 rounded text-gray-400 hover:text-yellow-200 hover:bg-gray-700"
                 >
                   <span className="flex-1 min-w-0 truncate">{cp.nom}</span>
-                  <span className="text-stone-600">{cp.participants?.length ?? 0}</span>
-                  <span className="text-amber-400">▶</span>
+                  <span className="text-gray-500">{cp.participants?.length ?? 0}</span>
+                  <span className="text-yellow-500">▶</span>
                 </button>
               </li>
             ))}
@@ -195,13 +195,13 @@ function Entree({
       onClick={onClick}
       className={`w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-bold border ${
         actif
-          ? 'border-amber-500/50 bg-stone-900/70 text-yellow-100'
-          : 'border-transparent text-stone-400 hover:text-yellow-200 hover:bg-stone-900/40'
+          ? 'border-gray-600 bg-gray-700 text-yellow-100'
+          : 'border-transparent text-gray-400 hover:text-yellow-200 hover:bg-gray-700'
       }`}
     >
       <span aria-hidden>{icone}</span>
       <span className="flex-1 min-w-0 truncate text-left">{label}</span>
-      <span className={`text-[10px] px-1 rounded ${alerte ? 'bg-red-800/60 text-red-100' : 'text-stone-600'}`}>
+      <span className={`text-[10px] px-1 rounded ${alerte ? 'bg-red-800/60 text-red-100' : 'text-gray-500'}`}>
         {compteur}
       </span>
     </button>
@@ -209,5 +209,5 @@ function Entree({
 }
 
 function SousVide({ texte }: { texte: string }) {
-  return <li className="text-[11px] text-stone-600 italic px-1.5 py-1">{texte}</li>
+  return <li className="text-[11px] text-gray-500 italic px-1.5 py-1">{texte}</li>
 }

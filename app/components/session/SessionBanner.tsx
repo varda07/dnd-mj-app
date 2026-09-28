@@ -81,17 +81,17 @@ export default function SessionBanner() {
             className="flex items-center gap-3 rounded-xl border px-3 py-2.5 shadow-lg"
             style={{
               background:
-                'linear-gradient(120deg, rgba(201,168,76,0.16) 0%, rgba(30,22,8,0.85) 60%)',
-              borderColor: 'rgba(201,168,76,0.5)'
+                'linear-gradient(120deg, color-mix(in srgb, var(--theme-accent, #C9A84C) 16%, transparent) 0%, var(--theme-bg-card, #12141a) 60%)',
+              borderColor: 'color-mix(in srgb, var(--theme-accent, #C9A84C) 50%, transparent)'
             }}
           >
             <span className="text-2xl flex-shrink-0">🎲</span>
             <div className="flex-1 min-w-0">
               <p className="text-yellow-100 font-bold text-sm truncate">
                 {s.mj_nom} a lancé{' '}
-                <span className="text-[#C9A84C]">« {s.scenario_nom} »</span>
+                <span className="text-yellow-500">« {s.scenario_nom} »</span>
               </p>
-              <p className="text-stone-400 text-xs truncate">
+              <p className="text-gray-400 text-xs truncate">
                 {s.title || 'Session de jeu'}
                 {s.status === 'lobby'
                   ? ' — Salle d’attente ouverte'
@@ -109,7 +109,7 @@ export default function SessionBanner() {
                     : `/session/${s.session_id}/rejoindre`
                 )
               }
-              className="flex-shrink-0 px-4 py-2 rounded-lg font-bold text-gray-900 bg-[#C9A84C] hover:brightness-110 transition text-sm"
+              className="flex-shrink-0 px-4 py-2 rounded-lg font-bold text-gray-900 bg-yellow-500 hover:brightness-110 transition text-sm"
             >
               {enCours ? '▶ Reprendre' : '➜ Rejoindre'}
             </button>
@@ -118,7 +118,7 @@ export default function SessionBanner() {
               onClick={() =>
                 setMasquees((m) => new Set(m).add(s.session_id))
               }
-              className="flex-shrink-0 text-stone-500 hover:text-stone-300 text-sm"
+              className="flex-shrink-0 text-gray-500 hover:text-gray-300 text-sm"
               aria-label="Masquer"
               title="Masquer"
             >

@@ -8,12 +8,16 @@
 // les points de vie ne sont plus affichés qu'ICI, par l'arc du pourtour.
 //
 //   · centre  : demi-disque portrait + nom + PV / CA — appui ⇒ panneau PV
-//   · arc     : jauge de PV sur le pourtour extérieur, vert / ambre / rouge / gris
+//   · arc     : jauge de PV sur le pourtour extérieur — couleur fournie par
+//               couleurPv() (app/lib/combat-engine), source unique partagée
+//               avec les barres de PV du cockpit MJ et du mode présentation
 //   · pétales : Compétences · Sorts · Notes · Actions · Sac (gauche → droite)
 //
 // Tout est en SVG à viewBox fixe : la roue se met à l'échelle de son conteneur,
 // donc un seul composant sert le mobile et le PC (aucune seconde arborescence).
 // ============================================================================
+
+import { couleurPv } from '@/app/lib/combat-engine'
 
 export type PetaleKey = 'competences' | 'sorts' | 'notes' | 'actions' | 'sac'
 
@@ -46,14 +50,11 @@ function secteur(a1: number, a2: number): string {
   return `M ${x1} ${y1} A ${R_OUT} ${R_OUT} 0 0 1 ${x2} ${y2} L ${x3} ${y3} A ${R_IN} ${R_IN} 0 0 0 ${x4} ${y4} Z`
 }
 
-/** Couleur de la jauge de PV — vert > 2/3, ambre 1/3‥2/3, rouge < 1/3, gris à 0. */
-export function couleurPv(hp: number, hpMax: number): string {
-  if (hp <= 0 || hpMax <= 0) return '#6b7280'
-  const r = hp / hpMax
-  if (r > 2 / 3) return '#4ade80'
-  if (r > 1 / 3) return '#f59e0b'
-  return '#ef4444'
-}
+// La couleur de la jauge de PV vient désormais de `app/lib/combat-engine`
+// (source unique, mêmes seuils et mêmes teintes que les barres de PV du
+// cockpit MJ et du mode présentation). Ré-exportée ici pour les composants de
+// la roue qui l'importaient déjà par ce chemin.
+export { couleurPv }
 
 const PAS = 180 / PETALES.length // 36° par pétale
 
@@ -88,10 +89,14 @@ export default function RoueJoueur({
   return (
     <div className="roue-joueur relative w-full select-none" style={{ maxWidth: 420, margin: '0 auto' }}>
       <svg viewBox="0 0 320 172" width="100%" preserveAspectRatio="xMidYMax meet" style={{ display: 'block', overflow: 'visible' }}>
+        {/* ⚠ Les couleurs thémées passent par `style`, JAMAIS par l'attribut de
+            présentation (`fill="var(…)"`) : la substitution de var() / color-mix()
+            dans un attribut de présentation SVG n'est pas fiable selon les
+            moteurs, alors qu'elle l'est dans une déclaration CSS. */}
         <defs>
           <linearGradient id="roue-fond" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#1c1710" />
-            <stop offset="100%" stopColor="#0e0b06" />
+            <stop offset="0%" style={{ stopColor: 'var(--theme-bg-card, #12141a)' }} />
+            <stop offset="100%" style={{ stopColor: 'var(--theme-bg-primary, #0a0b0d)' }} />
           </linearGradient>
         </defs>
 
@@ -99,11 +104,17 @@ export default function RoueJoueur({
         <path
           d={`M ${CX - R_OUT} ${CY} A ${R_OUT} ${R_OUT} 0 0 1 ${CX + R_OUT} ${CY} Z`}
           fill="url(#roue-fond)"
-          stroke="rgba(201,168,76,0.18)"
+          style={{ stroke: 'color-mix(in srgb, var(--theme-accent, #C9A84C) 18%, transparent)' }}
         />
 
         {/* Jauge de PV — piste puis remplissage proportionnel */}
-        <path d={cheminArc} fill="none" stroke="rgba(87,83,78,0.5)" strokeWidth={9} strokeLinecap="round" />
+        <path
+          d={cheminArc}
+          fill="none"
+          style={{ stroke: 'color-mix(in srgb, var(--theme-text-secondary, #6a6a72) 55%, transparent)' }}
+          strokeWidth={9}
+          strokeLinecap="round"
+        />
         <path
           d={cheminArc}
           fill="none"
@@ -142,10 +153,16 @@ export default function RoueJoueur({
             >
               <path
                 d={secteur(a1, a2)}
-                fill={estActif ? 'rgba(201,168,76,0.28)' : 'rgba(28,23,16,0.95)'}
-                stroke={estActif ? '#C9A84C' : 'rgba(201,168,76,0.22)'}
                 strokeWidth={estActif ? 2 : 1}
-                style={{ transition: 'fill 180ms ease' }}
+                style={{
+                  transition: 'fill 180ms ease',
+                  fill: estActif
+                    ? 'color-mix(in srgb, var(--theme-accent, #C9A84C) 28%, transparent)'
+                    : 'var(--theme-bg-secondary, #0f1115)',
+                  stroke: estActif
+                    ? 'var(--theme-accent, #C9A84C)'
+                    : 'color-mix(in srgb, var(--theme-accent, #C9A84C) 22%, transparent)'
+                }}
               />
               {/* Mobile : l'intitulé complet tient dans l'arc. */}
               <text
@@ -156,8 +173,13 @@ export default function RoueJoueur({
                 dominantBaseline="central"
                 fontSize={10}
                 fontWeight={estActif ? 700 : 500}
-                fill={estActif ? '#fef3c7' : '#d6d3d1'}
-                style={{ fontFamily: 'Georgia, serif', pointerEvents: 'none' }}
+                style={{
+                  fontFamily: 'Georgia, serif',
+                  pointerEvents: 'none',
+                  fill: estActif
+                    ? 'var(--theme-text-primary, #e8e8ec)'
+                    : 'color-mix(in srgb, var(--theme-text-primary, #e8e8ec) 65%, transparent)'
+                }}
               >
                 {p.label}
               </text>
@@ -173,8 +195,12 @@ export default function RoueJoueur({
                   dominantBaseline="central"
                   fontSize={10}
                   fontWeight={estActif ? 700 : 500}
-                  fill={estActif ? '#fef3c7' : '#a8a29e'}
-                  style={{ fontFamily: 'Georgia, serif' }}
+                  style={{
+                    fontFamily: 'Georgia, serif',
+                    fill: estActif
+                      ? 'var(--theme-text-primary, #e8e8ec)'
+                      : 'color-mix(in srgb, var(--theme-text-primary, #e8e8ec) 65%, transparent)'
+                  }}
                 >
                   {p.court}
                 </text>
@@ -187,7 +213,7 @@ export default function RoueJoueur({
         <path
           d={`M ${CX - R_IN} ${CY} A ${R_IN} ${R_IN} 0 0 1 ${CX + R_IN} ${CY} Z`}
           fill="none"
-          stroke="rgba(201,168,76,0.4)"
+          style={{ stroke: 'color-mix(in srgb, var(--theme-accent, #C9A84C) 40%, transparent)' }}
           strokeWidth={1.5}
         />
       </svg>
@@ -217,7 +243,7 @@ export default function RoueJoueur({
             src={imageUrl}
             alt={nom}
             className="rounded-full object-cover"
-            style={{ width: '44%', aspectRatio: '1 / 1', border: '1.5px solid rgba(201,168,76,0.55)' }}
+            style={{ width: '44%', aspectRatio: '1 / 1', border: '1.5px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 55%, transparent)' }}
           />
         ) : (
           <span
@@ -225,8 +251,8 @@ export default function RoueJoueur({
             style={{
               width: '44%',
               aspectRatio: '1 / 1',
-              background: '#231c12',
-              border: '1.5px solid rgba(201,168,76,0.55)',
+              background: 'var(--theme-bg-card, #12141a)',
+              border: '1.5px solid color-mix(in srgb, var(--theme-accent, #C9A84C) 55%, transparent)',
               fontSize: '0.8rem'
             }}
           >
@@ -240,11 +266,11 @@ export default function RoueJoueur({
           </span>
           <span
             className="text-[11px] font-bold truncate"
-            style={{ color: '#fef3c7', fontFamily: 'Georgia, serif', maxWidth: '55%' }}
+            style={{ color: 'var(--theme-accent, #C9A84C)', fontFamily: 'Georgia, serif', maxWidth: '55%' }}
           >
             {nom}
           </span>
-          <span className="text-[10px] text-stone-400 font-bold">CA {ca}</span>
+          <span className="text-[10px] text-gray-400 font-bold">CA {ca}</span>
         </span>
       </button>
     </div>

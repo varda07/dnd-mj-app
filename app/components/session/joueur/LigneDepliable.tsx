@@ -38,9 +38,9 @@ export default function LigneDepliable({
 }) {
   return (
     <li
-      className={`rounded-lg border overflow-hidden ${
-        ouvert ? 'border-amber-500/50 bg-amber-900/10' : 'border-yellow-800/20 bg-stone-900/30'
-      } ${attenue ? 'opacity-60' : ''}`}
+      className={`grim-card overflow-hidden ${ouvert ? 'is-active' : ''} ${
+        attenue ? 'opacity-60' : ''
+      }`}
     >
       <button
         type="button"
@@ -48,27 +48,27 @@ export default function LigneDepliable({
         aria-expanded={ouvert}
         className="w-full flex items-center gap-2 px-2.5 py-2 text-left"
       >
-        <span className="flex-1 min-w-0 text-sm text-stone-200 truncate">{nom}</span>
+        <span className="flex-1 min-w-0 text-sm text-gray-200 truncate">{nom}</span>
         {accessoire}
         {valeur !== undefined && valeur !== null && (
           <span className="text-yellow-100 font-bold text-sm flex-shrink-0">{valeur}</span>
         )}
-        <span className={`text-stone-600 text-xs flex-shrink-0 ${ouvert ? 'rotate-180' : ''}`} aria-hidden>
+        <span className={`text-gray-500 text-xs flex-shrink-0 ${ouvert ? 'rotate-180' : ''}`} aria-hidden>
           ▾
         </span>
       </button>
 
       {ouvert && (
-        <div className="px-2.5 pb-2.5 pt-0.5 space-y-2 border-t border-yellow-800/15">
+        <div className="px-2.5 pb-2.5 pt-0.5 space-y-2 border-t border-gray-700">
           {description && (
-            <p className="text-stone-400 text-xs leading-relaxed whitespace-pre-wrap">{description}</p>
+            <p className="text-gray-400 text-xs leading-relaxed whitespace-pre-wrap">{description}</p>
           )}
           {contenu}
           {formule && onLancer && (
             <button
               type="button"
               onClick={onLancer}
-              className="w-full py-2 rounded-lg font-bold text-sm text-gray-900 bg-[#C9A84C] hover:brightness-110 active:scale-[0.98] transition"
+              className="w-full py-2 rounded-lg font-bold text-sm text-gray-900 bg-yellow-500 hover:brightness-110 active:scale-[0.98] transition"
             >
               🎲 Lancer {formule}
             </button>

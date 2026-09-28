@@ -173,44 +173,46 @@ export default function SessionMJ({
   }
 
   return (
-    <div className="h-[100dvh] flex flex-col overflow-hidden" style={{ background: '#0e0b06' }}>
+    <div className="h-[100dvh] flex flex-col overflow-hidden bg-gray-900">
       {/* Barre de session */}
-      <header className="flex-shrink-0 px-3 py-1.5 border-b flex items-center gap-2 flex-wrap"
-        style={{ borderColor: 'rgba(201,168,76,0.25)', background: 'rgba(14,11,6,0.95)' }}>
+      {/* `theme-no-deco` : surface structurelle (barre de session) — opt-out
+          documenté du traitement premium, qui poserait bordure animée et
+          ornements de coins sur un simple bandeau. */}
+      <header className="flex-shrink-0 px-3 py-1.5 border-b border-gray-700 bg-gray-800 theme-no-deco flex items-center gap-2 flex-wrap">
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] uppercase tracking-[0.2em] text-yellow-600 leading-none">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-yellow-500 leading-none">
             {statut === 'paused' ? 'En pause' : 'En session'} · MJ
             {session.setup_mode ? ` · ${SETUP_LABEL[session.setup_mode]}` : ''}
           </p>
-          <h1 className="text-base font-bold truncate" style={{ color: '#C9A84C', fontFamily: 'Georgia, serif' }}>
+          <h1 className="grim-h2 text-base truncate">
             {session.title || scenarioNom}
           </h1>
         </div>
 
         {/* Repos court / long (Delta C.2) */}
         <button data-tour="session-repos" type="button" disabled={busy} onClick={() => repos('court')}
-          className="px-2.5 py-1.5 rounded-lg border border-yellow-800/40 text-yellow-200 text-xs font-bold disabled:opacity-50">
+          className="px-2.5 py-1.5 rounded-lg border border-gray-700 text-yellow-200 text-xs font-bold disabled:opacity-50">
           🌤 Repos court
         </button>
         <button type="button" disabled={busy} onClick={() => repos('long')}
-          className="px-2.5 py-1.5 rounded-lg border border-yellow-800/40 text-yellow-200 text-xs font-bold disabled:opacity-50">
+          className="px-2.5 py-1.5 rounded-lg border border-gray-700 text-yellow-200 text-xs font-bold disabled:opacity-50">
           🌙 Repos long
         </button>
 
         {session.setup_mode === 'pc-tv' && (
           <a href={`/session/${sessionId}/ecran`} target="_blank" rel="noopener noreferrer"
-            className="px-2.5 py-1.5 rounded-lg border border-yellow-800/40 text-yellow-200 text-xs font-bold">
+            className="px-2.5 py-1.5 rounded-lg border border-gray-700 text-yellow-200 text-xs font-bold">
             📺 Écran TV
           </a>
         )}
         {statut === 'active' ? (
           <button type="button" disabled={busy} onClick={() => changerStatut('paused')}
-            className="px-2.5 py-1.5 rounded-lg border border-yellow-700/50 text-yellow-200 text-xs font-bold disabled:opacity-50">
+            className="px-2.5 py-1.5 rounded-lg border border-gray-600 text-yellow-200 text-xs font-bold disabled:opacity-50">
             ⏸ Pause
           </button>
         ) : (
           <button type="button" disabled={busy} onClick={() => changerStatut('active')}
-            className="px-2.5 py-1.5 rounded-lg text-gray-900 bg-[#C9A84C] text-xs font-bold disabled:opacity-50">
+            className="px-2.5 py-1.5 rounded-lg text-gray-900 bg-yellow-500 text-xs font-bold disabled:opacity-50">
             ▶ Reprendre
           </button>
         )}
@@ -222,7 +224,7 @@ export default function SessionMJ({
       </header>
 
       {msg && (
-        <p className="flex-shrink-0 px-3 py-1 text-xs text-yellow-300 border-b" style={{ borderColor: 'rgba(201,168,76,0.15)' }}>
+        <p className="flex-shrink-0 px-3 py-1 text-xs text-yellow-300 border-b" style={{ borderColor: 'color-mix(in srgb, var(--theme-accent, #C9A84C) 15%, transparent)' }}>
           {msg}
         </p>
       )}
@@ -231,8 +233,8 @@ export default function SessionMJ({
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
         {/* Gauche — Ma préparation */}
         <aside className="order-2 lg:order-1 lg:w-[200px] lg:flex-shrink-0 border-t lg:border-t-0 lg:border-r px-2 py-2 min-h-0 max-h-[35vh] lg:max-h-none overflow-hidden flex flex-col"
-          style={{ borderColor: 'rgba(201,168,76,0.18)' }}>
-          <h2 className="text-[10px] uppercase tracking-widest text-yellow-600 mb-1.5 flex-shrink-0" data-tour="session-preparation">Ma préparation</h2>
+          style={{ borderColor: 'color-mix(in srgb, var(--theme-accent, #C9A84C) 18%, transparent)' }}>
+          <h2 className="text-[10px] uppercase tracking-widest text-yellow-500 mb-1.5 flex-shrink-0" data-tour="session-preparation">Ma préparation</h2>
           <PanneauPreparation
             scenarioId={scenarioId}
             etat={etat}
@@ -249,7 +251,7 @@ export default function SessionMJ({
         {/* Centre — zone de travail + journal */}
         <main className="order-1 lg:order-2 flex-1 min-h-0 flex flex-col overflow-hidden">
           <div className="flex-shrink-0 px-3 pt-2">
-            <h2 className="text-[10px] uppercase tracking-widest text-yellow-600">{LABEL_VUE[vue]}</h2>
+            <h2 className="text-[10px] uppercase tracking-widest text-yellow-500">{LABEL_VUE[vue]}</h2>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2">
             <ZoneTravailMJ
@@ -262,9 +264,9 @@ export default function SessionMJ({
               onLancerRencontre={lancerRencontre}
             />
           </div>
-          <div className="flex-shrink-0 border-t px-3 py-1.5" style={{ borderColor: 'rgba(201,168,76,0.18)' }}>
+          <div className="flex-shrink-0 border-t px-3 py-1.5" style={{ borderColor: 'color-mix(in srgb, var(--theme-accent, #C9A84C) 18%, transparent)' }}>
             <button type="button" onClick={() => setJournalOuvert((o) => !o)}
-              className="text-[10px] uppercase tracking-widest text-yellow-600 hover:text-yellow-400">
+              className="text-[10px] uppercase tracking-widest text-yellow-500 hover:text-yellow-400">
               Journal de séance {journalOuvert ? '▾' : '▸'}
             </button>
             {journalOuvert && (
@@ -277,8 +279,8 @@ export default function SessionMJ({
 
         {/* Droite — Ma table, toujours visible */}
         <aside className="order-3 lg:w-[200px] lg:flex-shrink-0 border-t lg:border-t-0 lg:border-l px-2 py-2 min-h-0 max-h-[35vh] lg:max-h-none overflow-hidden flex flex-col"
-          style={{ borderColor: 'rgba(201,168,76,0.18)' }}>
-          <h2 className="text-[10px] uppercase tracking-widest text-yellow-600 mb-1.5 flex-shrink-0" data-tour="session-table">Ma table</h2>
+          style={{ borderColor: 'color-mix(in srgb, var(--theme-accent, #C9A84C) 18%, transparent)' }}>
+          <h2 className="text-[10px] uppercase tracking-widest text-yellow-500 mb-1.5 flex-shrink-0" data-tour="session-table">Ma table</h2>
           <div className="flex-1 min-h-0 overflow-y-auto pr-0.5">
             <PanneauTable sessionId={sessionId} />
           </div>

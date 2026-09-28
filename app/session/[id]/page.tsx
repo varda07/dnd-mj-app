@@ -48,11 +48,8 @@ export default function SessionDispatcher() {
   }, [id, router])
 
   return (
-    <main
-      className="min-h-screen flex items-center justify-center"
-      style={{ background: '#0e0b06' }}
-    >
-      <p className="text-stone-400 text-sm italic">Ouverture de la session…</p>
+    <main className="min-h-screen flex items-center justify-center bg-gray-900">
+      <p className="text-gray-400 text-sm italic">Ouverture de la session…</p>
     </main>
   )
 }

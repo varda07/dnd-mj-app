@@ -86,15 +86,15 @@ export default function JournalTable({
   return (
     <div className="h-full flex flex-col min-h-0">
       {titre && (
-        <p className="text-[10px] uppercase tracking-widest text-yellow-600 mb-1.5 flex-shrink-0">{titre}</p>
+        <p className="text-[10px] uppercase tracking-widest text-yellow-500 mb-1.5 flex-shrink-0">{titre}</p>
       )}
       {lignes.length === 0 ? (
-        <p className="text-stone-500 text-sm italic">La table est silencieuse pour l’instant.</p>
+        <p className="text-gray-500 text-sm italic">La table est silencieuse pour l’instant.</p>
       ) : (
         <ul className="space-y-1 overflow-y-auto min-h-0 flex-1">
           {lignes.map(({ e, texte }) => (
-            <li key={e.id} className="text-xs rounded border border-yellow-800/15 bg-stone-900/30 px-2 py-1 text-stone-300">
-              <span className="text-stone-600 mr-1.5">
+            <li key={e.id} className="text-xs rounded border border-gray-700 bg-gray-700 px-2 py-1 text-gray-300">
+              <span className="text-gray-500 mr-1.5">
                 {new Date(e.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
               </span>
               {texte}

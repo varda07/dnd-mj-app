@@ -70,8 +70,8 @@ export default function LancerSessionButton({
         onClick={() => setOuvert(true)}
         className={
           compact
-            ? 'text-sm font-bold px-2 py-1.5 rounded transition text-gray-900 bg-[#C9A84C] hover:brightness-110'
-            : 'inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-gray-900 bg-[#C9A84C] hover:brightness-110 transition'
+            ? 'text-sm font-bold px-2 py-1.5 rounded transition text-gray-900 bg-yellow-500 hover:brightness-110'
+            : 'inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-gray-900 bg-yellow-500 hover:brightness-110 transition'
         }
         title="Lancer une session de jeu"
       >
@@ -92,7 +92,7 @@ export default function LancerSessionButton({
               type="button"
               onClick={fermer}
               disabled={enCours}
-              className="px-4 py-2 rounded-lg text-stone-300 hover:text-white text-sm disabled:opacity-50"
+              className="px-4 py-2 rounded-lg text-gray-300 hover:text-white text-sm disabled:opacity-50"
             >
               Annuler
             </button>
@@ -100,7 +100,7 @@ export default function LancerSessionButton({
               type="button"
               onClick={lancer}
               disabled={enCours}
-              className="px-5 py-2.5 rounded-lg font-bold text-gray-900 bg-[#C9A84C] hover:brightness-110 disabled:opacity-60"
+              className="px-5 py-2.5 rounded-lg font-bold text-gray-900 bg-yellow-500 hover:brightness-110 disabled:opacity-60"
             >
               {enCours ? 'Ouverture du lobby…' : 'Ouvrir le lobby'}
             </button>
@@ -108,13 +108,13 @@ export default function LancerSessionButton({
         }
       >
         <div className="space-y-4">
-          <p className="text-stone-400 text-sm">
+          <p className="text-gray-400 text-sm">
             Scénario :{' '}
             <span className="text-yellow-200 font-bold">« {scenarioNom} »</span>
           </p>
 
           <div>
-            <label className="block text-stone-400 text-xs uppercase tracking-widest mb-1">
+            <label className="block text-gray-400 text-xs uppercase tracking-widest mb-1">
               Titre de la séance (optionnel)
             </label>
             <input
@@ -122,12 +122,12 @@ export default function LancerSessionButton({
               value={titre}
               onChange={(e) => setTitre(e.target.value)}
               placeholder="Ex. Séance 4 — Le Puits Noir"
-              className="w-full rounded-lg bg-black/40 border border-stone-700 focus:border-amber-500 px-3 py-2 text-stone-100 text-sm outline-none"
+              className="w-full rounded-lg bg-black/40 border border-gray-700 px-3 py-2 text-gray-200 text-sm outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-stone-400 text-xs uppercase tracking-widest mb-2">
+            <label className="block text-gray-400 text-xs uppercase tracking-widest mb-2">
               Setup de jeu
             </label>
             <SetupSelector value={setup} onChange={setSetup} />

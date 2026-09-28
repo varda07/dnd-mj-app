@@ -19,6 +19,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import DiceLauncher, { type DiceSessionContext } from '@/app/components/DiceLauncher'
+import { DiceFabIcon } from '@/app/components/DiceFabIcon'
 
 export function ouvrirLanceurDes(): void {
   window.dispatchEvent(new CustomEvent('dice:open'))
@@ -31,17 +32,12 @@ export function BoutonDes({ className = '', taille = 52 }: { className?: string;
       onClick={ouvrirLanceurDes}
       aria-label="Ouvrir le lanceur de dés"
       title="Lanceur de dés"
-      className={`rounded-full flex items-center justify-center flex-shrink-0 border-2 shadow-lg active:scale-95 transition ${className}`}
-      style={{
-        width: taille,
-        height: taille,
-        background: 'radial-gradient(circle at 30% 25%, #2a2114, #12100a)',
-        borderColor: 'rgba(201,168,76,0.6)'
-      }}
+      className={`dice-fab rounded-full flex items-center justify-center flex-shrink-0 shadow-lg ${className}`}
+      style={{ width: taille, height: taille }}
     >
-      <span style={{ fontSize: taille * 0.42, lineHeight: 1 }} aria-hidden>
-        🎲
-      </span>
+      {/* Même d20 que le bouton de dés du reste de l'app (bleu cobalt, « 20 »
+          gravé en or) : pas de variante propre au mode session. */}
+      <DiceFabIcon taille={Math.round(taille * 0.73)} />
     </button>
   )
 }

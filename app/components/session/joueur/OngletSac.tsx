@@ -33,17 +33,17 @@ export default function OngletSac({
   return (
     <div className="space-y-4">
       <div>
-        <p className="text-xs uppercase tracking-widest text-yellow-600 mb-2">Bourse</p>
+        <p className="text-xs uppercase tracking-widest text-yellow-500 mb-2">Bourse</p>
         <div className="grid grid-cols-5 gap-1.5">
           {MONNAIES.map((m) => (
             <div key={m.key} className="text-center">
-              <p className="text-[10px] uppercase tracking-wider text-yellow-600" title={m.long}>{m.label}</p>
+              <p className="text-[10px] uppercase tracking-wider text-yellow-500" title={m.long}>{m.label}</p>
               <input
                 value={monnaie[m.key]}
                 onChange={(e) => setPiece(m.key, parseInt(e.target.value.replace(/[^0-9]/g, ''), 10) || 0)}
                 disabled={!isOwner}
                 inputMode="numeric"
-                className="w-full mt-0.5 bg-stone-900/60 border border-yellow-800/30 rounded px-1 py-1 text-sm text-center text-yellow-100 outline-none disabled:opacity-70"
+                className="w-full mt-0.5 bg-gray-700 border border-gray-700 rounded px-1 py-1 text-sm text-center text-yellow-100 outline-none disabled:opacity-70"
               />
             </div>
           ))}
@@ -51,7 +51,7 @@ export default function OngletSac({
       </div>
 
       <div>
-        <p className="text-xs uppercase tracking-widest text-yellow-600 mb-2">Inventaire</p>
+        <p className="text-xs uppercase tracking-widest text-yellow-500 mb-2">Inventaire</p>
         <InventaireSection personnageId={sheet.id} isOwner={isOwner} />
       </div>
     </div>
